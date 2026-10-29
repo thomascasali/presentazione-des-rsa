@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cesare a chiave numerica — simulatore e sfida</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  .tabs { display: flex; gap: .4rem; margin: .5rem 0 .8rem; }
+  .tabs .btn { flex: 1; }
+  .tab-seq { display: flex; flex-wrap: wrap; gap: 4px 3px; align-items: flex-start; }
+  .tab-seq .cl { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .tab-seq .cl.sp { width: .6em; }
+  .tab-seq .c { width: 1.9em; text-align: center; font-family: var(--f-mono); font-weight: 600; font-size: 15px; padding: .2em 0; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  .tab-seq .c.k { color: var(--info-t); border-color: var(--info); background: color-mix(in srgb, var(--info) 12%, var(--bg)); }
+  .tab-seq .c.o { color: var(--accent-alt); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
+  .leg { display: flex; flex-wrap: wrap; gap: .3rem .9rem; font-size: 13px; color: var(--text-muted); }
+  .leg i { display: inline-block; width: .9em; height: .9em; border-radius: 3px; vertical-align: -1px; margin-right: .35em; border: 1px solid var(--border); }
+  .leg i.k { background: color-mix(in srgb, var(--info) 30%, var(--bg)); border-color: var(--info); }
+  .leg i.o { background: color-mix(in srgb, var(--accent) 30%, var(--bg)); border-color: var(--accent); }
+  .chiave-ed { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; }
+  .chiave-ed .num { display: flex; flex-direction: column; align-items: center; gap: .2rem; }
+  .chiave-ed .num label { font-size: 13px; color: var(--text-muted); }
+  .chiave-ed select { min-width: 4.2em; min-height: 44px; text-align: center; font-family: var(--f-mono); font-size: 1.1rem; }
+  .intercetto { font-family: var(--f-mono); font-size: 1.25rem; line-height: 1.5; letter-spacing: .04em; color: var(--accent-alt); background: #0e0c0a; border: 1px solid var(--border); border-radius: 10px; padding: .8rem 1rem; overflow-wrap: anywhere; }
+  .tentativo { font-family: var(--f-mono); font-size: 1.05rem; line-height: 1.5; color: var(--text); background: var(--bg); border: 1px dashed var(--border); border-radius: 10px; padding: .6rem 1rem; overflow-wrap: anywhere; min-height: 3.5em; }
+  .statistiche { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; text-align: center; }
+  .statistiche div { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: .4rem; }
+  .statistiche b { display: block; font-family: var(--f-mono); font-size: 1.4rem; color: var(--accent-alt); }
+  .statistiche span { font-size: .8rem; color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Btn, Field, Box, Chip, PaginaGioco } = UI;
+const C = window.Cripto, A = C.ALFABETO;
+
+/* Helper locale: Cesare a chiave numerica (serie di spostamenti). crypto.js ha solo il cifrario affine.
+   La chiave avanza solo sulle lettere A-Z / a-z; il resto si copia senza consumarla. */
+const mod26 = (n) => ((n % 26) + 26) % 26;
+const pot26 = (n) => { let r = 1n; for (let i = 0; i < n; i++) r *= 26n; return r; };   // 26^n con BigInt (senza **, che Babel trasforma in Math.pow)
+function seqTraccia(testo, chiave, decifra) {
+  const k = chiave.map(mod26); let j = 0;
+  return Array.from(String(testo)).map((ch) => {
+    const code = ch.charCodeAt(0), up = code >= 65 && code <= 90, lo = code >= 97 && code <= 122;
+    if ((!up && !lo) || !k.length) return { c: ch, lettera: false, out: ch };
+    const base = up ? 65 : 97, kk = k[j % k.length], x = code - base, y = mod26(x + (decifra ? -kk : kk));
+    j++; return { c: ch, lettera: true, k: kk, x, y, out: String.fromCharCode(base + y) };
+  });
+}
+const seq = (t, k, d) => seqTraccia(t, k, d).map(x => x.out).join('');
+const serie = (k) => k.join('-');
+
+function Tabella({ testo, chiave, decifra, max }) {
+  const tr = seqTraccia(testo, chiave, decifra).slice(0, max || 20);
+  return (
+    <div>
+      <div className="leg" aria-hidden="true"><span><i className="k" />spostamento</span><span><i />{decifra ? 'cifrato' : 'in chiaro'}</span><span><i className="o" />{decifra ? 'in chiaro' : 'cifrato'}</span></div>
+      <div className="tab-seq mt" role="img" aria-label={'Prime lettere con chiave ' + serie(chiave)}>
+        {tr.map((t, i) => t.lettera ? (
+          <div key={i} className="cl"><div className="c k">{t.k}</div><div className="c">{t.c}</div><div className="c o">{t.out}</div></div>
+        ) : <div key={i} className="cl sp" />)}
+      </div>
+    </div>
+  );
+}
+
+// Editor della chiave: un menu a tendina per ogni numero, più pulsanti per aggiungere o togliere.
+function EditorChiave({ chiave, setChiave, fissa, min, max }) {
+  const lo = min || 1, hi = max || 8;
+  const cambia = (i, v) => setChiave(chiave.map((x, p) => (p === i ? v : x)));
+  return (
+    <div className="stack">
+      <div className="chiave-ed" role="group" aria-label="Numeri della chiave">
+        {chiave.map((n, i) => (
+          <div key={i} className="num">
+            <label htmlFor={'k' + i}>n. {i + 1}</label>
+            <select id={'k' + i} className="input" value={n} onChange={e => cambia(i, +e.target.value)}>
+              {Array.from({ length: 26 }, (_, v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </div>
+        ))}
+      </div>
+      {fissa ? null : (
+        <div className="row">
+          <Btn small onClick={() => setChiave([...chiave, 0])} disabled={chiave.length >= hi}>Aggiungi un numero</Btn>
+          <Btn small onClick={() => setChiave(chiave.slice(0, -1))} disabled={chiave.length <= lo}>Togli l'ultimo</Btn>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Simulatore() {
+  const [testo, setTesto] = useState('Ci vediamo domani alle otto');
+  const [chiave, setChiaveS] = useState(() => UI.carica('seq-chiave', [3, 1, 4]));
+  const [modo, setModo] = useState('cifra');
+  const setChiave = (k) => { setChiaveS(k); UI.salva('seq-chiave', k); };
+  const decifra = modo === 'decifra';
+  const out = seq(testo, chiave, decifra);
+  return (
+    <div>
+      <p>Ogni lettera si sposta di un numero diverso, nell'ordine della chiave; finita la serie si ricomincia. Spazi e punteggiatura non consumano la chiave.</p>
+      <div className="sim">
+        <div className="sim-title">Chiave</div>
+        <EditorChiave chiave={chiave} setChiave={setChiave} />
+        <p className="small muted">Serie scelta: <span className="mono hl">{serie(chiave)}</span> · chiavi possibili con {chiave.length} {chiave.length === 1 ? 'numero' : 'numeri'}: <span className="mono">{(pot26(chiave.length)).toLocaleString('it-IT')}</span></p>
+      </div>
+      <div className="sim">
+        <div className="sim-title">Testo</div>
+        <div className="row">
+          <Btn variant={modo === 'cifra' ? 'primary' : ''} onClick={() => setModo('cifra')} aria-pressed={modo === 'cifra'}>Cifra</Btn>
+          <Btn variant={modo === 'decifra' ? 'primary' : ''} onClick={() => setModo('decifra')} aria-pressed={modo === 'decifra'}>Decifra</Btn>
+        </div>
+        <Field label="Scrivi qui" htmlFor="testo"><textarea id="testo" className="input" rows={2} value={testo} onChange={e => setTesto(e.target.value)} /></Field>
+        <div className="xs muted" style={{ textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600 }}>{decifra ? 'Testo in chiaro' : 'Testo cifrato'}</div>
+        <div className="out big" aria-live="polite">{out || ' '}</div>
+        <Tabella testo={testo} chiave={chiave} decifra={decifra} max={20} />
+      </div>
+      <Box type="tip" title="Con un solo numero">Togli numeri fino a lasciarne uno: ottieni il cifrario di Cesare. <a className="text-link" href="../modulo-1-cesare/simulazione-ruota.html">Apri la ruota di Cesare</a></Box>
+    </div>
+  );
+}
+
+/* ---------- sfida ---------- */
+
+// Frasi italiane: per cifrare si tolgono gli accenti (la sostituzione agisce solo su A-Z).
+const FRASI = [
+  'Domani niente compiti per chi ha studiato tutto il weekend',
+  'La password migliore è quella che nessuno riesce a indovinare',
+  'Il router della scuola è acceso ma il wifi non funziona',
+  'Ogni computer ha bisogno di un buon sistema operativo',
+  'Non lasciare mai la tua chiave sotto lo zerbino',
+  'Il gatto dorme sulla tastiera e scrive messaggi misteriosi',
+  'Domenica pomeriggio partita a scacchi con il professore',
+  'Il segreto è custodito nella cassaforte del terzo piano',
+  'Prima di inviare il file controlla sempre il destinatario',
+  'Il progetto di sistemi e reti va consegnato venerdì',
+  'Incontriamoci davanti al laboratorio alle otto in punto',
+  'Un buon programmatore commenta sempre il proprio codice',
+  'Il server è sempre acceso anche quando nessuno lo guarda',
+  'Gli antichi romani scrivevano lettere segrete ai generali',
+  'Il professore ha dimenticato gli appunti sul tavolo',
+  'Nessun algoritmo è sicuro se la chiave è troppo corta',
+  'Questa frase nasconde un indizio per la caccia al tesoro',
+  'La campanella suona e tutti corrono verso l\'uscita',
+];
+
+function nuovaPartita(prec, lung) {
+  let i; do { i = Math.floor(Math.random() * FRASI.length); } while (FRASI.length > 1 && i === prec);
+  return { i, chiave: Array.from({ length: lung }, () => 1 + Math.floor(Math.random() * 25)) };
+}
+const formatta = (t, gruppi) => gruppi ? (C.normalizza(t).match(/.{1,5}/g) || []).join(' ') : t.toUpperCase();
+
+function Sfida() {
+  const [livello, setLivello] = useState(() => UI.carica('seq-livello', 2));
+  const [partita, setPartita] = useState(() => nuovaPartita(-1, UI.carica('seq-livello', 2)));
+  const [prova, setProva] = useState(() => Array.from({ length: UI.carica('seq-livello', 2) }, () => 0));
+  const [errori, setErrori] = useState(0);
+  const [svelati, setSvelati] = useState(0);
+  const [esito, setEsito] = useState(null);                 // null | {tipo:'ok'|'ko'|'resa'}
+  const [stat, setStat] = useState(() => UI.carica('seq-stat', { punti: 0, risolti: 0, serie: 0, migliore: 0 }));
+  const chiaro = FRASI[partita.i];
+  const gruppi = livello >= 3;
+  const base = useMemo(() => C.senzaAccenti(chiaro), [partita]);
+  const cifrato = useMemo(() => formatta(seq(base, partita.chiave), gruppi), [partita, gruppi]);
+  const tentativo = formatta(seq(seq(base, partita.chiave), prova, true), gruppi);
+  const salvaStat = (s) => { setStat(s); UI.salva('seq-stat', s); };
+  const nuova = (lung) => {
+    const l = lung || livello;
+    setPartita(nuovaPartita(partita.i, l)); setProva(Array.from({ length: l }, () => 0));
+    setErrori(0); setSvelati(0); setEsito(null);
+  };
+  const cambiaLivello = (l) => { setLivello(l); UI.salva('seq-livello', l); nuova(l); };
+  const chiuso = esito && (esito.tipo === 'ok' || esito.tipo === 'resa');
+  const conferma = () => {
+    if (chiuso) return;
+    if (prova.every((v, i) => v === partita.chiave[i])) {
+      const punti = Math.max(10, 100 - 8 * errori - 25 * svelati) * (livello - 1);
+      const serie = stat.serie + 1;
+      salvaStat({ punti: stat.punti + punti, risolti: stat.risolti + 1, serie, migliore: Math.max(stat.migliore, serie) });
+      setEsito({ tipo: 'ok', punti });
+    } else {
+      setErrori(errori + 1); setEsito({ tipo: 'ko' });
+      if (stat.serie) salvaStat({ ...stat, serie: 0 });
+    }
+  };
+  const arrenditi = () => { setProva(partita.chiave); setEsito({ tipo: 'resa' }); if (stat.serie) salvaStat({ ...stat, serie: 0 }); };
+  const rivela = () => {
+    const i = prova.findIndex((v, p) => v !== partita.chiave[p]);
+    if (i < 0) return;
+    setProva(prova.map((v, p) => (p === i ? partita.chiave[p] : v))); setSvelati(svelati + 1);
+  };
+  const cambiaProva = (k) => { setProva(k); if (esito && esito.tipo === 'ko') setEsito(null); };
+  return (
+    <div>
+      <div className="statistiche" aria-label="Statistiche">
+        <div><b>{stat.punti}</b><span>punti</span></div>
+        <div><b>{stat.serie}</b><span>serie (record {stat.migliore})</span></div>
+        <div><b>{stat.risolti}</b><span>risolti</span></div>
+      </div>
+      <div className="tabs" role="group" aria-label="Livello">
+        <Btn variant={livello === 2 ? 'primary' : ''} aria-pressed={livello === 2} onClick={() => cambiaLivello(2)}>2 numeri</Btn>
+        <Btn variant={livello === 3 ? 'primary' : ''} aria-pressed={livello === 3} onClick={() => cambiaLivello(3)}>3 numeri, gruppi di 5 (punti ×2)</Btn>
+      </div>
+
+      <h2>Messaggio intercettato</h2>
+      <div className="intercetto" aria-label="Testo cifrato">{cifrato}</div>
+      <p className="small muted mt">La chiave è una serie di <b>{livello}</b> numeri da 1 a 25. Trovali: scegli i numeri e guarda il testo che si forma. Suggerimento: ogni numero governa una lettera ogni {livello}.</p>
+
+      <h2>Il tuo decifratore</h2>
+      <EditorChiave chiave={prova} setChiave={cambiaProva} fissa />
+      <p className="xs muted mt">Con la serie {serie(prova)} il messaggio diventa:</p>
+      <div className="tentativo" aria-live="polite">{tentativo}</div>
+
+      <div className="row mt">
+        <Btn variant="primary" onClick={conferma} disabled={chiuso}>È questa la chiave!</Btn>
+        <Btn onClick={rivela} disabled={chiuso}>Svela un numero (−25)</Btn>
+      </div>
+
+      {esito && esito.tipo === 'ko' ? <div className="feedback ko mt" role="status">Non è la chiave giusta. Errori: {errori}. Guarda quali lettere sono già leggibili e correggi gli altri numeri.</div> : null}
+      {esito && esito.tipo === 'ok' ? <div className="feedback ok mt" role="status"><b>Esatto!</b> La chiave era {serie(partita.chiave)}. +{esito.punti} punti. Il messaggio: «{chiaro}»</div> : null}
+      {esito && esito.tipo === 'resa' ? <div className="feedback mt" role="status">La chiave era {serie(partita.chiave)}. Il messaggio: «{chiaro}». La serie riparte da zero.</div> : null}
+
+      <div className="row mt">
+        <Btn variant={chiuso ? 'primary' : 'ghost'} onClick={() => nuova()}>Nuovo messaggio</Btn>
+        {!chiuso ? <Btn variant="ghost" onClick={arrenditi}>Mi arrendo</Btn> : null}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [scheda, setScheda] = useState('sim');
+  return (
+    <PaginaGioco titolo="Cesare a chiave numerica" indietro="slide.html#8" indietroEtichetta="Modulo 2">
+      <div className="tabs" role="group" aria-label="Sezioni">
+        <Btn variant={scheda === 'sim' ? 'primary' : ''} aria-pressed={scheda === 'sim'} onClick={() => setScheda('sim')}>Simulatore</Btn>
+        <Btn variant={scheda === 'sfida' ? 'primary' : ''} aria-pressed={scheda === 'sfida'} onClick={() => setScheda('sfida')}>Trova la chiave</Btn>
+      </div>
+      {scheda === 'sim' ? <Simulatore /> : <Sfida />}
+      <p className="small muted mt-lg">Punteggi e impostazioni restano solo su questo dispositivo. Non viene raccolto nessun dato.</p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>

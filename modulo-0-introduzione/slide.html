@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modulo 0 — Introduzione alla crittografia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  /* Stili specifici di questo modulo */
+  .tl { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .tl .btn { flex: 1 1 8.5rem; flex-direction: column; line-height: 1.25; padding-top: .4rem; padding-bottom: .4rem; }
+  .tl .btn b { font-family: var(--f-mono); font-size: var(--fs-sm); }
+  .tl .btn span { font-size: var(--fs-xs); font-weight: 500; }
+  .bars { display: grid; gap: .5rem; }
+  .bar-row { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr) 5rem; gap: .6rem; align-items: center; font-size: var(--fs-sm); }
+  .bar-row .tr { height: 1.1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .bar-row .tr i { display: block; height: 100%; border-radius: 0 5px 5px 0; min-width: 2px; }
+  .bar-row .v { font-family: var(--f-mono); text-align: right; }
+  .scena { display: flex; flex-wrap: wrap; gap: .4rem .8rem; align-items: center; justify-content: center; font-size: 2rem; }
+  .opz { display: grid; gap: .5rem; }
+  .opz .btn { justify-content: flex-start; text-align: left; }
+  .opz .btn.giusta { border-color: var(--success); background: color-mix(in srgb, var(--success) 18%, var(--bg)); color: var(--text); }
+  .opz .btn.sbagliata { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 16%, var(--bg)); color: var(--text); }
+  @media (max-width: 900px) { .bar-row { grid-template-columns: 5.5rem minmax(0, 1fr) 4rem; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+const { Box, Glow, Chip, Grid, Card, Btn, Field, Table, Flow, CompareTwo, ActivityBadge, Steps } = UI;
+const C = window.Cripto;
+
+/* ---------- dati calcolati con crypto.js ---------- */
+const CIFRATO_ES = C.cesare('ATTACCO', 3);
+const SCITALA = C.trasposizioneGriglia('ATTACCO ALL ALBA', 'ABCD');   // griglia larga 4, colonne lette da sinistra a destra
+
+/* ---------- componenti specifici del modulo ---------- */
+
+// Linea del tempo: si sceglie un evento e compare la scheda.
+const EVENTI = [
+  { anno: 'V sec. a.C.', nome: 'Scitala', famiglia: 'trasposizione', testo: 'Gli autori greci, tra cui Plutarco, descrivono la scitala spartana: una striscia di cuoio avvolta a spirale su un bastone. Si scrive lungo il bastone; svolta, la striscia mostra lettere in disordine. Chi ha un bastone dello stesso diametro la rilegge.' },
+  { anno: 'I sec. a.C.', nome: 'Cesare', famiglia: 'sostituzione', testo: 'Svetonio racconta che Giulio Cesare spostava ogni lettera di tre posti. È il capostipite dei cifrari a sostituzione: lo studiamo nel modulo 1 e nel modulo 2 lo generalizziamo.' },
+  { anno: '1553 - 1586', nome: 'Vigenère', famiglia: 'sostituzione polialfabetica', testo: 'Giovan Battista Bellaso descrive nel 1553 un cifrario con una chiave a parola; nel 1586 Blaise de Vigenère ne pubblica una versione e il nome gli resta attaccato. Resiste per secoli, finché Kasiski (1863) ne trova il punto debole.' },
+  { anno: '1918 - 1945', nome: 'Enigma', famiglia: 'macchina a rotori', testo: 'Brevettata da Arthur Scherbius nel 1918, è usata dalla Germania nella seconda guerra mondiale. Matematici polacchi e poi il gruppo di Bletchley Park (con Alan Turing) riescono a romperla: la crittoanalisi cambia l\'esito della guerra.' },
+  { anno: '1977', nome: 'DES', famiglia: 'simmetrico', testo: 'Il Data Encryption Standard, basato su un progetto IBM, diventa lo standard americano per cifrare dati. Cifra blocchi di 64 bit con una chiave di 56 bit. Lo studiamo nel modulo 6; oggi è sostituito da AES (2001).' },
+  { anno: '1976 - 1977', nome: 'DH e RSA', famiglia: 'asimmetrico', testo: 'Nel 1976 Diffie e Hellman propongono l\'idea di coppia di chiavi; nel 1977 Rivest, Shamir e Adleman realizzano RSA, basato sulla difficoltà di fattorizzare. Per la prima volta ci si può scambiare messaggi segreti senza incontrarsi prima.' },
+];
+function LineaDelTempo() {
+  const [sel, setSel] = useState(1);
+  const e = EVENTI[sel];
+  return (
+    <div className="stack">
+      <div className="tl" role="group" aria-label="Eventi della storia della crittografia">
+        {EVENTI.map((x, i) => <Btn key={i} variant={sel === i ? 'primary' : ''} aria-pressed={sel === i} onClick={() => setSel(i)}><b>{x.anno}</b><span>{x.nome}</span></Btn>)}
+      </div>
+      <div className="card" aria-live="polite">
+        <div className="row-between"><h3>{e.nome}</h3><Chip color="info">{e.famiglia}</Chip></div>
+        <p className="mt">{e.testo}</p>
+      </div>
+    </div>
+  );
+}
+
+// Quante chiavi servono per n persone.
+function ConteggioChiavi() {
+  const [n, setN] = useState(10);
+  const sim = n * (n - 1) / 2, asim = 2 * n, mx = Math.max(sim, asim);
+  const f = (x) => x.toLocaleString('it-IT');
+  return (
+    <div className="sim">
+      <div className="sim-title">Quante chiavi per n persone?</div>
+      <Field label={'Persone che vogliono parlarsi a coppie: ' + n}><input type="range" min="2" max="100" value={n} onChange={e => setN(+e.target.value)} aria-label="Numero di persone" /></Field>
+      <div className="bars">
+        <div className="bar-row"><span>Simmetrica</span><div className="tr"><i style={{ width: (100 * sim / mx) + '%', background: 'var(--danger)' }} /></div><span className="v">{f(sim)}</span></div>
+        <div className="bar-row"><span>Asimmetrica</span><div className="tr"><i style={{ width: (100 * asim / mx) + '%', background: 'var(--success)' }} /></div><span className="v">{f(asim)}</span></div>
+      </div>
+      <div className="row">
+        {[5, 10, 28, 100].map(x => <Btn key={x} small variant={n === x ? 'primary' : ''} onClick={() => setN(x)}>{x} persone</Btn>)}
+        <span className="xs muted">28 = una classe</span>
+      </div>
+    </div>
+  );
+}
+
+// Passi del gioco della scatola con doppio lucchetto (stesso copione della pagina di simulazione).
+function Scatola({ aperta, a, b, dove }) {
+  return (
+    <div className="scena" aria-hidden="true">
+      <span>👩</span><span className="small mono dim">{dove === 'alice' ? '← la scatola è qui' : ''}</span>
+      <span>{aperta ? '📭' : '📦'}</span>
+      {a ? <span>🔒<sub className="mono small">A</sub></span> : null}
+      {b ? <span>🔒<sub className="mono small">B</sub></span> : null}
+      <span className="small mono dim">{dove === 'bob' ? 'la scatola è qui →' : ''}</span><span>👨</span>
+    </div>
+  );
+}
+const PASSI_LUCCHETTI = [
+  ['Alice chiude la scatola', 'Alice mette il messaggio nella scatola e la chiude con il suo lucchetto A. Solo lei ha la chiave di A.', { aperta: false, a: true, b: false, dove: 'alice' }],
+  ['La scatola viaggia', 'La scatola va da Bob. Eve può guardarla, ma non può aprirla: ha un lucchetto sopra.', { aperta: false, a: true, b: false, dove: 'bob' }],
+  ['Bob aggiunge il suo lucchetto', 'Bob non può aprire A, e aggiunge il suo lucchetto B. Ora i lucchetti sono due.', { aperta: false, a: true, b: true, dove: 'bob' }],
+  ['Ritorno ad Alice', 'La scatola torna da Alice con due lucchetti. Alice può togliere il suo.', { aperta: false, a: true, b: true, dove: 'alice' }],
+  ['Alice toglie A', 'Alice toglie il suo lucchetto A: resta solo B, di cui ha la chiave solo Bob.', { aperta: false, a: false, b: true, dove: 'alice' }],
+  ['Ancora da Bob', 'La scatola viaggia per la seconda volta, con il solo lucchetto B.', { aperta: false, a: false, b: true, dove: 'bob' }],
+  ['Bob apre', 'Bob toglie B, apre la scatola e legge il messaggio. Nessuna chiave è mai passata da una mano all\'altra.', { aperta: true, a: false, b: false, dove: 'bob' }],
+];
+
+// Quiz rapido a scelta multipla.
+const DOMANDE = [
+  { q: 'Quale obiettivo garantisce che un messaggio non sia stato modificato durante il viaggio?', o: ['Riservatezza', 'Integrità', 'Non ripudio', 'Disponibilità'], g: 1, sp: 'L\'integrità: chi riceve può accorgersi di una modifica.' },
+  { q: 'Secondo il principio di Kerckhoffs, che cosa deve restare segreto?', o: ['L\'algoritmo', 'La chiave', 'Sia algoritmo sia chiave', 'Il canale di comunicazione'], g: 1, sp: 'Solo la chiave: l\'algoritmo si suppone noto all\'attaccante.' },
+  { q: 'Dieci persone vogliono parlarsi a coppie con la crittografia simmetrica. Quante chiavi servono?', o: ['20', '45', '90', '100'], g: 1, sp: '10 × 9 / 2 = 45. Con la crittografia asimmetrica sarebbero 20 (due per persona).' },
+  { q: 'Alice vuole inviare a Bob un messaggio riservato con la crittografia asimmetrica. Che cosa usa?', o: ['La sua chiave privata', 'La sua chiave pubblica', 'La chiave pubblica di Bob', 'La chiave privata di Bob'], g: 2, sp: 'Cifra con la chiave pubblica di Bob: solo la sua chiave privata potrà decifrare.' },
+  { q: 'Come si chiama lo studio dei metodi per leggere un messaggio cifrato senza conoscere la chiave?', o: ['Steganografia', 'Crittoanalisi', 'Cifratura', 'Hashing'], g: 1, sp: 'Crittoanalisi. La steganografia nasconde l\'esistenza stessa del messaggio.' },
+];
+function Quiz() {
+  const [r, setR] = useState(() => DOMANDE.map(() => null));
+  const giuste = r.filter((x, i) => x === DOMANDE[i].g).length, fatte = r.filter(x => x !== null).length;
+  return (
+    <div className="stack">
+      <Steps keys={false} steps={DOMANDE.map((d, i) => ({
+        title: 'Domanda ' + (i + 1) + ' di ' + DOMANDE.length,
+        content: (
+          <div className="stack">
+            <p>{d.q}</p>
+            <div className="opz" role="group" aria-label="Risposte">
+              {d.o.map((t, j) => {
+                const scelta = r[i] === j, mostra = r[i] !== null;
+                const cls = mostra && j === d.g ? 'giusta' : (scelta ? 'sbagliata' : '');
+                return <Btn key={j} className={cls} disabled={mostra} onClick={() => setR(r.map((x, p) => (p === i ? j : x)))}>{String.fromCharCode(65 + j)}. {t}</Btn>;
+              })}
+            </div>
+            {r[i] !== null ? <div className={'feedback ' + (r[i] === d.g ? 'ok' : 'ko')} role="status">{r[i] === d.g ? 'Giusto. ' : 'Non proprio. '}{d.sp}</div> : null}
+          </div>
+        ),
+      }))} />
+      <div className="row-between"><span className="small muted">Risposte date: {fatte} / {DOMANDE.length}</span><span className="mono hl">Punteggio: {giuste} / {DOMANDE.length}</span>
+        <Btn small variant="ghost" onClick={() => setR(DOMANDE.map(() => null))}>Ricomincia</Btn></div>
+    </div>
+  );
+}
+
+/* ---------- le slide ---------- */
+
+const MODULI = [
+  ['1', 'Cesare', 'Spostare le lettere: il più antico dei cifrari.', '../modulo-1-cesare/slide.html'],
+  ['2', 'Cesare generalizzato', 'Una serie di spostamenti al posto di uno.', '../modulo-2-cesare-generalizzato/slide.html'],
+  ['3', 'Vigenère', 'La chiave diventa una parola.', '../modulo-3-vigenere/slide.html'],
+  ['4', 'Trasposizione', 'Mescolare le lettere senza cambiarle.', '../modulo-4-trasposizione/slide.html'],
+  ['5', 'Cifrari moderni', 'Bit, XOR, confusione e diffusione.', '../modulo-5-cifrari-moderni/slide.html'],
+  ['6', 'DES', 'Rete di Feistel, S-DES, 3DES e AES.', '../modulo-6-des/slide.html'],
+  ['7', 'Matematica di RSA', 'Modulo, MCD, inverso, potenze modulari.', '../modulo-7-matematica-rsa/slide.html'],
+  ['8', 'RSA', 'Chiavi pubbliche, privata e firma.', '../modulo-8-rsa/slide.html'],
+  ['9', 'Crittografia ibrida', 'Simmetrica e asimmetrica insieme: TLS.', '../modulo-9-ibrida/slide.html'],
+];
+
+const slides = [
+  { copertina: true, sezione: 'Apertura', titolo: 'Introduzione alla crittografia',
+    sottotitolo: 'Perché si cifra, che cosa vuol dire proteggere un messaggio e quale strada percorreremo: dai cifrari antichi a DES e RSA.',
+    note: ['Apertura del percorso. Questo modulo non ha un laboratorio: serve a fissare il lessico e la mappa. Si può svolgere in una lezione, con il gioco della scatola come attività centrale.', 'Tasti utili: frecce per scorrere, N per queste note, I per l\'elenco delle slide, F per lo schermo intero.'] },
+
+  { sezione: 'Perché', titolo: 'Un messaggio su una rete non è mai solo',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { icon: '👩‍💻', label: 'Alice', sub: 'mittente' },
+          { icon: '📡', label: 'Wi-Fi / switch', sub: 'nodo 1', color: 'var(--warn)' },
+          { icon: '🌐', label: 'Router, provider', sub: 'molti nodi', color: 'var(--warn)' },
+          { icon: '🖥️', label: 'Server di Bob', sub: 'destinatario' },
+        ]} />
+        <Grid cols={2}>
+          <Card tone="danger"><h3>🕵️ Eve intercetta</h3><p className="small">Chi controlla un nodo può leggere il traffico (sniffing) o modificarlo mentre passa.</p></Card>
+          <Card tone="success"><h3>🔐 La contromisura</h3><p className="small">Rendere il messaggio incomprensibile a chiunque non abbia il segreto giusto: la crittografia.</p></Card>
+        </Grid>
+        <p className="small muted">Crittografia significa «scrittura nascosta»: dal greco <i>kryptós</i> (nascosto) e <i>gráphein</i> (scrivere).</p>
+      </div>
+    ),
+    note: 'Collegate a quanto già visto in Sistemi e Reti: i pacchetti attraversano molti dispositivi che non controlliamo. Chiedete ai ragazzi dove un attaccante potrebbe mettersi (rete Wi-Fi pubblica, router compromesso, provider). Alice, Bob ed Eve sono i nomi convenzionali dei personaggi: li useremo in tutto il corso.' },
+
+  { sezione: 'Perché', titolo: 'Quattro obiettivi della crittografia',
+    contenuto: () => (
+      <Grid cols={2} stretch>
+        <Card tone="info"><h3>🔒 Riservatezza</h3><p className="small">Solo il destinatario legge il messaggio.</p><p className="xs muted">Strumento: cifratura (moduli 1-9)</p></Card>
+        <Card tone="success"><h3>🧩 Integrità</h3><p className="small">Il messaggio non è stato modificato.</p><p className="xs muted">Strumento: funzioni hash e codici MAC</p></Card>
+        <Card tone="accent"><h3>🪪 Autenticazione</h3><p className="small">Il mittente è davvero chi dice di essere.</p><p className="xs muted">Strumento: password, certificati, firma</p></Card>
+        <Card tone="purple"><h3>✍️ Non ripudio</h3><p className="small">Il mittente non può negare di aver inviato il messaggio.</p><p className="xs muted">Strumento: firma digitale (modulo 8)</p></Card>
+      </Grid>
+    ),
+    note: 'Sono le quattro proprietà richieste a un sistema sicuro. Fate un esempio per ciascuna: una chat (riservatezza), un file scaricato che deve corrispondere all\'originale (integrità), un accesso a un sito di home banking (autenticazione), un contratto firmato (non ripudio). In questo percorso ci concentriamo su riservatezza e firma; integrità e funzioni hash sono un tema a parte, che si incontra nel modulo su TLS.' },
+
+  { sezione: 'Lessico', titolo: 'Le parole della crittografia',
+    contenuto: () => (
+      <div className="stack">
+        <Table head={['Termine', 'Significato', 'Esempio']} rows={[
+          ['Testo in chiaro', 'Il messaggio originale, leggibile', 'ATTACCO'],
+          ['Testo cifrato', 'Il messaggio trasformato, illeggibile', CIFRATO_ES],
+          ['Algoritmo (cifrario)', 'La regola con cui si trasforma il testo', 'spostare le lettere'],
+          ['Chiave', 'Il dato segreto che governa l\'algoritmo', '3'],
+          ['Cifratura / decifratura', 'Da chiaro a cifrato / da cifrato a chiaro', 'ATTACCO ⇄ ' + CIFRATO_ES],
+          ['Crittoanalisi', 'Leggere o rompere il cifrato senza la chiave', 'provare tutte le chiavi'],
+        ]} />
+        <p className="small muted">Esempio calcolato con il cifrario di Cesare, chiave 3 (modulo 1).</p>
+      </div>
+    ),
+    note: 'Sono i termini che useremo in ogni modulo. Distinguete bene cifrare (operazione di chi conosce la chiave) da decifrare e da «rompere» (crittoanalisi). Attenzione all\'abuso di «criptare»: in italiano corretto si dice cifrare. Il cifrato dell\'esempio è prodotto dal motore crypto.js.' },
+
+  { sezione: 'Lessico', titolo: 'Crittografia, crittoanalisi, steganografia',
+    contenuto: () => (
+      <Grid cols={3} stretch>
+        <Card tone="info"><h3>Crittografia</h3><p className="small">Rende il messaggio <span className="hl">illeggibile</span>. Tutti sanno che c'è un messaggio, nessuno lo capisce.</p></Card>
+        <Card tone="danger"><h3>Crittoanalisi</h3><p className="small">Cerca di <span className="hl">rompere</span> il cifrario senza la chiave. È il gioco di Eve.</p></Card>
+        <Card tone="warn"><h3>Steganografia</h3><p className="small">Nasconde l'<span className="hl">esistenza</span> del messaggio, per esempio dentro un'immagine.</p></Card>
+      </Grid>
+    ),
+    note: 'La crittografia (progettare cifrari) e la crittoanalisi (romperli) sono due facce della crittologia: ogni cifrario nuovo nasce da un attacco riuscito al precedente. La steganografia si può combinare con la crittografia: prima si cifra, poi si nasconde. Non la approfondiamo ma serve a evitare confusione tra «nascondere» e «rendere illeggibile».' },
+
+  { sezione: 'Principi', titolo: 'Il principio di Kerckhoffs',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Glow><p className="center">La sicurezza di un cifrario deve dipendere <span className="hl">solo dalla segretezza della chiave</span>, non da quella dell'algoritmo.</p></Glow>
+        <Grid cols={3} stretch>
+          <Card tone="info"><h3>Perché</h3><p className="small">Un algoritmo segreto prima o poi trapela (smontando un dispositivo, un programma, una spia).</p></Card>
+          <Card tone="success"><h3>Vantaggio</h3><p className="small">Un algoritmo pubblico è esaminato da migliaia di esperti: i difetti emergono.</p></Card>
+          <Card tone="warn"><h3>Costo</h3><p className="small">Cambiare una chiave è facile; cambiare un algoritmo no.</p></Card>
+        </Grid>
+        <p className="small muted">Formulato nel 1883 da Auguste Kerckhoffs. DES e RSA sono pubblici da decenni, e restano sicuri.</p>
+      </div>
+    ),
+    note: 'Il principio compare in ogni modulo. L\'opposto si chiama «sicurezza per oscurità» (security through obscurity) ed è considerato una cattiva pratica. Chiedete: se vi dessi un cifrario di cui è segreto anche l\'algoritmo, vi fidereste di più o di meno? Nel corso gli algoritmi saranno sempre noti e l\'unico segreto sarà la chiave.' },
+
+  { sezione: 'Storia', titolo: 'Due famiglie: sostituire e mescolare',
+    contenuto: () => (
+      <Grid cols={2} stretch>
+        <Card tone="accent">
+          <h3>Sostituzione (Cesare)</h3>
+          <p className="small">Ogni lettera diventa un'altra lettera.</p>
+          <p className="mono mt">ATTACCO → <span className="hl">{CIFRATO_ES}</span></p>
+          <p className="xs muted">Le lettere cambiano, la posizione resta.</p>
+        </Card>
+        <Card tone="info">
+          <h3>Trasposizione (scitala)</h3>
+          <p className="small">Le lettere restano le stesse, cambia l'ordine. Scrivo su 4 colonne e leggo per colonne:</p>
+          <Table mono center rows={SCITALA.righe} />
+          <p className="mono small">→ <span className="hl">{SCITALA.cifrato}</span></p>
+        </Card>
+      </Grid>
+    ),
+    note: 'Tutti i cifrari classici sono combinazioni di queste due idee, e lo sono anche i cifrari moderni (confusione = sostituzione, diffusione = trasposizione, modulo 5). Nell\'esempio di destra le lettere cifrate sono le stesse del testo in chiaro; i riempimenti X completano la griglia. La griglia è prodotta da crypto.js. La trasposizione a colonne è il tema del modulo 4.' },
+
+  { sezione: 'Storia', titolo: 'Breve storia della crittografia',
+    contenuto: () => <LineaDelTempo />,
+    note: 'Scegliete un evento alla volta e leggete la scheda; non serve esaurire l\'elenco. Il filo conduttore: ogni cifrario nasce dall\'attacco al precedente. Cesare cade con le frequenze, Vigenère con Kasiski, Enigma con la matematica e le macchine, DES con la potenza di calcolo. RSA nasce da un\'idea diversa: la coppia di chiavi. Le date sono quelle indicate nelle fonti comuni; i dettagli si possono approfondire nei moduli corrispondenti.' },
+
+  { sezione: 'Simmetrica e asimmetrica', titolo: 'Crittografia simmetrica: una chiave sola',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { icon: '👩', label: 'Alice', sub: 'testo in chiaro' },
+          { icon: '🔑', label: 'Cifra con K', sub: 'chiave segreta', color: 'var(--info)' },
+          { icon: '🕵️', label: 'Canale (Eve)', sub: 'vede solo il cifrato', color: 'var(--danger)' },
+          { icon: '🔑', label: 'Decifra con K', sub: 'la stessa chiave', color: 'var(--info)' },
+          { icon: '👨', label: 'Bob', sub: 'testo in chiaro' },
+        ]} />
+        <Grid cols={2}>
+          <Card tone="success"><h3>Pregi</h3><p className="small">Veloce, adatta a grandi quantità di dati. Esempi: Cesare, Vigenère, DES, AES.</p></Card>
+          <Card tone="danger"><h3>Problema</h3><p className="small">Alice e Bob devono già condividere K. Come se la scambiano, senza che Eve la veda?</p></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Tutti i cifrari dei moduli 1-6 sono simmetrici: la stessa chiave cifra e decifra. Il problema che apre la slide successiva è la distribuzione della chiave: se potessero incontrarsi di persona non ci sarebbe problema, ma su Internet non è possibile.' },
+
+  { sezione: 'Simmetrica e asimmetrica', titolo: 'Crittografia asimmetrica: due chiavi',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { icon: '👩', label: 'Alice', sub: 'testo in chiaro' },
+          { icon: '🔓', label: 'Cifra con la pubblica di Bob', sub: 'chiunque la conosce', color: 'var(--info)' },
+          { icon: '🕵️', label: 'Canale (Eve)', sub: 'vede solo il cifrato', color: 'var(--danger)' },
+          { icon: '🔐', label: 'Decifra con la privata di Bob', sub: 'solo lui ce l\'ha', color: 'var(--success)' },
+          { icon: '👨', label: 'Bob', sub: 'testo in chiaro' },
+        ]} />
+        <Grid cols={2}>
+          <Card tone="info"><h3>Riservatezza</h3><p className="small">Si cifra con la chiave <b>pubblica</b> del destinatario; si decifra con la sua <b>privata</b>.</p></Card>
+          <Card tone="accent"><h3>Firma digitale</h3><p className="small">Si firma con la chiave <b>privata</b> del mittente; chiunque verifica con la sua <b>pubblica</b>.</p></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Ogni persona ha una coppia di chiavi legate matematicamente: ciò che una cifra, l\'altra decifra. La pubblica si può diffondere, la privata non esce mai dal suo proprietario. È la soluzione al problema della distribuzione, ed è la base di RSA (moduli 7-8). Qui non entriamo nella matematica: serve solo capire i ruoli.' },
+
+  { sezione: 'Simmetrica e asimmetrica', titolo: 'A confronto',
+    contenuto: () => (
+      <div className="stack">
+        <Table head={['', 'Simmetrica', 'Asimmetrica']} rows={[
+          ['Chiavi', 'Una sola, segreta e condivisa', 'Coppia: pubblica e privata'],
+          ['Velocità', 'Alta', 'Molto più bassa'],
+          ['Problema', 'Come scambiare la chiave', 'Come essere certi di chi è la chiave pubblica'],
+          ['Chiavi per n persone', 'n(n−1)/2', '2n'],
+          ['Esempi', 'DES, AES', 'RSA'],
+          ['Uso tipico', 'Cifrare i dati', 'Scambiare chiavi, firmare'],
+        ]} />
+        <Box type="tip" title="Nella pratica si usano insieme">La crittografia asimmetrica scambia una chiave segreta; quella simmetrica cifra i dati. È la crittografia ibrida (modulo 9), alla base di HTTPS e SSH.</Box>
+      </div>
+    ),
+    note: 'Sintesi dei due mondi. La velocità è il motivo per cui non si cifrano i file con RSA. La riga sul problema dell\'autenticità della chiave pubblica anticipa i certificati digitali. L\'ibrida combina i punti di forza: è l\'argomento finale del percorso.' },
+
+  { sezione: 'Chiavi', titolo: 'Il problema della distribuzione delle chiavi',
+    contenuto: () => (
+      <div className="stack">
+        <Glow><p className="center">Simmetrica: <span className="mono hl">n(n−1)/2</span> chiavi &nbsp;·&nbsp; Asimmetrica: <span className="mono hl">2n</span> chiavi</p></Glow>
+        <ConteggioChiavi />
+        <p className="small muted">Con la simmetrica, ogni coppia ha bisogno di una chiave sua, scambiata in segreto. Con l'asimmetrica ogni persona ne ha due e pubblica una.</p>
+      </div>
+    ),
+    note: 'Fate muovere il cursore e fermatevi su 28 (la classe): 378 chiavi simmetriche contro 56. Con 100 persone: 4.950 contro 200. Il numero cresce in modo quadratico, quindi non è gestibile; con l\'asimmetrica cresce in modo lineare. Ma il problema vero non è solo la quantità: ogni chiave simmetrica va scambiata prima in un canale sicuro.' },
+
+  { sezione: 'Attività', titolo: 'Il gioco della scatola con il doppio lucchetto',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2} stretch>
+          <Card tone="accent">
+            <h3>In classe</h3>
+            <ol>
+              <li>Tre ruoli: Alice, Bob, Eve. Una scatola, due lucchetti, due chiavi diverse.</li>
+              <li>Alice e Bob <b>non si scambiano mai le chiavi</b>.</li>
+              <li>Eve tocca la scatola, ma non può aprirla.</li>
+              <li>Alice deve far arrivare un biglietto a Bob. Come?</li>
+            </ol>
+          </Card>
+          <Card tone="info">
+            <h3>Sul telefono</h3>
+            <p>Una simulazione animata mostra chi ha messo e tolto i lucchetti a ogni passaggio.</p>
+            <ActivityBadge href="simulazione-lucchetti.html" label="Apri la simulazione" icon="📱" />
+          </Card>
+        </Grid>
+        <Box type="tip" title="Prima di guardare la simulazione">Provate in gruppo a trovare la sequenza di passaggi. Quante volte viaggia la scatola?</Box>
+      </div>
+    ),
+    note: 'Materiale: una scatola con due occhielli, due lucchetti con chiavi diverse (oppure una scatola e due cartoncini di colore diverso al posto dei lucchetti). Lasciate 5-10 minuti per cercare la soluzione, poi mostrate la sequenza. Variante: Eve prova a sostituire il lucchetto di Bob con uno suo, fingendosi Bob: è il problema dell\'autenticazione. Non svelate la sequenza prima del tentativo dei gruppi.' },
+
+  { sezione: 'Attività', titolo: 'La sequenza dei passaggi',
+    contenuto: () => (
+      <div className="stack">
+        <Steps steps={PASSI_LUCCHETTI.map((p, i) => ({
+          title: 'Passo ' + (i + 1) + ': ' + p[0],
+          content: <div className="stack"><Scatola {...p[2]} /><p>{p[1]}</p></div>,
+        }))} />
+        <p className="small muted">Tre viaggi, due lucchetti: nessuna chiave è mai stata scambiata.</p>
+      </div>
+    ),
+    note: 'La sequenza si scorre con le frecce. È un\'analogia con la crittografia: i lucchetti si possono togliere in qualsiasi ordine (in crittografia si dice che le operazioni sono commutative) e questo permette di non scambiare mai la chiave. Non è però RSA: con RSA Alice usa direttamente il lucchetto «aperto» di Bob, cioè la sua chiave pubblica, e la scatola viaggia una volta sola. Il punto debole del gioco è che Eve può fingersi Bob.' },
+
+  { sezione: 'Verifica', titolo: 'Quiz rapido',
+    contenuto: () => <Quiz />,
+    note: 'Cinque domande per controllare il lessico: le risposte compaiono dopo ogni scelta, con una breve spiegazione. Si può svolgere a voce con la LIM: leggete la domanda, chiedete un voto per alzata di mano, poi cliccate. Il quiz completo di tutti i moduli è nella pagina dedicata.' },
+
+  { sezione: 'Mappa', titolo: 'Il percorso del corso',
+    contenuto: () => (
+      <Grid cols={3} stretch>
+        {MODULI.map(m => (
+          <Card key={m[0]} light>
+            <ActivityBadge stesso href={m[3]} label={'Modulo ' + m[0] + ' · ' + m[1]} icon="📘" />
+            <p className="xs muted mt">{m[2]}</p>
+          </Card>
+        ))}
+      </Grid>
+    ),
+    note: 'Tre blocchi: classici (moduli 1-4: sostituzione e trasposizione, con attacchi), moderni (5-6: bit e DES), asimmetrici (7-9: matematica, RSA, ibrida). Ogni modulo ha slide, simulazioni e attività; i cifrari classici hanno anche un laboratorio PHP. I link portano alle slide di ciascun modulo.' },
+
+  { sezione: 'Riepilogo', titolo: 'Riepilogo e prossimi passi',
+    contenuto: () => (
+      <div className="stack-lg">
+        <ul>
+          <li>Obiettivi: <span className="hl">riservatezza, integrità, autenticazione, non ripudio</span>.</li>
+          <li>Kerckhoffs: l'algoritmo è pubblico, <span className="hl">la chiave è il segreto</span>.</li>
+          <li>Simmetrica: una chiave, veloce, ma da scambiare. Asimmetrica: due chiavi, lenta, risolve la distribuzione.</li>
+        </ul>
+        <Grid cols={3} stretch>
+          <Card tone="accent"><h3>Attività</h3><p className="small">Rifai la scatola con i lucchetti.</p><ActivityBadge href="simulazione-lucchetti.html" stesso label="Simulazione" icon="📦" /></Card>
+          <Card tone="info"><h3>Quiz</h3><p className="small">Verifica che i concetti siano chiari.</p><ActivityBadge href="../quiz/quiz.html" label="Vai al quiz" icon="✅" /></Card>
+          <Card tone="success"><h3>Avanti</h3><p className="small">Si parte dal cifrario più antico.</p><ActivityBadge href="../modulo-1-cesare/slide.html" stesso label="Modulo 1" icon="➡️" /></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Chiusura con tre idee da ricordare. Il modulo 1 parte dal cifrario di Cesare perché contiene già tutto: algoritmo, chiave, attacco. I moduli 7-9 ritornano sul problema della distribuzione delle chiavi e lo risolvono con RSA.' },
+];
+
+Deck.mount(slides, { modulo: 0, nome: 'Introduzione alla crittografia', indice: '../index.html' });
+</script>
+</body>
+</html>

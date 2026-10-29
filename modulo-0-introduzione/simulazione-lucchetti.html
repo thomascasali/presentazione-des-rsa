@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La scatola con il doppio lucchetto — simulazione</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  .scena-box { max-width: 30rem; margin: 0 auto; }
+  .scena-svg { width: 100%; height: auto; display: block; }
+  .scena-svg text { font-family: var(--f-mono); text-anchor: middle; }
+  .scena-svg .nome { fill: var(--text-dim); font-size: 13px; font-weight: 600; }
+  .scena-svg .pers { font-size: 34px; }
+  .scena-svg .tavolo { fill: var(--bg-light); stroke: var(--border); stroke-width: 1.5; }
+  .scena-svg .scatola { fill: color-mix(in srgb, var(--accent) 22%, var(--bg-card)); stroke: var(--accent); stroke-width: 2; }
+  .scena-svg .coperchio { fill: color-mix(in srgb, var(--accent) 38%, var(--bg-card)); stroke: var(--accent); stroke-width: 2; transform-origin: 0 0; transition: transform .45s ease; }
+  .scena-svg .biglietto { fill: var(--text); }
+  .scena-svg .lucA { fill: var(--accent-alt); stroke: var(--bg); stroke-width: 1.5; }
+  .scena-svg .lucB { fill: var(--info-t); stroke: var(--bg); stroke-width: 1.5; }
+  .scena-svg .lucT { fill: var(--on-accent); font-size: 11px; font-weight: 700; }
+  .scena-svg .chiave { font-size: 15px; }
+  .scena-svg .sposta { transition: transform .8s ease; }
+  .scena-svg .appari { transition: opacity .35s ease, transform .35s ease; }
+  .scena-svg .eve-linea { stroke: var(--danger); stroke-width: 1.5; stroke-dasharray: 4 4; fill: none; }
+  @media (prefers-reduced-motion: reduce) { .scena-svg .sposta, .scena-svg .appari, .scena-svg .coperchio { transition: none; } }
+  .comandi { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; }
+  .comandi .btn { flex: 1 1 7rem; }
+  .passo-n { font-family: var(--f-mono); color: var(--accent); font-size: .95rem; }
+  .punti { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+  .punti i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border); background: var(--bg); display: block; }
+  .punti i.on { background: var(--accent); border-color: var(--accent); }
+  .punti i.fatto { border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+const { Btn, Box, Chip, PaginaGioco } = UI;
+
+/* Stati della scena. x: 0 = scatola da Alice, 1 = scatola da Bob.
+   A / B: lucchetto di Alice / di Bob presente. aperta: coperchio sollevato. viaggio: la scatola ha appena viaggiato
+   (Eve la vede passare). */
+const STATI = [
+  { x: 0, aperta: true,  A: false, B: false, viaggio: false, titolo: 'Alice prepara il messaggio',
+    testo: 'Alice scrive il messaggio e lo mette nella scatola. Ha un lucchetto A, di cui solo lei ha la chiave.', eve: 'Eve non vede ancora niente.' },
+  { x: 0, aperta: false, A: true,  B: false, viaggio: false, titolo: 'Alice chiude con A',
+    testo: 'Alice chiude la scatola con il suo lucchetto A.', eve: 'Eve non vede ancora niente.' },
+  { x: 1, aperta: false, A: true,  B: false, viaggio: true,  titolo: 'Primo viaggio: da Alice a Bob',
+    testo: 'La scatola arriva a Bob. Lui non ha la chiave di A e non può aprirla.', eve: 'Eve vede passare una scatola con un lucchetto. Non può aprirla.' },
+  { x: 1, aperta: false, A: true,  B: true,  viaggio: false, titolo: 'Bob aggiunge B',
+    testo: 'Bob aggiunge il suo lucchetto B. Ora la scatola ne ha due.', eve: 'Eve non vede ancora niente.' },
+  { x: 0, aperta: false, A: true,  B: true,  viaggio: true,  titolo: 'Secondo viaggio: da Bob ad Alice',
+    testo: 'La scatola torna da Alice con due lucchetti.', eve: 'Eve vede passare una scatola con due lucchetti. Non può aprirla.' },
+  { x: 0, aperta: false, A: false, B: true,  viaggio: false, titolo: 'Alice toglie A',
+    testo: 'Alice toglie il proprio lucchetto A. Resta solo B, di cui ha la chiave soltanto Bob.', eve: 'Eve non vede ancora niente.' },
+  { x: 1, aperta: false, A: false, B: true,  viaggio: true,  titolo: 'Terzo viaggio: da Alice a Bob',
+    testo: 'La scatola viaggia per l\'ultima volta, con il solo lucchetto B.', eve: 'Eve vede passare una scatola con un lucchetto. Non può aprirla.' },
+  { x: 1, aperta: true,  A: false, B: false, viaggio: false, titolo: 'Bob apre e legge',
+    testo: 'Bob toglie B, apre la scatola e legge il messaggio. Nessuna chiave è mai passata da Alice a Bob.', eve: 'Eve ha visto solo scatole chiuse.' },
+];
+
+const AX = 60, BX = 300;      // posizione orizzontale della scatola da Alice / da Bob
+
+function Scena({ s }) {
+  const px = s.x ? BX : AX;
+  return (
+    <svg className="scena-svg" viewBox="0 0 360 230" role="img"
+      aria-label={'Scena: ' + s.titolo + '. La scatola è ' + (s.x ? 'da Bob' : 'da Alice') + ', lucchetti: ' + ((s.A ? 'A ' : '') + (s.B ? 'B' : '') || 'nessuno') + '.'}>
+      {/* Alice, Eve, Bob */}
+      <text className="pers" x="60" y="62">👩</text><text className="nome" x="60" y="84">Alice</text>
+      <text className="chiave" x="94" y="62">🔑</text><text className="lucT" x="102" y="76" style={{ fill: 'var(--accent-alt)', fontSize: 11 }}>A</text>
+      <text className="pers" x="300" y="62">👨</text><text className="nome" x="300" y="84">Bob</text>
+      <text className="chiave" x="266" y="62">🔑</text><text className="lucT" x="274" y="76" style={{ fill: 'var(--info-t)', fontSize: 11 }}>B</text>
+      <text className="pers" x="180" y="62" style={{ opacity: s.viaggio ? 1 : .45 }}>🕵️</text><text className="nome" x="180" y="84">Eve</text>
+      {s.viaggio ? <path className="eve-linea" d="M 180 92 L 180 118" /> : null}
+      {/* tavoli */}
+      <rect className="tavolo" x="16" y="170" width="88" height="14" rx="4" />
+      <rect className="tavolo" x="256" y="170" width="88" height="14" rx="4" />
+      {/* scatola: si sposta tra i tavoli */}
+      <g className="sposta" style={{ transform: 'translateX(' + (px - AX) + 'px)' }}>
+        <g transform={'translate(' + AX + ' 170)'}>
+          <rect className="scatola" x="-30" y="-44" width="60" height="44" rx="4" />
+          {s.aperta ? <text x="0" y="-18" style={{ fontSize: 20 }}>✉️</text> : null}
+          <g className="coperchio" style={{ transform: s.aperta ? 'translate(-30px,-60px) rotate(-18deg)' : 'translate(-30px,-50px) rotate(0deg)' }}>
+            <rect x="0" y="0" width="60" height="8" rx="3" />
+          </g>
+          <g className="appari" style={{ opacity: s.A ? 1 : 0, transform: s.A ? 'scale(1)' : 'scale(.4)', transformOrigin: '-15px -38px' }}>
+            <rect className="lucA" x="-26" y="-40" width="22" height="20" rx="4" /><text className="lucT" x="-15" y="-29" style={{ dominantBaseline: 'central' }}>A</text>
+          </g>
+          <g className="appari" style={{ opacity: s.B ? 1 : 0, transform: s.B ? 'scale(1)' : 'scale(.4)', transformOrigin: '15px -38px' }}>
+            <rect className="lucB" x="4" y="-40" width="22" height="20" rx="4" /><text className="lucT" x="15" y="-29" style={{ dominantBaseline: 'central' }}>B</text>
+          </g>
+        </g>
+      </g>
+    </svg>
+  );
+}
+
+function App() {
+  const [i, setI] = useState(0);
+  const [auto, setAuto] = useState(false);
+  const timer = useRef(null);
+  const s = STATI[i], ultimo = STATI.length - 1;
+  useEffect(() => {
+    if (!auto) return undefined;
+    timer.current = setTimeout(() => { if (i >= ultimo) setAuto(false); else setI(i + 1); }, 2400);
+    return () => clearTimeout(timer.current);
+  }, [auto, i]);
+  const vai = (n) => { setAuto(false); setI(Math.max(0, Math.min(ultimo, n))); };
+  return (
+    <PaginaGioco titolo="Scatola con doppio lucchetto" indietro="slide.html#13" indietroEtichetta="Modulo 0">
+      <p>Alice vuole mandare un messaggio a Bob. Non hanno mai potuto scambiarsi una chiave e Eve può guardare la scatola mentre viaggia.</p>
+      <div className="scena-box mt">
+        <Scena s={s} />
+        <div className="punti mt" aria-hidden="true">{STATI.map((_, p) => <i key={p} className={p === i ? 'on' : (p < i ? 'fatto' : '')} />)}</div>
+      </div>
+
+      <div className="sim">
+        <div className="passo-n">Passo {i + 1} di {STATI.length}</div>
+        <h2 style={{ margin: '.2rem 0' }}>{s.titolo}</h2>
+        <p aria-live="polite">{s.testo}</p>
+        <p className="small"><Chip color="danger">Eve</Chip> {s.eve}</p>
+      </div>
+
+      <div className="comandi mt">
+        <Btn onClick={() => vai(i - 1)} disabled={i === 0}>← Indietro</Btn>
+        <Btn variant="primary" onClick={() => vai(i + 1)} disabled={i === ultimo}>Avanti →</Btn>
+        <Btn variant={auto ? 'danger' : 'info'} onClick={() => { if (i >= ultimo) setI(0); setAuto(!auto); }} aria-pressed={auto}>{auto ? 'Pausa' : 'Riproduci'}</Btn>
+        <Btn variant="ghost" onClick={() => vai(0)}>Ricomincia</Btn>
+      </div>
+
+      <h2>Che cosa abbiamo imparato</h2>
+      <Box type="success" title="Nessuna chiave scambiata">Alice e Bob hanno condiviso un segreto senza mai incontrarsi: ognuno ha usato soltanto il proprio lucchetto.</Box>
+      <Box type="warn" title="Il punto debole">Se Eve si finge Bob e mette un lucchetto suo al posto di B, Alice non se ne accorge. Serve un modo per sapere di chi è davvero il lucchetto: è il problema dell'<b>autenticazione</b>.</Box>
+      <Box type="info" title="E nella crittografia vera?">Con la crittografia asimmetrica la scatola viaggia una volta sola: Bob distribuisce lucchetti aperti (la chiave pubblica) e tiene la chiave (la privata). Lo vedremo con RSA.</Box>
+      <p className="small muted mt">Questa è un'analogia: i lucchetti si tolgono in qualsiasi ordine, come in un cifrario commutativo.</p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>

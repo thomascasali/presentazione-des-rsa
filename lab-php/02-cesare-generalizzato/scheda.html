@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab PHP 02 — Cesare generalizzato (scheda)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/print.css">
+</head>
+<body>
+<div class="toolbar no-stampa">
+  <a href="../../index.html">← Indice</a>
+  <button onclick="window.print()">Stampa la scheda</button>
+</div>
+
+<section class="sheet">
+  <div class="meta">Laboratorio PHP 02 · Sistemi e Reti</div>
+  <h1>Cesare generalizzato in PHP</h1>
+  <p>Nel cifrario di Cesare la chiave è un numero solo. Qui la chiave è una <b>serie di numeri</b>, per esempio <span class="mono">3-1-4</span>: la prima lettera si sposta di 3, la seconda di 1, la terza di 4, poi si ricomincia da 3. Lavori nel file <code>esercizio.php</code>; il file <code>test.php</code> controlla il tuo codice con dei casi noti.</p>
+
+  <h2>Prima di iniziare</h2>
+  <p><b>La convenzione.</b> La chiave avanza <b>solo quando cifri una lettera</b>. Spazi, cifre, punteggiatura e lettere accentate si copiano e non consumano nessun numero della chiave. Maiuscole e minuscole restano tali. I numeri della chiave possono essere negativi o maggiori di 25: contano <i>modulo 26</i>.</p>
+  <table>
+    <tr><th>Funzione PHP</th><th>Cosa fa</th><th>Esempio</th></tr>
+    <tr><td class="mono">count($a)</td><td>numero di elementi di un array</td><td class="mono">count([3, 1, 4]) vale 3</td></tr>
+    <tr><td class="mono">$a[$j % $n]</td><td>elemento ciclico: dopo l'ultimo si torna al primo</td><td class="mono">con n = 3, j = 4 → $a[1]</td></tr>
+    <tr><td class="mono">array_map(fn, $a)</td><td>applica una funzione a ogni elemento</td><td class="mono">array_map(fn($x) =&gt; -$x, [3, 1])</td></tr>
+    <tr><td class="mono">ord($c) / chr($n)</td><td>da carattere a codice e viceversa</td><td class="mono">ord('A') vale 65</td></tr>
+  </table>
+  <p><b>Prima di scrivere, rispondi a mano.</b> Cifra <span class="mono">xyz xyz</span> con la chiave <span class="mono">3-1-4</span>. Scrivi accanto a ogni lettera lo spostamento usato.</p>
+  <p class="righe"></p><p class="righe"></p>
+  <div class="nota attenzione"><b>Attenzione.</b> Il secondo gruppo <span class="mono">xyz</span> riparte dallo spostamento 3 oppure continua da dove si era fermato il primo? Dipende da quante lettere ci sono state prima, non da quanti caratteri.</div>
+
+  <h2><span class="livello">Livello 1</span> Completa la funzione</h2>
+  <p>In <code>esercizio.php</code> trova <code>cesareGeneralizzato(string $testo, array $chiave): string</code> e sostituisci i tre <code>TODO</code> (1, 2 e 3). Lo scheletro è questo:</p>
+<pre><code>function cesareGeneralizzato(string $testo, array $chiave): string
+{
+    $n = count($chiave);
+    if ($n === 0) { return $testo; }
+
+    // TODO 1: ogni numero della chiave nell'intervallo 0..25
+    $chiave = $chiave;
+
+    $risultato = '';
+    $j = 0;                       // lettere già cifrate
+    for ($i = 0; $i &lt; strlen($testo); $i++) {
+        $c = $testo[$i];
+        if ($c &gt;= 'A' &amp;&amp; $c &lt;= 'Z')      { $base = 65; }
+        elseif ($c &gt;= 'a' &amp;&amp; $c &lt;= 'z') { $base = 97; }
+        else { $risultato .= $c; continue; }
+
+        // TODO 2: sposta $c di $chiave[$j % $n] posti
+        $risultato .= $c;
+
+        // TODO 3: fai avanzare $j
+    }
+    return $risultato;
+}</code></pre>
+  <p><b>Per riflettere:</b> perché l'istruzione <code>continue</code> nel ramo <code>else</code> è importante? Che cosa cambierebbe se l'indice <code>$j</code> aumentasse anche per gli spazi?</p>
+  <p class="righe"></p><p class="righe"></p>
+  <p><b>Controllo:</b> da terminale <code>php test.php</code>. Il livello è finito quando tutti i test «Livello 1» sono OK.</p>
+</section>
+
+<section class="sheet">
+  <h2><span class="livello">Livello 2</span> Scrivi l'inversa</h2>
+  <p>Scrivi <code>decifraCesareGeneralizzato(string $testo, array $chiave): string</code>, che riporta in chiaro un testo cifrato con la serie <code>$chiave</code>.</p>
+  <ul>
+    <li>Devi <b>usare</b> <code>cesareGeneralizzato()</code>, senza ricopiare il suo codice.</li>
+    <li>Pensa al modulo sul percorso inverso: se cifrando si sposta di 3, di quanto si sposta chi decifra? Come cambia la serie?</li>
+    <li>Deve funzionare con chiavi che contengono numeri negativi o maggiori di 25.</li>
+  </ul>
+  <p><b>Prova a mano:</b> decifra <span class="mono">Fjer</span> con la chiave <span class="mono">3-1-4</span>: <span class="vuoto" style="min-width:8em"></span></p>
+
+  <h2><span class="livello">Livello 3</span> Attacco con chiave di lunghezza nota</h2>
+  <p>Un attaccante sa che la chiave è fatta da <b>2 numeri</b>. Le chiavi possibili sono 26 × 26 = 676. Scrivi due funzioni:</p>
+  <ol>
+    <li><code>forzaBruta2(string $cifrato): array</code> prova tutte le coppie <span class="mono">[a, b]</span> con a e b da 0 a 25. Restituisce un array con la chiave scritta come stringa <span class="mono">"a-b"</span> e il testo decifrato come valore, nell'ordine <span class="mono">0-0, 0-1, …, 0-25, 1-0, …, 25-25</span>.</li>
+    <li><code>trovaChiave2(string $cifrato, string $parola): ?array</code> usa <code>forzaBruta2()</code> e restituisce la prima chiave, nella forma <span class="mono">[a, b]</span>, per cui il testo decifrato contiene la <code>$parola</code> (senza distinguere maiuscole e minuscole), oppure <code>null</code>.</li>
+  </ol>
+  <div class="nota">Una parola che immagini presente nel messaggio, come «attacco», si chiama <i>parola probabile</i>. Con 676 chiavi basta a distinguere quella giusta.</div>
+  <p><b>Per riflettere:</b> con una chiave di 4 numeri, quante chiavi dovrebbe provare lo stesso programma? Il calcolo è fattibile?</p>
+  <p class="righe"></p><p class="righe"></p>
+
+  <h2><span class="livello">Livello 3 bonus</span> Frequenze per colonna</h2>
+  <p>Se sai che la chiave è lunga <i>n</i>, le lettere nelle posizioni 0, n, 2n, … sono state tutte spostate dello stesso numero: ogni «colonna» è un Cesare semplice, attaccabile con le frequenze, senza provare 676 chiavi. Scrivi:</p>
+  <ul>
+    <li><code>colonna(string $cifrato, int $n, int $i): string</code> — le sole lettere della colonna <i>i</i>, in maiuscolo. Esempio: <span class="mono">colonna('Ciao, Mondo!', 3, 0)</span> dà <span class="mono">CON</span>.</li>
+    <li><code>chiavePerFrequenze(string $cifrato, int $n): array</code> — per ogni colonna prova gli spostamenti 0..25 e sceglie quello con il punteggio più alto, dove il punteggio somma <code>frequenzeItaliane()[(L − s) mod 26]</code> sulle lettere <i>L</i> della colonna. La funzione <code>frequenzeItaliane()</code> è già scritta.</li>
+  </ul>
+  <p>Funziona bene su testi lunghi (qualche centinaio di lettere). Perché su un messaggio di 20 lettere non è affidabile?</p>
+  <p class="righe"></p><p class="righe"></p>
+
+  <h2>Come eseguire i test</h2>
+  <table>
+    <tr><th>Da terminale</th><td class="mono">cd lab-php/02-cesare-generalizzato<br>php test.php</td></tr>
+    <tr><th>Con XAMPP</th><td>copia la cartella in <span class="mono">htdocs</span> e apri <span class="mono">http://localhost/…/02-cesare-generalizzato/test.php</span></td></tr>
+  </table>
+  <p>Ogni riga è <b>OK</b> oppure <b>ERRORE</b>, con il valore atteso e quello ottenuto. In fondo c'è un riepilogo per livello.</p>
+
+  <h2>Consegna</h2>
+  <p>Il file <code>esercizio.php</code> con i livelli completati e il riepilogo di <code>test.php</code>.</p>
+  <p>Nome e cognome: <span class="vuoto" style="min-width:14em"></span> &nbsp; Classe: <span class="vuoto" style="min-width:5em"></span> &nbsp; Test superati: <span class="vuoto" style="min-width:4em"></span> / 32</p>
+</section>
+</body>
+</html>
