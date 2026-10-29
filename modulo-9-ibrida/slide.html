@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modulo 9 — Crittografia ibrida, firme e certificati</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  /* Scena a tre colonne: chi possiede cosa in ogni passo del protocollo */
+  .scena { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .7rem; }
+  .scena-col { background: var(--bg-card); border: 1px solid var(--border); border-top: 4px solid var(--info); border-radius: 10px; padding: .55rem .7rem; display: flex; flex-direction: column; gap: .35rem; min-width: 0; }
+  .scena-col.canale { border-top-color: var(--danger); background: color-mix(in srgb, var(--danger) 7%, var(--bg-card)); }
+  .scena-col.bob { border-top-color: var(--success); }
+  .scena-col.mallory { border-top-color: var(--danger); background: color-mix(in srgb, var(--danger) 9%, var(--bg-card)); }
+  .scena-t { font-family: var(--f-mono); font-size: var(--fs-xs); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+  .voce { font-family: var(--f-mono); font-size: var(--fs-sm); padding: .2em .5em; border-radius: 6px; border: 1px solid var(--border); color: var(--text); background: var(--bg); overflow-wrap: anywhere; }
+  .voce.pub { border-color: var(--info); color: var(--info-t); }
+  .voce.priv { border-color: var(--danger); color: var(--danger-t); }
+  .voce.sess { border-color: var(--accent); color: var(--accent-alt); }
+  .voce.cif { border-color: var(--purple); color: var(--purple-t); }
+  .voce.ok { border-color: var(--success); color: var(--success-t); }
+  .voce.vuota { border-style: dashed; color: var(--text-muted); text-align: center; }
+  .legenda { display: flex; flex-wrap: wrap; gap: .4rem .9rem; font-size: var(--fs-xs); color: var(--text-muted); }
+  .legenda span::before { content: ''; display: inline-block; width: .8em; height: .8em; border-radius: 3px; margin-right: .35em; vertical-align: -.05em; background: currentColor; }
+  .legenda .l-pub { color: var(--info-t); } .legenda .l-priv { color: var(--danger-t); } .legenda .l-sess { color: var(--accent-alt); } .legenda .l-cif { color: var(--purple-t); }
+  .hash { font-family: var(--f-mono); font-size: var(--fs-xs); overflow-wrap: anywhere; line-height: 1.5; color: var(--text); }
+  .hash .d { background: color-mix(in srgb, var(--danger) 35%, transparent); border-radius: 3px; color: var(--text); }
+  .tls-riga { display: grid; grid-template-columns: minmax(0, 1fr) 2.2rem minmax(0, 1fr); gap: .3rem; align-items: center; }
+  .tls-msg { background: var(--bg-light); border: 1px solid var(--border); border-radius: 8px; padding: .3rem .6rem; font-size: var(--fs-sm); }
+  .tls-msg.cifrato { border-color: var(--purple); }
+  .tls-freccia { text-align: center; color: var(--accent-alt); font-size: 1.3rem; }
+  @media (max-width: 900px) { .scena { grid-template-columns: 1fr; } .tls-riga { grid-template-columns: 1fr; } .tls-freccia { display: none; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
+const { Box, Glow, Chip, Grid, Card, Btn, Field, Table, Flow, CompareTwo, ActivityBadge, Steps, Code } = UI;
+const C = window.Cripto;
+
+/* ---------- numeri dell'esempio, tutti calcolati con crypto.js ---------- */
+
+const R = C.rsa.genera(61, 53, 17);                      // n=3233, e=17, d=2753
+const K_BIT = '1010011010', K_NUM = parseInt(K_BIT, 2);   // chiave di sessione S-DES (10 bit) = 666
+const K_CIF = C.rsa.cifra(K_NUM, R.pub);                  // 2892
+const MSG = 'CIAO';
+const hex2 = (bit) => (C.bitAHex(bit).match(/.{1,2}/g) || []).join(' ');
+const MSG_HEX = hex2(C.testoABit(MSG));
+const ENC = C.ecb(C.testoABit(MSG), K_BIT, { cifrario: 'sdes' }).output;
+const ENC_HEX = hex2(ENC);
+
+// hash giocattolo: somma dei codici dei caratteri modulo 256 (NON sicuro: serve solo a contare)
+const hashGioco = (t) => [...t].reduce((s, x) => s + x.charCodeAt(0), 0) % 256;
+const DOC = 'PAGA 100', DOC_FALSO = 'PAGA 900';
+const H1 = hashGioco(DOC), H2 = hashGioco(DOC_FALSO);
+const FIRMA = C.rsa.firma(H1, R.priv);
+const FIRMA_OK = C.rsa.verifica(FIRMA, H1, R.pub);
+const FIRMA_KO = C.rsa.verifica(FIRMA, H2, R.pub);
+
+// Diffie-Hellman giocattolo: p=23, g=5
+const DH = { p: 23, g: 5, a: 6, b: 15 };
+DH.A = C.potenzaModulare(DH.g, DH.a, DH.p);
+DH.B = C.potenzaModulare(DH.g, DH.b, DH.p);
+DH.sA = C.potenzaModulare(DH.B, DH.a, DH.p);
+DH.sB = C.potenzaModulare(DH.A, DH.b, DH.p);
+
+/* ---------- componenti specifici del modulo ---------- */
+
+// Scena a tre colonne. Ogni voce: { t: testo, tipo: 'pub'|'priv'|'sess'|'cif'|'ok' }
+function Scena({ titoli, alice, mezzo, bob, tipoMezzo }) {
+  const [ta, tm, tb] = titoli || ['Alice', 'Canale (visibile a tutti)', 'Bob'];
+  const col = (titolo, cls, voci) => (
+    <div className={'scena-col ' + cls}>
+      <div className="scena-t">{titolo}</div>
+      {voci.length ? voci.map((v, i) => <div key={i} className={'voce ' + (v.tipo || '')}>{v.t}</div>) : <div className="voce vuota">nulla</div>}
+    </div>
+  );
+  return (
+    <div className="stack">
+      <div className="scena">{col(ta, 'alice', alice)}{col(tm, tipoMezzo || 'canale', mezzo)}{col(tb, 'bob', bob)}</div>
+      <div className="legenda"><span className="l-pub">chiave pubblica</span><span className="l-priv">chiave privata</span><span className="l-sess">chiave di sessione</span><span className="l-cif">dato cifrato</span></div>
+    </div>
+  );
+}
+
+// Una riga del protocollo TLS: da chi a chi, cosa
+function RigaTls({ verso, testo, cifrato }) {
+  const msg = <div className={'tls-msg' + (cifrato ? ' cifrato' : '')}>{testo}</div>;
+  const vuoto = <div />;
+  return (
+    <div className="tls-riga">
+      {verso === 'cs' ? msg : vuoto}
+      <div className="tls-freccia" aria-hidden="true">{verso === 'cs' ? '→' : '←'}</div>
+      {verso === 'cs' ? vuoto : msg}
+    </div>
+  );
+}
+
+// Hash vero (SHA-256) calcolato dal browser con Web Crypto
+async function sha256(testo) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(testo));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function HashSim() {
+  const [a, setA] = useState('Pago 100 euro');
+  const [b, setB] = useState('Pago 900 euro');
+  const [h, setH] = useState({ a: '', b: '' });
+  const [errore, setErrore] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    if (!(window.crypto && crypto.subtle)) { setErrore(true); return; }
+    Promise.all([sha256(a), sha256(b)]).then(([x, y]) => { if (vivo) setH({ a: x, b: y }); }).catch(() => setErrore(true));
+    return () => { vivo = false; };
+  }, [a, b]);
+  const bitDiff = useMemo(() => {
+    if (!h.a || !h.b) return 0;
+    return C.hexABit(h.a).split('').filter((x, i) => x !== C.hexABit(h.b)[i]).length;
+  }, [h]);
+  const evid = (x, y) => x.split('').map((c, i) => <span key={i} className={c !== y[i] ? 'd' : ''}>{c}</span>);
+  if (errore) return <Box type="warn" title="Web Crypto non disponibile">Questo browser non permette il calcolo di SHA-256 da una pagina locale. Apri la pagina da un server (anche locale) oppure usa il comando <code>openssl dgst -sha256</code>.</Box>;
+  return (
+    <div className="sim">
+      <div className="sim-title">SHA-256 dal vivo</div>
+      <Grid cols={2}>
+        <div className="stack">
+          <Field label="Testo A" htmlFor="ha"><input id="ha" className="input mono" value={a} onChange={e => setA(e.target.value)} /></Field>
+          <div className="hash" aria-live="polite">{h.a ? evid(h.a, h.b) : '…'}</div>
+        </div>
+        <div className="stack">
+          <Field label="Testo B" htmlFor="hb"><input id="hb" className="input mono" value={b} onChange={e => setB(e.target.value)} /></Field>
+          <div className="hash" aria-live="polite">{h.b ? evid(h.b, h.a) : '…'}</div>
+        </div>
+      </Grid>
+      <p className="small dim">I due testi differiscono di pochi caratteri, le impronte di <b className="hl">{bitDiff}</b> bit su 256 (in media circa la metà). Le cifre diverse sono evidenziate.</p>
+    </div>
+  );
+}
+
+/* ---------- passi delle animazioni ---------- */
+
+const passiIbrida = [
+  { title: '1 · Alice crea la coppia di chiavi RSA', content: (
+    <Scena alice={[{ t: 'chiave pubblica (e=' + R.e + ', n=' + R.n + ')', tipo: 'pub' }, { t: 'chiave privata d=' + R.d, tipo: 'priv' }]} mezzo={[]} bob={[]} />) },
+  { title: '2 · Alice pubblica la chiave pubblica', content: (
+    <Scena alice={[{ t: 'pubblica (' + R.e + ', ' + R.n + ')', tipo: 'pub' }, { t: 'privata ' + R.d, tipo: 'priv' }]} mezzo={[{ t: '(' + R.e + ', ' + R.n + ')', tipo: 'pub' }]} bob={[{ t: 'pubblica di Alice', tipo: 'pub' }]} />) },
+  { title: '3 · Bob inventa una chiave di sessione casuale', content: (
+    <Scena alice={[{ t: 'pubblica', tipo: 'pub' }, { t: 'privata', tipo: 'priv' }]} mezzo={[]} bob={[{ t: 'pubblica di Alice', tipo: 'pub' }, { t: 'K = ' + K_BIT + ' (' + K_NUM + ')', tipo: 'sess' }]} />) },
+  { title: '4 · Bob cifra K con la pubblica di Alice (RSA)', content: (
+    <Scena alice={[{ t: 'pubblica', tipo: 'pub' }, { t: 'privata', tipo: 'priv' }]} mezzo={[]} bob={[{ t: 'K = ' + K_NUM, tipo: 'sess' }, { t: 'c = K^e mod n = ' + K_NUM + '^' + R.e + ' mod ' + R.n + ' = ' + K_CIF, tipo: 'cif' }]} />) },
+  { title: '5 · Bob cifra i dati con K (cifrario simmetrico)', content: (
+    <Scena alice={[{ t: 'pubblica', tipo: 'pub' }, { t: 'privata', tipo: 'priv' }]} mezzo={[]} bob={[{ t: 'K = ' + K_NUM, tipo: 'sess' }, { t: 'c = ' + K_CIF, tipo: 'cif' }, { t: '«' + MSG + '» → ' + ENC_HEX + ' (S-DES)', tipo: 'cif' }]} />) },
+  { title: '6 · Bob invia la chiave cifrata e i dati cifrati', content: (
+    <Scena alice={[{ t: 'pubblica', tipo: 'pub' }, { t: 'privata', tipo: 'priv' }]} mezzo={[{ t: 'c = ' + K_CIF, tipo: 'cif' }, { t: ENC_HEX, tipo: 'cif' }]} bob={[{ t: 'K = ' + K_NUM, tipo: 'sess' }]} />) },
+  { title: '7 · Alice ricava K con la sua chiave privata', content: (
+    <Scena alice={[{ t: 'privata ' + R.d, tipo: 'priv' }, { t: 'K = c^d mod n = ' + K_CIF + '^' + R.d + ' mod ' + R.n + ' = ' + C.rsa.decifra(K_CIF, R.priv), tipo: 'sess' }]} mezzo={[{ t: 'c = ' + K_CIF, tipo: 'cif' }, { t: ENC_HEX, tipo: 'cif' }]} bob={[{ t: 'K = ' + K_NUM, tipo: 'sess' }]} />) },
+  { title: '8 · Alice decifra i dati: ora hanno un canale protetto', content: (
+    <Scena alice={[{ t: 'K = ' + K_NUM, tipo: 'sess' }, { t: ENC_HEX + ' → «' + MSG + '»', tipo: 'ok' }]} mezzo={[{ t: 'solo numeri senza senso', tipo: 'cif' }]} bob={[{ t: 'K = ' + K_NUM, tipo: 'sess' }]} />) },
+];
+
+const passiFirma = [
+  { title: '1 · Alice calcola l\'hash del documento', content: (
+    <div className="stack">
+      <p>Documento: <span className="mono hl">«{DOC}»</span>. Con l'hash giocattolo (somma dei codici mod 256) l'impronta è <span className="mono hl">{H1}</span>. Nella realtà si usa SHA-256: 256 bit.</p>
+    </div>) },
+  { title: '2 · Alice cifra l\'hash con la sua chiave privata', content: (
+    <div className="stack">
+      <p>È la formula della decifratura RSA usata al contrario: <span className="mono">firma = hash^d mod n</span></p>
+      <p className="mono hl">{H1}^{String(R.d)} mod {String(R.n)} = {String(FIRMA)}</p>
+      <p className="small muted">Alice invia il documento e la firma <span className="mono">{String(FIRMA)}</span>.</p>
+    </div>) },
+  { title: '3 · Bob ricalcola l\'hash e apre la firma', content: (
+    <div className="stack">
+      <p>Con la chiave <b>pubblica</b> di Alice: <span className="mono">firma^e mod n</span></p>
+      <p className="mono hl">{String(FIRMA)}^{String(R.e)} mod {String(R.n)} = {String(C.potenzaModulare(FIRMA, R.e, R.n))}</p>
+      <p>Bob ricalcola da sé l'hash di «{DOC}»: <span className="mono hl">{H1}</span>. Sono uguali: <Chip color={FIRMA_OK ? 'success' : 'danger'}>firma valida</Chip></p>
+    </div>) },
+  { title: '4 · Se qualcuno cambia il documento', content: (
+    <div className="stack">
+      <p>Mallory cambia «{DOC}» in <span className="mono hl">«{DOC_FALSO}»</span>. L'hash ricalcolato da Bob è <span className="mono hl">{H2}</span>, ma la firma restituisce {H1}.</p>
+      <p>Non coincidono: <Chip color={FIRMA_KO ? 'success' : 'danger'}>firma NON valida</Chip> Mallory non può rifare la firma perché non ha la chiave privata di Alice.</p>
+    </div>) },
+];
+
+const passiMitm = [
+  { title: '1 · Alice chiede la chiave di Bob', content: (
+    <Scena titoli={['Alice', 'Mallory (in mezzo)', 'Bob']} tipoMezzo="mallory" alice={[]} mezzo={[{ t: 'legge ogni pacchetto' }]} bob={[{ t: 'pubblica di Bob', tipo: 'pub' }, { t: 'privata di Bob', tipo: 'priv' }]} />) },
+  { title: '2 · Mallory sostituisce la chiave', content: (
+    <Scena titoli={['Alice', 'Mallory (in mezzo)', 'Bob']} tipoMezzo="mallory" alice={[{ t: 'riceve la pubblica di MALLORY, convinta sia di Bob', tipo: 'pub' }]} mezzo={[{ t: 'sua coppia di chiavi', tipo: 'priv' }, { t: 'tiene la vera pubblica di Bob', tipo: 'pub' }]} bob={[{ t: 'non sa niente' }]} />) },
+  { title: '3 · Alice cifra per «Bob»: apre Mallory', content: (
+    <Scena titoli={['Alice', 'Mallory (in mezzo)', 'Bob']} tipoMezzo="mallory" alice={[{ t: 'cifra la chiave di sessione con la pubblica sbagliata', tipo: 'cif' }]} mezzo={[{ t: 'decifra con la sua privata: ora conosce K', tipo: 'sess' }]} bob={[]} />) },
+  { title: '4 · Mallory inoltra a Bob e legge tutto', content: (
+    <Scena titoli={['Alice', 'Mallory (in mezzo)', 'Bob']} tipoMezzo="mallory" alice={[{ t: 'crede di parlare con Bob' }]} mezzo={[{ t: 'ricifra K con la vera pubblica di Bob', tipo: 'cif' }, { t: 'legge e può modificare i dati', tipo: 'sess' }]} bob={[{ t: 'crede di parlare con Alice' }]} />) },
+];
+
+const passiDh = [
+  { title: '1 · Parametri pubblici', content: <p>Tutti conoscono un numero primo <span className="mono hl">p = {DH.p}</span> e una base <span className="mono hl">g = {DH.g}</span>. Eve li può leggere.</p> },
+  { title: '2 · Ognuno sceglie un numero segreto', content: <p>Alice sceglie <span className="mono hl">a = {DH.a}</span>, Bob sceglie <span className="mono hl">b = {DH.b}</span>. Non li dicono a nessuno.</p> },
+  { title: '3 · Si scambiano le parti pubbliche', content: <div className="stack"><p>Alice invia <span className="mono hl">A = g^a mod p = {DH.g}^{DH.a} mod {DH.p} = {DH.A}</span></p><p>Bob invia <span className="mono hl">B = g^b mod p = {DH.g}^{DH.b} mod {DH.p} = {DH.B}</span></p></div> },
+  { title: '4 · Lo stesso segreto, mai trasmesso', content: <div className="stack"><p>Alice calcola <span className="mono hl">B^a mod p = {DH.B}^{DH.a} mod {DH.p} = {DH.sA}</span></p><p>Bob calcola <span className="mono hl">A^b mod p = {DH.A}^{DH.b} mod {DH.p} = {DH.sB}</span></p><p className="small muted">Eve conosce {DH.p}, {DH.g}, {DH.A}, {DH.B} ma per trovare il segreto dovrebbe risolvere il logaritmo discreto (difficile con numeri grandi).</p></div> },
+];
+
+const COMANDI_SSH = `# genera una coppia di chiavi (moderna: ed25519)
+ssh-keygen -t ed25519 -C "thomas@scuola"
+
+# cartella ~/.ssh
+id_ed25519       # chiave PRIVATA: mai condividerla
+id_ed25519.pub   # chiave pubblica: la metti sul server
+known_hosts      # chiavi dei server già incontrati
+authorized_keys  # (sul server) chiavi utente ammesse`;
+
+const SSH_AVVISO = `@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!`;
+
+/* ---------- le slide ---------- */
+
+const slides = [
+  { copertina: true, sezione: 'Apertura', titolo: 'Crittografia ibrida, firme e certificati',
+    sottotitolo: 'Come si mettono insieme cifrari simmetrici e RSA per costruire HTTPS, SSH e la firma digitale.',
+    note: ['Modulo conclusivo: riprende i cifrari a chiave condivisa (DES, AES) e RSA e li compone nei protocolli che usiamo ogni giorno. Il filo conduttore sono tre problemi: velocità, scambio delle chiavi, fiducia nella chiave pubblica.', 'Il laboratorio OpenSSL a fine modulo fa provare al PC tutti i passi mostrati qui.'] },
+
+  { sezione: 'Il problema', titolo: 'Due famiglie, due difetti',
+    contenuto: () => (
+      <div className="stack-lg">
+        <CompareTwo
+          left={{ icon: '🔑', title: 'Simmetrica (DES, AES)', color: 'var(--info)', points: ['Una sola chiave per cifrare e decifrare', 'Molto veloce, anche in hardware', 'Come si scambia la chiave in sicurezza?', 'Per n persone servono n(n−1)/2 chiavi'] }}
+          right={{ icon: '🔐', title: 'Asimmetrica (RSA)', color: 'var(--purple)', points: ['Coppia: pubblica per cifrare, privata per decifrare', 'Nessun segreto da scambiare prima', 'Lenta e adatta solo a dati piccoli (meno di n)', 'Ogni utente ha una sola coppia'] }} />
+        <Table head={['Persone', 'Chiavi simmetriche', 'Coppie RSA']} center mono
+          rows={[10, 100, 1000].map(n => [n, (n * (n - 1) / 2).toLocaleString('it-IT'), n])} />
+      </div>
+    ),
+    note: 'Riassume i moduli precedenti. La simmetrica è veloce ma presuppone che i due abbiano già un segreto in comune; l\'asimmetrica risolve il problema dello scambio ma è molto più lenta, di ordini di grandezza, e può cifrare solo messaggi più piccoli del modulo n. La tabella è calcolata con la formula n(n−1)/2: con 1000 persone sarebbero quasi mezzo milione di chiavi segrete da distribuire. Domanda per la classe: come si risolve prendendo il meglio di entrambe?' },
+
+  { sezione: 'Crittografia ibrida', titolo: 'L\'idea: RSA per la chiave, AES per i dati',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { icon: '🎲', label: 'Chiave di sessione', sub: 'casuale, usa e getta', color: 'var(--accent)' },
+          { icon: '🔐', label: 'RSA', sub: 'cifra solo la chiave (pochi byte)', color: 'var(--purple)' },
+          { icon: '📦', label: 'Chiave cifrata', sub: 'viaggia sul canale', color: 'var(--danger)' },
+          { icon: '⚡', label: 'AES / DES', sub: 'cifra tutti i dati', color: 'var(--info)' },
+        ]} />
+        <Grid cols={2} stretch>
+          <Card tone="purple"><h3>Asimmetrica: scambio</h3><p>Risolve il problema della distribuzione. Cifra 16–32 byte: il costo è trascurabile.</p></Card>
+          <Card tone="info"><h3>Simmetrica: dati</h3><p>Cifra file, pagine web, video. Velocità di centinaia di MB al secondo su un PC.</p></Card>
+        </Grid>
+        <p className="small muted">Con RSA a 2048 bit e padding OAEP-SHA256 si possono cifrare al massimo 190 byte: la chiave AES (32 byte) ci sta di sicuro, un documento no.</p>
+      </div>
+    ),
+    note: 'È il cuore del modulo. La chiave di sessione si chiama così perché dura una sessione di comunicazione e poi si butta. I 190 byte derivano da 256 − 2·32 − 2 (modulo 2048 bit, hash SHA-256 di OAEP). La velocità della simmetrica dipende molto dal processore: sui PC moderni le istruzioni AES-NI portano AES nell\'ordine del GB/s; non serve citare numeri esatti.' },
+
+  { sezione: 'Crittografia ibrida', titolo: 'Alice e Bob, passo per passo',
+    contenuto: () => (
+      <div className="stack">
+        <Steps steps={passiIbrida} />
+        <ActivityBadge href="simulazione-ibrida.html" label="Provalo tu: simulazione con la tua chiave e il tuo messaggio" icon="📱" />
+      </div>
+    ),
+    note: 'Avanzate con la freccia destra. I numeri sono quelli del modulo 8 (p=61, q=53, e=17, d=2753) e come cifrario simmetrico usiamo S-DES con chiave di 10 bit, abbastanza piccola da stare sotto n=3233. Sottolineate dopo il passo 6: Eve vede il canale ma ha solo la chiave cifrata e i dati cifrati; senza d non ricava K. La pagina simulazione-ibrida.html permette di cambiare messaggio, chiave e coppia di primi dal telefono.' },
+
+  { sezione: 'Integrità', titolo: 'Hash: l\'impronta digitale di un dato',
+    contenuto: () => (
+      <div className="stack">
+        <Grid cols={3} stretch>
+          <Card tone="info"><h3>Lunghezza fissa</h3><p className="small">SHA-256 dà sempre 256 bit, qualunque sia il dato.</p></Card>
+          <Card tone="accent"><h3>Un solo verso</h3><p className="small">Dall'hash non si risale al testo.</p></Card>
+          <Card tone="danger"><h3>Effetto valanga</h3><p className="small">Un carattere diverso cambia circa metà dei bit.</p></Card>
+        </Grid>
+        <HashSim />
+      </div>
+    ),
+    note: 'Gli hash non sono cifrari: non hanno chiave e non si invertono. Servono a controllare l\'integrità e, insieme a RSA, a firmare. Nella demo cambiate un carattere e osservate le cifre evidenziate: circa metà dei 256 bit cambia. Con SHA-256 non si conoscono collisioni pratiche; MD5 e SHA-1 invece sono stati rotti e non vanno più usati per le firme. Se la pagina è aperta da file:// alcuni browser vietano Web Crypto: in quel caso usate un server locale.' },
+
+  { sezione: 'Firma digitale', titolo: 'La firma: RSA al contrario',
+    contenuto: () => (
+      <div className="stack">
+        <p>Per firmare si cifra l'<span className="hl">hash</span> con la chiave <span className="hl">privata</span>; chiunque verifica con la chiave <span className="hl">pubblica</span>.</p>
+        <Steps steps={passiFirma} />
+      </div>
+    ),
+    note: 'Il modulo 8 ha già mostrato firma e verifica con RSA. Qui aggiungiamo l\'hash: si firma l\'impronta, non l\'intero documento, per velocità e per evitare il limite dimensionale. L\'hash giocattolo (somma dei codici mod 256) è debole: ha moltissime collisioni e serve solo per i calcoli a mano; in HTTPS e nei documenti firmati si usa SHA-256. Nei sistemi reali la firma RSA usa anche un padding (PKCS#1 v1.5 o PSS): omesso qui.' },
+
+  { sezione: 'Firma digitale', titolo: 'Che cosa garantisce una firma',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={3} stretch>
+          <Card tone="success"><h3>Integrità</h3><p className="small">Se un bit del documento cambia, l'hash non coincide più.</p></Card>
+          <Card tone="success"><h3>Autenticità</h3><p className="small">Solo chi ha la chiave privata poteva produrre quella firma.</p></Card>
+          <Card tone="success"><h3>Non ripudio</h3><p className="small">Il firmatario non può negare, perché la privata è solo sua.</p></Card>
+        </Grid>
+        <Box type="warn" title="Che cosa NON fa">
+          Non nasconde il contenuto (il documento resta leggibile) e non dice <em>chi è</em> il proprietario della chiave pubblica: lo dimostra solo se sei sicuro che quella pubblica sia davvero di Alice.
+        </Box>
+      </div>
+    ),
+    note: 'Distinguete bene cifrare e firmare: si cifra con la pubblica del destinatario per la riservatezza; si firma con la privata del mittente per autenticità e integrità. Si possono combinare. Il non ripudio ha valore giuridico solo se la chiave è protetta bene (smart card, token, passphrase) e legata a una persona con un certificato: proprio il problema delle prossime slide.' },
+
+  { sezione: 'Fiducia', titolo: 'Il problema: di chi è questa chiave pubblica?',
+    contenuto: () => (
+      <div className="stack">
+        <p>La chiave pubblica non è segreta, ma deve essere <span className="hl">autentica</span>. Un attaccante che si mette in mezzo può sostituirla (attacco man-in-the-middle).</p>
+        <Steps steps={passiMitm} />
+      </div>
+    ),
+    note: 'Con RSA nessuno deve nascondere la chiave pubblica, ma qualcuno deve garantire che appartenga davvero a Bob. Se Mallory controlla la rete (Wi-Fi pubblico, router compromesso) può sostituire la chiave e fare da ponte tra i due. Nessun calcolo è stato rotto: l\'attacco sfrutta la mancanza di verifica dell\'identità. Chiedete alla classe come si potrebbe evitare: la risposta sono i certificati.' },
+
+  { sezione: 'Fiducia', titolo: 'Certificati e autorità di certificazione',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2} stretch>
+          <Card tone="info">
+            <h3>Il certificato (X.509)</h3>
+            <ul className="small">
+              <li>nome del soggetto (es. <span className="mono">www.example.it</span>)</li>
+              <li>la sua <b>chiave pubblica</b></li>
+              <li>date di inizio e fine validità</li>
+              <li>chi l'ha emesso</li>
+              <li>la <b>firma</b> dell'emittente</li>
+            </ul>
+          </Card>
+          <Card tone="accent">
+            <h3>La catena di fiducia</h3>
+            <Flow steps={[{ label: 'CA radice', sub: 'già nel browser' }, { label: 'CA intermedia' }, { label: 'Sito', sub: 'il tuo certificato' }]} />
+          </Card>
+        </Grid>
+        <Box type="tip" title="Come si rompe l'attacco">
+          Il browser conosce in anticipo le chiavi pubbliche di poche CA radice. Un certificato firmato da una CA fidata dimostra che quella chiave è del sito: Mallory non può fabbricarne uno valido.
+        </Box>
+      </div>
+    ),
+    note: 'Un certificato è una chiave pubblica con una carta d\'identità firmata da una autorità (CA, Certification Authority). Il browser o il sistema operativo contengono un archivio di certificati radice fidati; la CA radice di solito non firma direttamente i siti ma delle CA intermedie. Il browser controlla la catena, le date, il nome del sito e (quando previsto) la revoca. Let\'s Encrypt è la CA gratuita che ha reso comune HTTPS. Il modello ha un punto debole: bisogna fidarsi delle CA (alcune sono state compromesse in passato).' },
+
+  { sezione: 'Dove si usa', titolo: 'HTTPS: il protocollo TLS 1.3 in sintesi',
+    contenuto: () => (
+      <div className="stack">
+        <RigaTls verso="cs" testo="ClientHello: algoritmi supportati, numero casuale, parte pubblica Diffie-Hellman" />
+        <RigaTls verso="sc" testo="ServerHello: algoritmo scelto + parte pubblica DH del server" />
+        <RigaTls verso="sc" cifrato testo="Certificate + CertificateVerify (firma con la chiave del certificato) + Finished" />
+        <RigaTls verso="cs" cifrato testo="Finished (il client ha verificato catena, nome e firma)" />
+        <RigaTls verso="cs" cifrato testo="Dati HTTP cifrati con la chiave simmetrica derivata (AES-GCM o ChaCha20-Poly1305)" />
+        <Box type="warn" title="Attenzione: RSA non trasporta più la chiave">
+          Nelle vecchie versioni (TLS 1.2 con suite RSA) il client cifrava il segreto con la chiave RSA del server. In TLS 1.3 questo metodo non esiste più: il segreto nasce da Diffie-Hellman effimero. La chiave del certificato (RSA o curve ellittiche) serve soltanto a <b>firmare</b> e provare l'identità.
+        </Box>
+      </div>
+    ),
+    note: 'Handshake semplificato: nella realtà ci sono altri messaggi (estensioni, scelta del cifrario, derivazione delle chiavi con HKDF, ticket di sessione). Le righe cifrate (bordo viola) sono già protette dalle chiavi di handshake: in TLS 1.3 il certificato non viaggia più in chiaro. Si fa in un solo round trip. Punto da fissare: è ancora uno schema ibrido, ma l\'accordo sulla chiave è DH effimero e RSA (o ECDSA) serve alla firma; chi registra il traffico oggi e ruba la chiave del server domani non riesce comunque a decifrare (forward secrecy).' },
+
+  { sezione: 'Dove si usa', titolo: 'Diffie-Hellman: accordarsi senza trasmettere',
+    contenuto: () => (
+      <div className="stack">
+        <Steps steps={passiDh} />
+        <Grid cols={2}>
+          <Box type="info" title="Effimero">Per ogni connessione si generano numeri nuovi e si buttano: se il server viene violato in futuro, le sessioni passate restano al sicuro (<em>forward secrecy</em>).</Box>
+          <Box type="danger" title="Non autentica">DH da solo non dice con chi parli: un Mallory in mezzo farebbe due scambi. Per questo in TLS la parte del server è firmata e il certificato la lega al nome del sito.</Box>
+        </Grid>
+      </div>
+    ),
+    note: 'Esempio minimo con p=23 e g=5, calcolato con potenzaModulare di crypto.js (stesso algoritmo square-and-multiply del modulo 7). In TLS si usano gruppi di curve ellittiche (X25519) o primi di migliaia di bit, ma la struttura è identica: (g^a)^b = (g^b)^a. Il segreto condiviso non viaggia mai; con i numeri veri trovare a da g^a mod p è il problema del logaritmo discreto. Collegate al problema della slide sul man-in-the-middle.' },
+
+  { sezione: 'Dove si usa', titolo: 'Che cosa c\'è dietro il lucchetto',
+    contenuto: () => (
+      <div className="stack">
+        <Grid cols={2} stretch>
+          <Card tone="info">
+            <h3>Il browser controlla</h3>
+            <ul className="small">
+              <li>catena di certificati fino a una radice fidata</li>
+              <li>nome del sito uguale a quello del certificato</li>
+              <li>date di validità e revoca</li>
+              <li>firma sull'handshake (CertificateVerify)</li>
+            </ul>
+          </Card>
+          <Card tone="accent">
+            <h3>Esempio reale (<span className="mono">openssl s_client</span>)</h3>
+            <p className="mono small dim">Protocollo: TLSv1.3<br />Suite: TLS_AES_256_GCM_SHA384<br />Chiave server: ECDSA 256 bit<br />Scambio: X25519 (effimero)</p>
+          </Card>
+        </Grid>
+        <Box type="info" title="Non solo RSA">
+          I siti moderni spesso usano certificati con <b>curve ellittiche</b> (ECDSA), con chiavi di 256 bit equivalenti a un RSA molto più grande: la logica (firma e verifica) è la stessa che abbiamo visto con RSA.
+        </Box>
+        <ActivityBadge href="../lab-openssl/scheda.html" label="Lo verifichi anche tu nel laboratorio OpenSSL" icon="🧪" />
+      </div>
+    ),
+    note: 'I dati dell\'esempio provengono da una connessione di prova con openssl s_client verso un grande sito web; cambiano nel tempo e da sito a sito (alcuni usano ancora certificati RSA da 2048 bit). Nel laboratorio gli studenti eseguono lo stesso comando e leggono catena, emittente, validità, protocollo e suite scelta. L\'equivalenza indicativa: curva a 256 bit ≈ RSA 3072 bit come sicurezza.' },
+
+  { sezione: 'Dove si usa', titolo: 'SSH: chiavi in ~/.ssh e known_hosts',
+    contenuto: () => (
+      <Grid cols={2} className="split-ssh">
+        <Code title="terminale" lang="bash" code={COMANDI_SSH} />
+        <div className="stack">
+          <Card tone="info"><h3>Server → utente</h3><p className="small">Al primo accesso il client mostra l'impronta della chiave del server e la salva in <span className="mono">known_hosts</span>. Dalle volte successive la confronta.</p></Card>
+          <Card tone="accent"><h3>Utente → server</h3><p className="small">Il server sfida il client, che firma con la chiave privata. La privata non viaggia mai.</p></Card>
+          <Code title="se la chiave del server cambia" lang="bash" code={SSH_AVVISO} />
+        </div>
+      </Grid>
+    ),
+    note: 'SSH usa gli stessi ingredienti: scambio di chiavi con Diffie-Hellman (di solito su curva25519), cifratura simmetrica (AES o ChaCha20) per i dati, firme per autenticare il server (host key) e l\'utente (chiave in ~/.ssh). Il primo accesso funziona sulla fiducia (trust on first use): chi si connette dovrebbe verificare l\'impronta. L\'avviso REMOTE HOST IDENTIFICATION HAS CHANGED è proprio il segnale di un possibile man-in-the-middle (oppure di un server reinstallato). Mostrate gli studenti il proprio ~/.ssh solo a livello di nomi dei file, mai il contenuto della chiave privata.' },
+
+  { sezione: 'Dove si usa', titolo: 'Email cifrata e firma digitale qualificata',
+    contenuto: () => (
+      <Grid cols={2} stretch>
+        <Card tone="purple">
+          <h3>PGP / OpenPGP, S/MIME</h3>
+          <ul className="small">
+            <li>Schema ibrido: una chiave di sessione cifra il testo, la chiave pubblica del destinatario cifra la chiave di sessione.</li>
+            <li>Firma sull'hash del messaggio.</li>
+            <li>Fiducia: in PGP si verificano le impronte (<em>web of trust</em>), in S/MIME si usano certificati emessi da CA.</li>
+          </ul>
+        </Card>
+        <Card tone="success">
+          <h3>In Italia</h3>
+          <ul className="small">
+            <li><b>Firma digitale qualificata</b>: certificato qualificato di un prestatore di servizi fiduciari e dispositivo sicuro (smart card, token o firma remota). Per il regolamento europeo eIDAS ha il valore giuridico della firma autografa.</li>
+            <li>Formati comuni: <span className="mono">.p7m</span> (CAdES) e PDF firmati (PAdES).</li>
+            <li><b>SPID e CIE</b> servono soprattutto a <em>identificarsi</em> online, cioè autenticarsi, e non sono di per sé una firma qualificata.</li>
+          </ul>
+        </Card>
+      </Grid>
+    ),
+    note: 'Sono tutte applicazioni dello stesso schema: hash + firma con chiave privata, cifratura ibrida, certificato che lega nome e chiave. La firma qualificata richiede un certificato emesso da un prestatore qualificato iscritto agli elenchi di fiducia dell\'Unione e un dispositivo di creazione sicuro; la legge italiana di riferimento è il Codice dell\'amministrazione digitale insieme al regolamento europeo eIDAS. Attenzione a non semplificare troppo: SPID e CIE sono sistemi di identità digitale per l\'autenticazione ai servizi; esistono anche modalità di firma elettronica collegate a questi sistemi, ma sono altro rispetto alla firma qualificata. Se in classe sorgono dubbi, rimandate a quanto pubblicato da AgID.' },
+
+  { sezione: 'Sintesi', titolo: 'Mappa: chi fa che cosa nei protocolli',
+    contenuto: () => (
+      <Table head={['Protocollo', 'Accordo sulla chiave', 'Identità / firma', 'Dati']}
+        rows={[
+          ['HTTPS (TLS 1.3)', 'Diffie-Hellman effimero (X25519)', 'Certificato (RSA o ECDSA) + firma', 'AES-GCM, ChaCha20-Poly1305'],
+          ['SSH', 'Diffie-Hellman (curve25519)', 'Chiave del server e chiave utente', 'AES o ChaCha20'],
+          ['Email OpenPGP', 'Chiave di sessione cifrata con RSA / ECC', 'Firma sull\'hash', 'AES'],
+          ['Firma qualificata', '—', 'RSA o ECDSA sull\'hash (SHA-256)', 'documento in chiaro + firma'],
+        ]} />
+    ),
+    note: 'Tabella di sintesi: ogni protocollo reale combina gli stessi tre blocchi. Chi chiede «ma allora RSA non serve più?» ha colto il punto: oggi serve soprattutto per firmare e per certificare; l\'accordo di chiave nei protocolli moderni usa Diffie-Hellman, mentre in OpenPGP resta frequente il trasporto della chiave di sessione con la chiave pubblica del destinatario. I nomi dei cifrari sono quelli tipici, non gli unici ammessi.' },
+
+  { sezione: 'Riepilogo del percorso', titolo: 'Dai bigliettini di Cesare a HTTPS',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { icon: '📜', label: 'Cesare', sub: '25 chiavi', color: 'var(--accent)' },
+          { icon: '🔤', label: 'Vigenère', sub: 'chiave lunga', color: 'var(--accent)' },
+          { icon: '🔀', label: 'Trasposizione', sub: 'si mescola', color: 'var(--accent)' },
+          { icon: '⚙️', label: 'DES / AES', sub: 'bit e blocchi', color: 'var(--info)' },
+          { icon: '🔐', label: 'RSA', sub: 'coppia di chiavi', color: 'var(--purple)' },
+          { icon: '🌐', label: 'HTTPS', sub: 'tutto insieme', color: 'var(--success)' },
+        ]} />
+        <Grid cols={2}>
+          <Box type="info" title="Ogni passo corregge una debolezza">Troppe poche chiavi → chiavi più lunghe. Lettere con frequenze visibili → bit e diffusione. Chiave da scambiare → coppia di chiavi. Chiave pubblica da credere → certificati.</Box>
+          <Box type="tip" title="Principio di Kerckhoffs">Gli algoritmi sono pubblici e studiati da tutti; la sicurezza sta solo nelle chiavi, che non si inventano: si generano casuali con strumenti collaudati.</Box>
+        </Grid>
+      </div>
+    ),
+    note: 'Ripercorrete a voce il filo del corso: ogni cifrario è nato per rimediare a un attacco al precedente. Cesare cade per forza bruta e frequenze, Vigenère per la ripetizione della chiave (Kasiski), i cifrari moderni cifrano bit con confusione e diffusione, DES è ormai troppo corto, AES e RSA reggono se usati bene, ma la fiducia nelle chiavi pubbliche richiede i certificati. Concludete sul principio di Kerckhoffs, già incontrato nel modulo 1.' },
+
+  { sezione: 'Riepilogo del percorso', titolo: 'Tabella dei cifrari: tipo, chiave, debolezza',
+    contenuto: () => (
+      <Table head={['Cifrario', 'Tipo', 'Chiave', 'Debolezza']}
+        rows={[
+          ['Cesare', 'sostituzione', '1 numero (25 utili)', 'forza bruta, frequenze'],
+          ['Affine', 'sostituzione', '2 numeri (312)', 'forza bruta, frequenze'],
+          ['Vigenère', 'polialfabetico', 'una parola', 'chiave ripetuta: Kasiski, indice di coincidenza'],
+          ['Trasposizione', 'permutazione', 'ordine colonne', 'le lettere restano quelle: anagrammi'],
+          ['XOR con chiave ripetuta', 'a flusso', 'bit ripetuti', 'testo noto, chiave riusata'],
+          ['S-DES', 'a blocchi (didattico)', '10 bit', 'solo 1024 chiavi'],
+          ['DES / 3DES', 'a blocchi 64 bit', '56 bit / fino a 168', 'DES: forza bruta; 3DES: lento, blocco piccolo'],
+          ['AES', 'a blocchi 128 bit', '128–256 bit', 'nessuna nota in pratica; ECB espone i pattern'],
+          ['RSA', 'asimmetrico', 'coppia, n = p·q', 'se n si fattorizza; serve ≥ 2048 bit e padding'],
+        ]} />
+    ),
+    note: 'Tabella di ripasso: potete usarla come quiz orale coprendo una colonna. Dettagli: l\'affine ha 12 valori ammessi per a (coprimi con 26) e 26 per b, quindi 312 chiavi. DES ha chiave di 64 bit di cui 56 utili; nel 1998 una macchina dedicata (EFF) lo ha rotto in pochi giorni. 3DES offre al massimo circa 112 bit di sicurezza e blocchi di 64 bit: oggi è deprecato. ECB cifra blocchi uguali in blocchi uguali, come si vede nel laboratorio OpenSSL. RSA: la sicurezza si basa sulla difficoltà di fattorizzare n; dimensioni consigliate almeno 2048 bit.' },
+
+  { sezione: 'Riepilogo', titolo: 'Riepilogo e laboratorio',
+    contenuto: () => (
+      <div className="stack-lg">
+        <ul>
+          <li>La <span className="hl">simmetrica</span> è veloce ma serve una chiave condivisa; l'<span className="hl">asimmetrica</span> è lenta ma risolve lo scambio: si usano insieme (<span className="hl">schema ibrido</span>).</li>
+          <li>L'<span className="hl">hash</span> dà un'impronta; la <span className="hl">firma</span> la cifra con la privata e garantisce integrità e autenticità.</li>
+          <li>I <span className="hl">certificati</span> legano una chiave pubblica a un nome e fermano il man-in-the-middle.</li>
+          <li><span className="hl">TLS 1.3</span> usa Diffie-Hellman effimero per la chiave e la firma per l'identità; <span className="hl">SSH</span> segue la stessa logica.</li>
+        </ul>
+        <Grid cols={3} stretch>
+          <Card tone="accent"><h3>Laboratorio</h3><p className="small">Al PC: OpenSSL passo passo, dalla cifratura simmetrica ai certificati.</p><ActivityBadge href="../lab-openssl/scheda.html" label="Scheda del laboratorio" icon="🧪" /></Card>
+          <Card tone="info"><h3>Quiz</h3><p className="small">Verifica finale sul percorso.</p><ActivityBadge href="../quiz/quiz.html" label="Vai al quiz" icon="✅" /></Card>
+          <Card tone="success"><h3>Simulazione</h3><p className="small">Il protocollo ibrido da telefono.</p><ActivityBadge href="simulazione-ibrida.html" label="Apri la simulazione" icon="📱" /></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Chiusura del percorso. Il laboratorio OpenSSL è pensato per due ore o meno e può essere svolto in coppia: la parte finale (scambio ibrido tra due compagni) mette in pratica le slide su Alice e Bob. Il quiz comprende le domande sull\'intero corso.' },
+];
+
+Deck.mount(slides, { modulo: 9, nome: 'Crittografia ibrida, firme e certificati', indice: '../index.html' });
+</script>
+</body>
+</html>

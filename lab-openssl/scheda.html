@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab OpenSSL — crittografia ibrida al PC (scheda)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/print.css">
+<style>
+  @media (max-width: 700px) { .sheet { overflow-wrap: anywhere; } code, .mono { overflow-wrap: anywhere; } table { display: block; overflow-x: auto; } }
+</style>
+</head>
+<body>
+<div class="toolbar no-stampa">
+  <a href="../index.html">← Indice</a>
+  <button onclick="window.print()">Stampa la scheda</button>
+</div>
+
+<section class="sheet">
+  <div class="meta">Laboratorio OpenSSL · Sistemi e Reti</div>
+  <h1>Crittografia simmetrica, asimmetrica e ibrida con OpenSSL</h1>
+  <p>Provi al PC tutto ciò che hai visto nelle slide: cifrare un file con AES e 3DES, vedere perché ECB è debole, generare una coppia RSA e riconoscerne i numeri, firmare, leggere un certificato vero e infine costruire lo scambio ibrido insieme a un compagno. A ogni passo c'è una domanda: scrivi la risposta sulla scheda.</p>
+
+  <h2>Prima di iniziare</h2>
+  <table>
+    <tr><th>Windows</th><td>Apri <b>Git Bash</b> (viene con Git for Windows e contiene <span class="mono">openssl</span>). Non usare il Prompt dei comandi.</td></tr>
+    <tr><th>Linux / macOS</th><td>Un terminale qualsiasi. Se <span class="mono">openssl</span> manca, installa il pacchetto <span class="mono">openssl</span>.</td></tr>
+  </table>
+  <p>Lavora in una cartella tua e vuota; tutti i comandi sono pensati per questa cartella:</p>
+<pre><code>mkdir ~/lab-openssl
+cd ~/lab-openssl</code></pre>
+  <div class="nota"><b>Due versioni di OpenSSL.</b> Git Bash include di solito la versione 1.1.1, molte distribuzioni Linux la 3.x. I comandi della scheda funzionano in entrambe; dove l'output cambia, c'è una nota. Le righe di output mostrate sono una sintesi: numeri, nomi e date possono essere diversi nel tuo caso.</div>
+  <div class="nota attenzione"><b>Regola d'oro.</b> La chiave privata (<span class="mono">*_priv.pem</span>) non si manda a nessuno, mai. Si condivide solo la chiave pubblica. Nel laboratorio le password sono scritte nei comandi per semplicità: in un sistema vero finirebbero nella cronologia della shell.</div>
+
+  <h2><span class="livello">1</span> Versione e algoritmi disponibili</h2>
+<pre><code>openssl version
+openssl list -cipher-algorithms | grep -i -E "aes-256-cbc|des-ede3-cbc"
+openssl list -digest-algorithms | grep -i sha256</code></pre>
+  <p><b>Atteso (sintesi):</b></p>
+<pre><code>OpenSSL 1.1.1s  1 Nov 2022          (nella 3.x: OpenSSL 3.x.y ...)
+AES-256-CBC
+DES-EDE3-CBC
+SHA256</code></pre>
+  <p><b>Domanda 1.</b> Quale versione hai? Che cosa significano «AES», «256» e «CBC» nel nome <span class="mono">AES-256-CBC</span>? (Pensa al modulo 6.)</p>
+  <p class="righe"></p><p class="righe"></p>
+</section>
+
+<section class="sheet">
+  <h2><span class="livello">2</span> Cifrare e decifrare un file con AES-256</h2>
+<pre><code>echo "Messaggio segreto: ci vediamo alle otto" &gt; messaggio.txt
+openssl enc -aes-256-cbc -pbkdf2 -in messaggio.txt -out messaggio.enc -pass pass:segreto123
+wc -c messaggio.txt messaggio.enc
+xxd messaggio.enc | head -3
+openssl enc -d -aes-256-cbc -pbkdf2 -in messaggio.enc -pass pass:segreto123</code></pre>
+  <p><b>Atteso (sintesi):</b></p>
+<pre><code> 40 messaggio.txt
+ 64 messaggio.enc
+00000000: 5361 6c74 6564 5f5f ....      ← «Salted__» seguito da 8 byte casuali
+Messaggio segreto: ci vediamo alle otto</code></pre>
+  <p>Ora prova con una password sbagliata: <span class="mono">-pass pass:sbagliata</span>. Di solito compare <span class="mono">bad decrypt</span> (a volte, per caso, esce solo spazzatura: il file è comunque illeggibile).</p>
+  <p><b>Domanda 2a.</b> Il file in chiaro è di 40 byte, quello cifrato di 64. Da dove arrivano i 24 byte in più? (Indizio: l'intestazione <span class="mono">Salted__</span> e il padding a blocchi di 16 byte.)</p>
+  <p class="righe"></p><p class="righe"></p>
+  <p><b>Domanda 2b.</b> Cifra due volte lo stesso file con la stessa password e confronta i risultati (<span class="mono">cmp</span> o <span class="mono">xxd</span>). Sono uguali? Perché?</p>
+  <p class="righe"></p><p class="righe"></p>
+  <div class="nota">L'opzione <span class="mono">-pbkdf2</span> trasforma la password in una chiave AES con una funzione apposta, lenta e salata. Senza di essa OpenSSL usa un metodo vecchio e debole e ti avvisa con un <i>warning</i>.</div>
+
+  <h2><span class="livello">3</span> 3DES e DES</h2>
+<pre><code>openssl enc -des-ede3-cbc -pbkdf2 -in messaggio.txt -out m3des.enc -pass pass:segreto123
+openssl enc -d -des-ede3-cbc -pbkdf2 -in m3des.enc -pass pass:segreto123
+openssl enc -des-cbc -pbkdf2 -in messaggio.txt -out mdes.enc -pass pass:segreto123</code></pre>
+  <p><b>Atteso:</b> i primi due comandi funzionano come con AES. L'ultimo (DES singolo) dà risultati diversi a seconda della versione:</p>
+  <table>
+    <tr><th>OpenSSL 1.1.1</th><td>funziona, nessun messaggio.</td></tr>
+    <tr><th>OpenSSL 3.x</th><td><span class="mono">Error setting cipher DES-CBC ... unsupported</span>: DES singolo è nel <i>legacy provider</i>, disattivato per sicurezza. Per riabilitarlo (solo per studio): <span class="mono">openssl enc -des-cbc -pbkdf2 -provider legacy -provider default ...</span>. Se non trova il modulo, indica la cartella con <span class="mono">-provider-path</span>.</td></tr>
+  </table>
+  <p><b>Domanda 3.</b> Perché DES singolo è stato messo da parte? Quanti bit ha la sua chiave e quante chiavi si devono provare al massimo con la forza bruta? Che cosa fa 3DES (EDE) per «allungare» la vita di DES?</p>
+  <p class="righe"></p><p class="righe"></p><p class="righe"></p>
+</section>
+
+<section class="sheet">
+  <h2><span class="livello">4</span> ECB e CBC a confronto</h2>
+  <p>Creiamo un testo di 32 byte con due blocchi AES <b>identici</b> (16 lettere ripetute) e lo cifriamo in due modi, con la stessa chiave scritta direttamente in esadecimale (solo per l'esperimento: <span class="mono">-K</span> e <span class="mono">-iv</span> indicano chiave e vettore iniziale).</p>
+<pre><code>printf 'CIAOCIAOCIAOCIAOCIAOCIAOCIAOCIAO' &gt; rip.txt
+openssl enc -aes-128-ecb -nopad -K 000102030405060708090a0b0c0d0e0f -in rip.txt | xxd
+openssl enc -aes-128-cbc -nopad -K 000102030405060708090a0b0c0d0e0f \
+        -iv 00000000000000000000000000000000 -in rip.txt | xxd</code></pre>
+  <p><b>Atteso (sintesi):</b></p>
+<pre><code>ECB: a9fb b291 6bfb e91d 607c 5ca8 b826 9ea6      ← blocco 1
+     a9fb b291 6bfb e91d 607c 5ca8 b826 9ea6      ← blocco 2: IDENTICO
+CBC: a9fb b291 6bfb e91d 607c 5ca8 b826 9ea6      ← blocco 1
+     6f5c dbb3 8fe3 d871 b223 e9fa 79a8 c659      ← blocco 2: diverso</code></pre>
+  <p><b>Domanda 4a.</b> Perché in ECB i due blocchi cifrati sono uguali e in CBC no? (Che cosa viene messo in XOR con il blocco prima di cifrarlo?)</p>
+  <p class="righe"></p><p class="righe"></p>
+  <p><b>Domanda 4b.</b> Cifrando un'immagine con grandi aree uniformi in ECB, il contorno resta riconoscibile. Spiega il motivo con le parole «blocchi uguali» e «pattern». Quale modo useresti per dati veri?</p>
+  <p class="righe"></p><p class="righe"></p>
+
+  <h2><span class="livello">5</span> Generare la coppia di chiavi RSA</h2>
+<pre><code>openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out alice_priv.pem
+openssl pkey -in alice_priv.pem -pubout -out alice_pub.pem
+head -1 alice_priv.pem alice_pub.pem</code></pre>
+  <p><b>Atteso:</b> <span class="mono">-----BEGIN PRIVATE KEY-----</span> per la privata e <span class="mono">-----BEGIN PUBLIC KEY-----</span> per la pubblica. Durante la generazione compaiono righe di puntini e <span class="mono">+</span>: OpenSSL sta cercando due numeri primi grandi (1.1.1); la 3.x può mostrare più puntini o niente.</p>
+  <p><b>Domanda 5.</b> Quale dei due file puoi pubblicare su un sito? Perché la chiave pubblica si può ricavare dalla privata ma non il contrario?</p>
+  <p class="righe"></p><p class="righe"></p>
+</section>
+
+<section class="sheet">
+  <h2><span class="livello">6</span> Dentro la chiave: n, e, d, p, q</h2>
+  <p>Con 2048 bit l'output è lunghissimo. Per leggerlo meglio generiamo una chiave piccola, <b>solo didattica</b> (512 bit, non sicura):</p>
+<pre><code>openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:512 -out mini.pem
+openssl rsa -in mini.pem -text -noout</code></pre>
+  <p><b>Atteso (sintesi, i numeri sono esadecimali a coppie di cifre):</b></p>
+<pre><code>RSA Private-Key: (512 bit, 2 primes)
+modulus:
+    00:a8:0e:74:15:98:3c:40:20:c9:...
+publicExponent: 65537 (0x10001)
+privateExponent:
+    ...
+prime1:
+    ...
+prime2:
+    ...
+exponent1:
+exponent2:
+coefficient:</code></pre>
+  <p>Completa la tabella con i simboli del modulo 8 (p, q, n, e, d):</p>
+  <table>
+    <tr><th>Etichetta OpenSSL</th><th>Simbolo</th><th>Che cos'è</th></tr>
+    <tr><td class="mono">modulus</td><td><span class="vuoto" style="min-width:3em"></span></td><td><span class="vuoto" style="min-width:12em"></span></td></tr>
+    <tr><td class="mono">publicExponent</td><td><span class="vuoto" style="min-width:3em"></span></td><td><span class="vuoto" style="min-width:12em"></span></td></tr>
+    <tr><td class="mono">privateExponent</td><td><span class="vuoto" style="min-width:3em"></span></td><td><span class="vuoto" style="min-width:12em"></span></td></tr>
+    <tr><td class="mono">prime1, prime2</td><td><span class="vuoto" style="min-width:3em"></span></td><td><span class="vuoto" style="min-width:12em"></span></td></tr>
+    <tr><td class="mono">exponent1, exponent2, coefficient</td><td colspan="2">valori aggiuntivi che OpenSSL precalcola per decifrare più in fretta (teorema cinese del resto): non servono per capire RSA.</td></tr>
+  </table>
+  <p>Due controlli con il comando <span class="mono">openssl prime</span> (stesso numero del modulo 8: p = 61, q = 53):</p>
+<pre><code>openssl prime 61
+openssl prime 3233</code></pre>
+<pre><code>3D (61) is prime
+CA1 (3233) is not prime</code></pre>
+  <p><b>Domanda 6a.</b> Quanti bit ha il modulo <span class="mono">n</span> della tua chiave mini? Quanti sono i bit di ciascuno dei due primi, più o meno? Il valore di <span class="mono">e</span> è 65537 e nel modulo 8 era 17: perché si sceglie un <i>e</i> piccolo, ma non troppo?</p>
+  <p class="righe"></p><p class="righe"></p>
+  <p><b>Domanda 6b.</b> Perché 3233 «non è primo»: quali due numeri lo compongono? Dire che il modulo n è composto è facile; perché con una chiave da 512 bit questo non basta per trovare p e q?</p>
+  <p class="righe"></p><p class="righe"></p>
+</section>
+
+<section class="sheet">
+  <h2><span class="livello">7</span> Cifrare un piccolo file con RSA</h2>
+<pre><code>echo "Ciao Bob, la chiave e 4242" &gt; piccolo.txt
+openssl pkeyutl -encrypt -pubin -inkey alice_pub.pem -in piccolo.txt -out piccolo.enc
+wc -c piccolo.enc
+openssl pkeyutl -decrypt -inkey alice_priv.pem -in piccolo.enc</code></pre>
+  <p><b>Atteso:</b></p>
+<pre><code>256 piccolo.enc
+Ciao Bob, la chiave e 4242</code></pre>
+  <p>Ripeti la cifratura su un secondo file <span class="mono">piccolo2.enc</span> e confronta con <span class="mono">cmp piccolo.enc piccolo2.enc</span>. Poi prova un file grande:</p>
+<pre><code>head -c 300 /dev/zero | tr '\0' 'a' &gt; grande.txt
+openssl pkeyutl -encrypt -pubin -inkey alice_pub.pem -in grande.txt -out grande.enc</code></pre>
+  <p><b>Atteso:</b> <span class="mono">Public Key operation error ... data too large for key size</span>.</p>
+  <p><b>Domanda 7a.</b> Il file cifrato ha sempre 256 byte (2048 bit) qualunque sia il messaggio e due cifrature dello stesso testo sono diverse. Che cosa lo spiega? (Il messaggio deve essere minore di n e viene preparato con un padding casuale.)</p>
+  <p class="righe"></p><p class="righe"></p>
+  <p><b>Domanda 7b.</b> Perché RSA non si usa per cifrare un intero documento? Quale schema usi invece?</p>
+  <p class="righe"></p><p class="righe"></p>
+
+  <h2><span class="livello">8</span> Firmare e verificare</h2>
+<pre><code>openssl dgst -sha256 messaggio.txt
+openssl dgst -sha256 -sign alice_priv.pem -out messaggio.sig messaggio.txt
+openssl dgst -sha256 -verify alice_pub.pem -signature messaggio.sig messaggio.txt</code></pre>
+  <p>Poi cambia il documento e verifica di nuovo:</p>
+<pre><code>echo "Messaggio segreto: ci vediamo alle nove" &gt; falso.txt
+openssl dgst -sha256 -verify alice_pub.pem -signature messaggio.sig falso.txt</code></pre>
+  <p><b>Atteso (sintesi):</b></p>
+<pre><code>SHA256(messaggio.txt)= 93d0acb6...    (64 cifre esadecimali)
+Verified OK
+Verification Failure                  (nella 3.x: Verification failure)</code></pre>
+  <p><b>Domanda 8.</b> Che cosa viene cifrato con la chiave privata: il file o il suo hash? La firma è lunga 256 byte (<span class="mono">wc -c messaggio.sig</span>) anche se il file è di 40: perché? Che cosa garantisce «Verified OK»?</p>
+  <p class="righe"></p><p class="righe"></p>
+</section>
+
+<section class="sheet">
+  <h2><span class="livello">9</span> Ispezionare un certificato vero</h2>
+  <p>Serve la rete. Chiediamo a un sito vero di presentarsi con TLS (il comando <span class="mono">echo |</span> chiude subito la connessione):</p>
+<pre><code>echo | openssl s_client -connect www.google.com:443 -servername www.google.com -brief
+echo | openssl s_client -connect www.google.com:443 -servername www.google.com 2&gt;/dev/null | openssl x509 -out sito.pem
+openssl x509 -in sito.pem -noout -subject -issuer -dates
+openssl x509 -in sito.pem -noout -text | grep -E "Signature Algorithm|Public Key Algorithm|Public-Key"</code></pre>
+  <p><b>Atteso (sintesi, cambia nel tempo e da sito a sito):</b></p>
+<pre><code>CONNECTION ESTABLISHED
+Protocol version: TLSv1.3
+Ciphersuite: TLS_AES_256_GCM_SHA384
+Peer certificate: CN = www.google.com
+Signature type: ECDSA
+Verification: OK
+Server Temp Key: X25519, 253 bits
+subject=CN = www.google.com
+issuer=C = US, O = Google Trust Services, CN = WE2
+notBefore=... GMT        notAfter=... GMT   (circa tre mesi di validità)
+Signature Algorithm: ecdsa-with-SHA256
+Public Key Algorithm: id-ecPublicKey      Public-Key: (256 bit)</code></pre>
+  <div class="nota"><b>Se compare «unable to get local issuer certificate»:</b> OpenSSL non ha trovato l'elenco delle CA fidate sul tuo PC (succede con alcune installazioni Windows). Non è un attacco: il comando continua e mostra comunque il certificato. Per la verifica serve indicare un file di CA con <span class="mono">-CAfile</span>. Dietro un proxy scolastico la connessione potrebbe fallire: chiedi al docente un sito raggiungibile.</div>
+  <p><b>Domanda 9a.</b> Chi è il soggetto (<i>subject</i>) e chi ha firmato il certificato (<i>issuer</i>)? Da quanto tempo è valido e per quanto ancora? Perché la durata è breve?</p>
+  <p class="righe"></p><p class="righe"></p>
+  <p><b>Domanda 9b.</b> La chiave pubblica del sito è RSA? Di che tipo è e quanti bit ha? In quale riga vedi che l'accordo sulla chiave di sessione è <i>effimero</i> (Diffie-Hellman)? Che cosa cifra ora i dati della pagina?</p>
+  <p class="righe"></p><p class="righe"></p>
+  <p><b>Domanda 9c (facoltativa).</b> Ripeti con <span class="mono">-tls1_2</span> aggiunto al comando <span class="mono">s_client</span> e con un altro sito a tua scelta. Che cosa cambia nella suite?</p>
+  <p class="righe"></p><p class="righe"></p>
+</section>
+
+<section class="sheet">
+  <h2><span class="livello">10</span> Scambio ibrido tra due compagni</h2>
+  <p>Mettetevi in coppia: <b>Alice</b> riceve, <b>Bob</b> invia. Lo scambio dei file può avvenire con chiavetta, cartella condivisa o messaggi: ricordate che il canale è <i>pubblico</i>, quindi non mandate mai le chiavi private.</p>
+
+  <h3>A. Alice prepara le chiavi (una volta)</h3>
+<pre><code>openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out alice_priv.pem
+openssl pkey -in alice_priv.pem -pubout -out alice_pub.pem</code></pre>
+  <p>Alice manda <span class="mono">alice_pub.pem</span> a Bob. Prima di usarla, Bob e Alice confrontano a voce l'<b>impronta</b> della chiave (ciascuno sul proprio PC): devono leggere lo stesso valore.</p>
+<pre><code>openssl pkey -pubin -in alice_pub.pem -outform DER | openssl dgst -sha256</code></pre>
+
+  <h3>B. Bob cifra un documento</h3>
+<pre><code>seq 1 2000 &gt; documento.txt                  # un file «grande» a piacere
+openssl rand -hex 32 &gt; sessione.key         # chiave di sessione casuale
+openssl enc -aes-256-cbc -pbkdf2 -in documento.txt -out documento.enc -pass file:sessione.key
+openssl pkeyutl -encrypt -pubin -inkey alice_pub.pem \
+        -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 \
+        -in sessione.key -out sessione.key.enc</code></pre>
+  <p>Bob manda ad Alice <span class="mono">documento.enc</span> e <span class="mono">sessione.key.enc</span> (e <b>non</b> <span class="mono">sessione.key</span>!).</p>
+
+  <h3>C. Alice decifra</h3>
+<pre><code>openssl pkeyutl -decrypt -inkey alice_priv.pem \
+        -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 \
+        -in sessione.key.enc -out sessione.key
+openssl enc -d -aes-256-cbc -pbkdf2 -in documento.enc -out documento_letto.txt -pass file:sessione.key
+head -3 documento_letto.txt</code></pre>
+  <p><b>Atteso:</b> la chiave <span class="mono">sessione.key</span> occupa 65 byte (64 cifre esadecimali più il ritorno a capo; 66 in Git Bash), il file <span class="mono">sessione.key.enc</span> 256 byte, e <span class="mono">documento_letto.txt</span> è identico all'originale (<span class="mono">cmp</span> non stampa nulla).</p>
+
+  <h3>D. Firma di Bob (scambio dei ruoli)</h3>
+  <p>Ora Bob crea la sua coppia (<span class="mono">bob_priv.pem</span>, <span class="mono">bob_pub.pem</span>) e firma <span class="mono">documento.enc</span> con <span class="mono">openssl dgst -sha256 -sign</span>; Alice verifica con la chiave pubblica di Bob.</p>
+
+  <p><b>Domanda 10a.</b> Che cosa viaggia sul canale? Che cosa servirebbe a un intercettatore per leggere il documento? Disegna sul retro la scena di Alice, Bob e del canale come nella slide.</p>
+  <p class="righe"></p><p class="righe"></p>
+  <p><b>Domanda 10b (man-in-the-middle).</b> Un terzo compagno intercetta <span class="mono">alice_pub.pem</span> e la sostituisce con una sua chiave pubblica. Che cosa succede quando Bob cifra? Come ve ne accorgete con l'impronta del punto A? Quale strumento, nelle slide, risolve il problema su larga scala?</p>
+  <p class="righe"></p><p class="righe"></p>
+  <p><b>Domanda 10c.</b> Quale parte è asimmetrica, quale simmetrica, quale usa un hash? Perché Bob usa una chiave di sessione nuova a ogni invio?</p>
+  <p class="righe"></p><p class="righe"></p>
+
+  <h2>Consegna</h2>
+  <p>La scheda con le risposte alle domande e, a scelta del docente, i file <span class="mono">documento_letto.txt</span> e <span class="mono">messaggio.sig</span>. Prima di chiudere, cancella le chiavi di prova: <span class="mono">rm *_priv.pem mini.pem sessione.key</span>.</p>
+  <p>Nome e cognome: <span class="vuoto" style="min-width:14em"></span> &nbsp; Classe: <span class="vuoto" style="min-width:5em"></span> &nbsp; Data: <span class="vuoto" style="min-width:6em"></span></p>
+</section>
+</body>
+</html>

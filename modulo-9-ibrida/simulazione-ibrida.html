@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crittografia ibrida — simulazione</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  .attore { font-family: var(--f-mono); font-size: var(--fs-xs); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  .attore.alice { color: var(--info-t); } .attore.bob { color: var(--success-t); } .attore.eve { color: var(--danger-t); }
+  .passo { background: var(--bg-card); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 10px; padding: .8rem 1rem; }
+  .passo.alice { border-left-color: var(--info); } .passo.bob { border-left-color: var(--success); } .passo.eve { border-left-color: var(--danger); }
+  .passo.attuale { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+  .passo h3 { font-size: var(--fs-body); margin: .1rem 0 .4rem; color: var(--text); }
+  .passo p { font-size: var(--fs-sm); color: var(--text-dim); }
+  .formula { font-family: var(--f-mono); font-size: var(--fs-sm); color: var(--text); overflow-wrap: anywhere; }
+  .chiaro-pub { border: 1px dashed var(--danger); border-radius: 8px; padding: .5rem .7rem; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Btn, Field, Box, BitRow, Chip, PaginaGioco } = UI;
+const C = window.Cripto;
+
+const PRESET = [
+  { p: 61, q: 53, e: 17 },
+  { p: 47, q: 59, e: 17 },
+  { p: 53, q: 59, e: 17 },
+  { p: 43, q: 41, e: 17 },
+];
+const casuale10 = () => Array.from({ length: 10 }, () => (Math.random() < 0.5 ? '0' : '1')).join('');
+const hex = (bit) => (C.bitAHex(bit).match(/.{1,2}/g) || []).join(' ');
+
+function App() {
+  const [pi, setPi] = useState(0);
+  const [K, setK] = useState('1010011010');
+  const [msg, setMsg] = useState('CIAO');
+  const [passo, setPasso] = useState(0);
+  const T = 7;
+
+  const d = useMemo(() => {
+    const pr = PRESET[pi];
+    const r = C.rsa.genera(pr.p, pr.q, pr.e);
+    const Kn = parseInt(K, 2);
+    const cK = C.rsa.cifra(Kn, r.pub);
+    const bitMsg = C.testoABit(msg);
+    const enc = C.ecb(bitMsg, K, { cifrario: 'sdes' });
+    const Kd = Number(C.rsa.decifra(cK, r.priv));
+    const Kdbit = Kd.toString(2).padStart(10, '0');
+    const dec = C.ecb(enc.output, Kdbit, { cifrario: 'sdes', decifra: true }).output;
+    const testo = C.bitATesto(dec).replace(/\u0000+$/, '');
+    const sbagliata = ((Kn ^ 1) >>> 0).toString(2).padStart(10, '0');
+    const eve = C.ecb(enc.output, sbagliata, { cifrario: 'sdes', decifra: true }).output;
+    return { r, Kn, cK, enc, Kd, Kdbit, testo, sbagliata, eve };
+  }, [pi, K, msg]);
+
+  const cambia = (f) => { f(); setPasso(0); };
+  const passi = [
+    { chi: 'alice', t: '1 · Alice crea la coppia RSA', c: (
+      <>
+        <p>Sceglie due primi piccoli e un esponente e = {d.r.e}. Pubblica la <b>chiave pubblica</b> e tiene per sé la privata.</p>
+        <p className="formula">p = {String(d.r.p)}, q = {String(d.r.q)} → n = {String(d.r.n)}, φ = {String(d.r.phi)}</p>
+        <p className="formula">pubblica (e, n) = ({String(d.r.e)}, {String(d.r.n)})<br />privata d = {String(d.r.d)} (segreta)</p>
+      </>) },
+    { chi: 'bob', t: '2 · Bob sceglie la chiave di sessione', c: (
+      <>
+        <p>Una chiave casuale di 10 bit, adatta al cifrario simmetrico S-DES. Tocca i bit per cambiarla oppure estraine una a caso.</p>
+        <BitRow bits={K} group={5} onToggle={(i) => cambia(() => setK(K.slice(0, i) + (K[i] === '1' ? '0' : '1') + K.slice(i + 1)))} label="Chiave di sessione K" />
+        <p className="formula mt">K = {K}₂ = {d.Kn}</p>
+        <Btn small onClick={() => cambia(() => setK(casuale10()))}>Estrai una chiave a caso</Btn>
+      </>) },
+    { chi: 'bob', t: '3 · Bob cifra la chiave con RSA', c: (
+      <>
+        <p>Usa la chiave <b>pubblica</b> di Alice: nessun segreto da scambiare prima. Il numero K deve essere minore di n.</p>
+        <p className="formula">c = K<sup>e</sup> mod n = {d.Kn}<sup>{String(d.r.e)}</sup> mod {String(d.r.n)} = <b className="hl">{String(d.cK)}</b></p>
+      </>) },
+    { chi: 'bob', t: '4 · Bob cifra il messaggio con S-DES', c: (
+      <>
+        <p>I dati veri viaggiano cifrati con il cifrario simmetrico (veloce) e la chiave K. Ogni blocco è di 8 bit (modo ECB, solo per semplicità).</p>
+        <Field label="Messaggio di Bob" htmlFor="msg"><input id="msg" className="input mono" maxLength={12} value={msg} onChange={(e) => cambia(() => setMsg(e.target.value))} /></Field>
+        <p className="formula">in chiaro: {hex(C.testoABit(msg)) || '—'}<br />cifrato : <b className="hl">{hex(d.enc.output) || '—'}</b></p>
+      </>) },
+    { chi: 'bob', t: '5 · Bob invia due cose', c: (
+      <>
+        <p>Sul canale passano la chiave cifrata e il messaggio cifrato. Chiunque può leggerli, anche Eve.</p>
+        <div className="chiaro-pub formula">chiave cifrata c = {String(d.cK)}<br />messaggio cifrato = {hex(d.enc.output)}</div>
+        <p className="mt"><span className="attore eve">Eve</span> senza la chiave K prova una chiave sbagliata ({d.sbagliata}₂) e ottiene: <span className="formula">{hex(d.eve)}</span> → «{C.bitATesto(d.eve)}»</p>
+      </>) },
+    { chi: 'alice', t: '6 · Alice recupera la chiave', c: (
+      <>
+        <p>Con la chiave <b>privata</b> d inverte l'operazione di Bob.</p>
+        <p className="formula">K = c<sup>d</sup> mod n = {String(d.cK)}<sup>{String(d.r.d)}</sup> mod {String(d.r.n)} = <b className="hl">{d.Kd}</b> = {d.Kdbit}₂</p>
+        <Chip color={d.Kdbit === K ? 'success' : 'danger'}>{d.Kdbit === K ? 'Uguale alla K di Bob' : 'Diversa dalla K di Bob'}</Chip>
+      </>) },
+    { chi: 'alice', t: '7 · Alice decifra il messaggio', c: (
+      <>
+        <p>Ora entrambi hanno la stessa chiave K e usano S-DES al contrario.</p>
+        <p className="formula">messaggio = <b className="hl">«{d.testo}»</b></p>
+        <Box type="info" title="Perché è «ibrida»">RSA ha cifrato soltanto 10 bit; il resto lo ha fatto il cifrario simmetrico. È lo stesso schema di HTTPS e SSH, con numeri molto più grandi.</Box>
+      </>) },
+  ];
+
+  return (
+    <PaginaGioco titolo="Crittografia ibrida a passi" indietro="slide.html" indietroEtichetta="Modulo 9">
+      <p className="lead mb">Alice e Bob non hanno mai scambiato un segreto. Segui il protocollo un passo alla volta.</p>
+      <div className="sim mb">
+        <div className="sim-title">Chiavi RSA di Alice</div>
+        <Field label="Coppia di numeri primi (p, q)" htmlFor="pq">
+          <select id="pq" className="input" value={pi} onChange={(e) => cambia(() => setPi(+e.target.value))}>
+            {PRESET.map((x, i) => <option key={i} value={i}>p = {x.p}, q = {x.q}, e = {x.e}</option>)}
+          </select>
+        </Field>
+      </div>
+      <div className="stack">
+        {passi.slice(0, passo + 1).map((s, i) => (
+          <div key={i} className={'passo ' + s.chi + (i === passo ? ' attuale' : '')}>
+            <div className={'attore ' + s.chi}>{s.chi === 'alice' ? 'Alice' : 'Bob'}</div>
+            <h3>{s.t}</h3>
+            {s.c}
+          </div>
+        ))}
+        <div className="row">
+          <Btn onClick={() => setPasso(Math.max(0, passo - 1))} disabled={passo === 0}>← Indietro</Btn>
+          <Btn variant="primary" onClick={() => setPasso(Math.min(T - 1, passo + 1))} disabled={passo === T - 1}>Avanti →</Btn>
+          {passo > 0 ? <Btn variant="ghost" onClick={() => setPasso(0)}>↺ Da capo</Btn> : null}
+          <span className="mono small muted">Passo {passo + 1} di {T}</span>
+        </div>
+      </div>
+      <Box type="warn" title="Solo un giocattolo">
+        S-DES ha 1024 chiavi e questi numeri RSA si fattorizzano a mente: nella realtà si usano AES con chiavi da 128 o 256 bit e moduli RSA da almeno 2048 bit. La struttura del protocollo però è identica.
+      </Box>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>
