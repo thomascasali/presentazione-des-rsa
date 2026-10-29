@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bigliettini di Vigenère — da ritagliare</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/print.css">
+<style>
+  .sheet.carte { padding: 8mm 10mm; }
+  .carte .griglia { grid-template-columns: repeat(2, 1fr); gap: 6mm; }
+  .carta { border: 1.5px dashed var(--p-text); border-radius: 3mm; padding: 4mm 5mm; min-height: 44mm; break-inside: avoid; display: flex; flex-direction: column; gap: 2mm; }
+  .carta .testa { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--f-mono); font-size: 9pt; color: var(--p-dim); gap: 6pt; }
+  .carta .tipo { border: 1.5px solid var(--p-text); border-radius: 10pt; padding: 0 7pt; font-weight: 600; color: var(--p-text); text-align: right; }
+  .carta .cifrato { font-family: var(--f-mono); font-size: 12pt; font-weight: 600; letter-spacing: .04em; line-height: 1.4; overflow-wrap: anywhere; }
+  .carta .indizio { font-size: 9.5pt; color: var(--p-dim); }
+  .carta .risposta { margin-top: auto; font-size: 9pt; color: var(--p-dim); }
+  .carta .riga { border-bottom: 1px solid var(--p-line); height: 6mm; }
+  table.tavola { border-collapse: collapse; width: 100%; font-family: var(--f-mono); font-size: 8.5pt; text-align: center; table-layout: fixed; }
+  table.tavola th, table.tavola td { border: 1px solid var(--p-line); padding: 0; height: 6.4mm; text-align: center; }
+  table.tavola th { background: var(--p-soft); font-weight: 700; }
+  table.tavola td.d { background: var(--p-soft); }
+  @media (max-width: 700px) { .sheet.carte { padding: 14px; } .carte .griglia { grid-template-columns: 1fr; } table.tavola { font-size: 6.5pt; } }
+  @media print { .carte .griglia { gap: 5mm; grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="toolbar no-stampa"><a href="../index.html">← Indice</a><button onclick="window.print()">Stampa</button></div>
+<section class="sheet carte">
+  <div class="meta">Gioco dei bigliettini · cifrario di Vigenère</div>
+  <h1>Bigliettini da ritagliare</h1>
+  <p><b>Come si gioca.</b> Ritagliate i bigliettini lungo le linee tratteggiate e usate la tavola di Vigenère (ultima pagina). Con la chiave scritta si decifra subito: per ogni lettera cifrata, cercate la riga della lettera della chiave e leggete in cima la colonna. Spazi e punteggiatura non consumano lettere della chiave. Con la «chiave ignota» partite dall'indizio.</p>
+  <div class="griglia">
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 1</span><span class="tipo">Chiave: SOLE</span></div>
+      <div class="cifrato">DO NLAOGI KW CMHSEI DIYKG HFXLC TP ESDWSURMG</div>
+      
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 2</span><span class="tipo">Chiave: MARE</span></div>
+      <div class="cifrato">OI MIPIRQA IE PMBFVMTFVUO RPXE ESHE</div>
+      
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 3</span><span class="tipo">Chiave: LUNA</span></div>
+      <div class="cifrato">AIETL CY CLPB DT LRTP Y VL AIETLNVLP</div>
+      
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 4</span><span class="tipo">Chiave: ROSA</span></div>
+      <div class="cifrato">FUFI CSLTVFS UJO MNF GHOJHSMVBLO UWNEIGG</div>
+      
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 5</span><span class="tipo">Chiave: CIAO</span></div>
+      <div class="cifrato">KT PFQNEGUWRS JI NOUKOGVW UB KVDWBQO GQBTC NI COVBERTI</div>
+      
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 6</span><span class="tipo">Chiave: VELA</span></div>
+      <div class="cifrato">WVLVV! LLI YINIAVLTJ MW PMMXO HIDSVKRIJ</div>
+      
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 7</span><span class="tipo">Chiave ignota · 5 lettere</span></div>
+      <div class="cifrato">IWARRN DSIMKQQR HN AWJXJUW V VJBW</div>
+      <div class="indizio">Il messaggio inizia con <b>DOMANI</b>.</div>
+      <div class="risposta">Testo in chiaro (e chiave trovata: ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 8</span><span class="tipo">Chiave ignota · 5 lettere</span></div>
+      <div class="cifrato">LBURQNW BCZ'LTCR RLT MRHZ VPIR OMM TCCBJCS</div>
+      <div class="indizio">Il messaggio inizia con <b>ATTACCO</b>.</div>
+      <div class="risposta">Testo in chiaro (e chiave trovata: ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 9</span><span class="tipo">Chiave ignota · 5 lettere</span></div>
+      <div class="cifrato">IOJMOME AE QHMHNHXR AG ONLS FOZNS OSGEJWW</div>
+      <div class="indizio">Il messaggio inizia con <b>PORTATE</b>.</div>
+      <div class="risposta">Testo in chiaro (e chiave trovata: ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 10</span><span class="tipo">Chiave ignota · 2 lettere</span></div>
+      <div class="cifrato">ZPTMW VRVZS UMMMX IEIII IIJMJ XVXKI GIIXI IJITS CMRKC MRXKE TGYMU MDSCX ZWKYU MFWZ</div>
+      <div class="indizio">Dividi il testo in 2 colonne (lettere pari e dispari) e prova per ciascuna gli spostamenti che portano le lettere più frequenti verso E, A, I, O e controlla che il testo abbia senso.</div>
+      <div class="risposta">Testo in chiaro (e chiave trovata: ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 11</span><span class="tipo">Chiave ignota · 2 lettere</span></div>
+      <div class="cifrato">GVMXM ZATMK TQMDQ UATFW OWDBM AUZUX QBQAB MEAAM FZMLU AOMXM XMFBQ ZQXUC RZQYG MZBU</div>
+      <div class="indizio">Dividi il testo in 2 colonne (lettere pari e dispari) e prova per ciascuna gli spostamenti che portano le lettere più frequenti verso E, A, I, O e controlla che il testo abbia senso.</div>
+      <div class="risposta">Testo in chiaro (e chiave trovata: ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 12</span><span class="tipo">Chiave ignota · 2 lettere</span></div>
+      <div class="cifrato">UVAQG BGGUS DSXFW EMSFN WRWZD ODWFU MOAHS ZAOFO HIGZW UYSJS AZESK GSUYW GGWBR OUVAO NS</div>
+      <div class="indizio">Dividi il testo in 2 colonne (lettere pari e dispari) e prova per ciascuna gli spostamenti che portano le lettere più frequenti verso E, A, I, O e controlla che il testo abbia senso.</div>
+      <div class="risposta">Testo in chiaro (e chiave trovata: ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+  </div>
+</section>
+<section class="sheet carte">
+  <div class="meta">Gioco dei bigliettini · seconda parte</div>
+  <h2 style="margin-top:0">Ora tocca a voi</h2>
+  <p>Scrivete un messaggio breve, scegliete una parola chiave, cifratelo con la tavola e passate solo il <b>testo cifrato</b> a un'altra coppia, scrivendo (se volete) la chiave a parte. Poi fate il contrario con il loro messaggio.</p>
+  <div class="griglia">
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 1</span><span class="tipo">Chiave scelta: ________</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 2</span><span class="tipo">Chiave scelta: ________</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 3</span><span class="tipo">Chiave scelta: ________</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 4</span><span class="tipo">Chiave scelta: ________</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 5</span><span class="tipo">Chiave scelta: ________</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 6</span><span class="tipo">Chiave scelta: ________</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+  </div>
+</section>
+<section class="sheet carte">
+  <div class="meta">Gioco dei bigliettini · tavola</div>
+  <h2 style="margin-top:0">Tavola di Vigenère</h2>
+  <p>La riga della lettera della <b>chiave</b> e la colonna della lettera del <b>testo in chiaro</b> si incontrano nella lettera cifrata. Per decifrare: nella riga della chiave cercate la lettera cifrata e leggete la colonna in cima.</p>
+  <table class="tavola" aria-label="Tavola di Vigenère">
+    <tr><th></th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>I</th><th>J</th><th>K</th><th>L</th><th>M</th><th>N</th><th>O</th><th>P</th><th>Q</th><th>R</th><th>S</th><th>T</th><th>U</th><th>V</th><th>W</th><th>X</th><th>Y</th><th>Z</th></tr>
+    <tr><th>A</th><td class="d">A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td></tr>
+    <tr><th>B</th><td>B</td><td class="d">C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td></tr>
+    <tr><th>C</th><td>C</td><td>D</td><td class="d">E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td></tr>
+    <tr><th>D</th><td>D</td><td>E</td><td>F</td><td class="d">G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td></tr>
+    <tr><th>E</th><td>E</td><td>F</td><td>G</td><td>H</td><td class="d">I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td></tr>
+    <tr><th>F</th><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td class="d">K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td></tr>
+    <tr><th>G</th><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td class="d">M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td></tr>
+    <tr><th>H</th><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td class="d">O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td></tr>
+    <tr><th>I</th><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td class="d">Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td></tr>
+    <tr><th>J</th><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td class="d">S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td></tr>
+    <tr><th>K</th><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td class="d">U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td></tr>
+    <tr><th>L</th><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td class="d">W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td></tr>
+    <tr><th>M</th><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td class="d">Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td></tr>
+    <tr><th>N</th><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td class="d">A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td></tr>
+    <tr><th>O</th><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td class="d">C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td></tr>
+    <tr><th>P</th><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td class="d">E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td></tr>
+    <tr><th>Q</th><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td class="d">G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td></tr>
+    <tr><th>R</th><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td class="d">I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td></tr>
+    <tr><th>S</th><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td class="d">K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td></tr>
+    <tr><th>T</th><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td class="d">M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td></tr>
+    <tr><th>U</th><td>U</td><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td class="d">O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td></tr>
+    <tr><th>V</th><td>V</td><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td class="d">Q</td><td>R</td><td>S</td><td>T</td><td>U</td></tr>
+    <tr><th>W</th><td>W</td><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td class="d">S</td><td>T</td><td>U</td><td>V</td></tr>
+    <tr><th>X</th><td>X</td><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td class="d">U</td><td>V</td><td>W</td></tr>
+    <tr><th>Y</th><td>Y</td><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td class="d">W</td><td>X</td></tr>
+    <tr><th>Z</th><td>Z</td><td>A</td><td>B</td><td>C</td><td>D</td><td>E</td><td>F</td><td>G</td><td>H</td><td>I</td><td>J</td><td>K</td><td>L</td><td>M</td><td>N</td><td>O</td><td>P</td><td>Q</td><td>R</td><td>S</td><td>T</td><td>U</td><td>V</td><td>W</td><td>X</td><td class="d">Y</td></tr>
+  </table>
+</section>
+</body>
+</html>

@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modulo 3 — Il cifrario di Vigenère</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  /* Stili specifici di questo modulo */
+  .tav-wrap { width: min(100%, 62vh); margin: 0 auto; }
+  .tav { display: grid; grid-template-columns: repeat(27, minmax(0, 1fr)); gap: 1px; font-family: var(--f-mono); font-size: clamp(9px, 1.3vh, 13px); line-height: 1; }
+  .tav button { display: flex; align-items: center; justify-content: center; aspect-ratio: 1 / 1; padding: 0; border: 0; border-radius: 2px; background: var(--bg-card); color: var(--text-dim); font: inherit; cursor: pointer; min-width: 0; }
+  .tav button.h { background: var(--bg-light); color: var(--accent-alt); font-weight: 700; }
+  .tav button.h.on { background: var(--accent); color: var(--on-accent); }
+  .tav button.rr, .tav button.cc { background: color-mix(in srgb, var(--info) 28%, var(--bg)); color: var(--text); }
+  .tav button.sel { background: var(--accent); color: var(--on-accent); font-weight: 800; outline: 2px solid var(--text); z-index: 1; }
+  .tav .corner { background: transparent; }
+  .allin { display: grid; gap: 3px 3px; font-family: var(--f-mono); margin-bottom: .6rem; }
+  .allin .lab { font-size: var(--fs-xs); color: var(--text-muted); display: flex; align-items: center; padding-right: .4em; white-space: nowrap; }
+  .allin .c { text-align: center; font-weight: 600; font-size: var(--fs-sm); padding: .2em 0; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-width: 0; }
+  .allin .c.k { color: var(--info-t); }
+  .allin .c.n { color: var(--text-muted); font-weight: 400; font-size: var(--fs-xs); border-color: transparent; background: transparent; }
+  .allin .c.o { background: color-mix(in srgb, var(--accent) 16%, var(--bg)); border-color: var(--accent); color: var(--accent-alt); }
+  .allin .c.sel { outline: 3px solid var(--info-t); }
+  .freq { display: flex; align-items: flex-end; gap: 2px; height: 3.2rem; }
+  .freq .b { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .freq .b i { display: block; width: 100%; background: var(--info); border-radius: 2px 2px 0 0; min-height: 1px; }
+  .freq .b.ev i { background: var(--accent); }
+  .freq.cif .b i { background: var(--danger); }
+  .freq-let { display: flex; gap: 2px; }
+  .freq-let span { flex: 1 1 0; text-align: center; font-family: var(--f-mono); font-size: 10px; color: var(--text-muted); }
+  .cifr { font-family: var(--f-mono); font-size: var(--fs-xs); line-height: 1.5; overflow-wrap: anywhere; max-height: 6.2rem; overflow-y: auto; padding: .4rem .6rem; background: #0e0c0a; border: 1px solid var(--border); border-radius: 8px; color: var(--text-dim); }
+  .cifr mark { background: color-mix(in srgb, var(--accent) 40%, transparent); color: var(--text); border-radius: 3px; padding: 0 1px; }
+  .ic-bars { display: flex; align-items: flex-end; gap: 6px; height: 7.5rem; border-bottom: 1px solid var(--border); position: relative; }
+  .ic-bars .b { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; background: transparent; border: 0; padding: 0; cursor: pointer; color: var(--text-dim); font-family: var(--f-mono); font-size: 11px; }
+  .ic-bars .b i { display: block; width: 100%; background: var(--info); border-radius: 3px 3px 0 0; }
+  .ic-bars .b.top i { background: var(--success); }
+  .ic-bars .b.on { outline: 2px solid var(--accent); }
+  .ic-bars .linea { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--accent); pointer-events: none; }
+  .ic-let { display: flex; gap: 6px; }
+  .ic-let span { flex: 1 1 0; text-align: center; font-family: var(--f-mono); font-size: 12px; color: var(--text-muted); }
+  .kas-row { cursor: pointer; }
+  .colbox { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: .4rem .5rem; min-width: 0; }
+  .colbox .tt { display: flex; justify-content: space-between; align-items: center; font-family: var(--f-mono); font-size: var(--fs-xs); color: var(--text-muted); }
+  .colbox .kl { font-size: 1.4rem; font-weight: 800; color: var(--accent-alt); font-family: var(--f-title); }
+  .mini-btn { min-width: 44px; min-height: 36px; font-size: 1rem; }
+  @media (min-width: 901px) { .split-code { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) !important; } }
+  @media (max-width: 900px) { .tav-wrap { width: 100%; } .tav { font-size: 9px; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Box, Glow, Chip, Grid, Card, Btn, Field, Table, Flow, CompareTwo, ActivityBadge, Steps, Code } = UI;
+const C = window.Cripto;
+const A = C.ALFABETO;
+const mod26 = (n) => ((n % 26) + 26) % 26;
+
+/* ---------- dati calcolati con crypto.js ---------- */
+
+const TESTO_ATT = 'Per quasi tre secoli il cifrario di Vigenère fu considerato impossibile da violare. Il segreto stava nella chiave: una parola che si ripete sotto il messaggio e cambia lo spostamento a ogni lettera. Ma anche una parola ripetuta lascia delle tracce, perché due frammenti uguali del testo, cifrati con la stessa parte della chiave, producono frammenti uguali. Charles Babbage prima e Friedrich Kasiski poi capirono come usare queste ripetizioni per scoprire la lunghezza della chiave.';
+const CHIAVE_ATT = 'LUNA';
+const CIFRATO_ATT = C.normalizza(C.vigenere(C.senzaAccenti(TESTO_ATT), CHIAVE_ATT));
+const TRACCIA = C.vigenereTraccia('ATTACCO', CHIAVE_ATT);
+const CIFRATO_ES = C.vigenere('ATTACCO', CHIAVE_ATT);
+
+// colonne j-esime del testo: lettere in posizione j, j+n, j+2n...
+const colonneDi = (t, n) => { const s = C.normalizza(t); return Array.from({ length: n }, (_, j) => { let o = ''; for (let i = j; i < s.length; i += n) o += s[i]; return o; }); };
+const icMedio = (t, n) => colonneDi(t, n).reduce((a, c) => a + C.indiceCoincidenza(c), 0) / n;
+const miglioreSpostamento = (col) => { let b = 0, bp = Infinity; for (let k = 0; k < 26; k++) { const p = C.punteggioItaliano(C.cesareDecifra(col, k)); if (p < bp) { bp = p; b = k; } } return b; };
+const mcdLista = (v) => v.reduce((a, b) => C.mcd(a, b));
+
+/* ---------- componenti ---------- */
+
+function TavolaVigenere({ riga, colonna, onPick }) {
+  const celle = [<span key="c" className="corner" />];
+  for (let c = 0; c < 26; c++) celle.push(<button key={'h' + c} type="button" className={'h' + (colonna === c ? ' on' : '')} onClick={() => onPick(riga, c)} aria-label={'Colonna ' + A[c]}>{A[c]}</button>);
+  for (let r = 0; r < 26; r++) {
+    celle.push(<button key={'r' + r} type="button" className={'h' + (riga === r ? ' on' : '')} onClick={() => onPick(r, colonna)} aria-label={'Riga ' + A[r]}>{A[r]}</button>);
+    for (let c = 0; c < 26; c++) {
+      let cl = '';
+      if (riga === r && colonna === c) cl = 'sel';
+      else if (riga === r && colonna != null && c < colonna) cl = 'rr';
+      else if (colonna === c && riga != null && r < riga) cl = 'cc';
+      celle.push(<button key={r + '-' + c} type="button" tabIndex={-1} className={cl} onClick={() => onPick(r, c)} aria-label={'Riga ' + A[r] + ' colonna ' + A[c] + ': ' + A[(r + c) % 26]}>{A[(r + c) % 26]}</button>);
+    }
+  }
+  return <div className="tav" role="group" aria-label="Tavola di Vigenère">{celle}</div>;
+}
+
+function TavolaEsplorabile() {
+  const [sel, setSel] = useState({ r: 11, c: 0 });
+  const pick = (r, c) => setSel({ r: r == null ? 0 : r, c: c == null ? 0 : c });
+  const ris = A[(sel.r + sel.c) % 26];
+  return (
+    <Grid cols={2} gap="1rem" className="split-tav">
+      <div className="tav-wrap"><TavolaVigenere riga={sel.r} colonna={sel.c} onPick={pick} /></div>
+      <div className="stack">
+        <div className="sim">
+          <div className="sim-title">Incrocio</div>
+          <p>Riga della <b className="hl">chiave</b>: <span className="mono hl">{A[sel.r]}</span> ({sel.r})</p>
+          <p>Colonna del <b className="hl">testo in chiaro</b>: <span className="mono hl">{A[sel.c]}</span> ({sel.c})</p>
+          <p>Lettera cifrata: <span className="mono hl" style={{ fontSize: '1.6em' }}>{ris}</span></p>
+          <div className="row">
+            <Field label="Chiave"><select className="input" value={sel.r} onChange={e => pick(+e.target.value, sel.c)}>{A.split('').map((l, i) => <option key={i} value={i}>{l}</option>)}</select></Field>
+            <Field label="Chiaro"><select className="input" value={sel.c} onChange={e => pick(sel.r, +e.target.value)}>{A.split('').map((l, i) => <option key={i} value={i}>{l}</option>)}</select></Field>
+          </div>
+        </div>
+        <div className="small muted">ATTACCO con chiave {CHIAVE_ATT}: tocca una coppia.</div>
+        <div className="row" style={{ gap: '.3rem' }}>
+          {TRACCIA.map((t, i) => <button key={i} type="button" className="btn sm" style={{ minWidth: 44, fontFamily: 'var(--f-mono)' }} onClick={() => pick(A.indexOf(t.chiave), A.indexOf(t.chiaro))}>{t.chiave}+{t.chiaro}</button>)}
+        </div>
+      </div>
+    </Grid>
+  );
+}
+
+// Righe incolonnate: chiaro / chiave / spostamento / cifrato.
+function Allineamento({ testo, chiave, decifra, max, sel, onPick }) {
+  let tr;
+  try { tr = C.vigenereTraccia(testo, chiave, decifra); } catch (e) { return null; }
+  const L = tr.filter(x => x.lettera);
+  const size = typeof window !== 'undefined' && window.innerWidth < 700 ? 8 : 14;
+  const vis = L.slice(0, max || 3 * size), blocchi = [];
+  for (let i = 0; i < vis.length; i += size) blocchi.push({ da: i, v: vis.slice(i, i + size) });
+  return (
+    <div>
+      {blocchi.map((b, bi) => (
+        <div key={bi} className="allin" style={{ gridTemplateColumns: 'auto repeat(' + b.v.length + ', minmax(0, 2.4em))' }}>
+          <div className="lab">{decifra ? 'Cifrato' : 'Chiaro'}</div>{b.v.map((x, i) => <div key={i} className={'c' + (sel === b.da + i ? ' sel' : '')} onClick={onPick ? () => onPick(b.da + i) : undefined}>{x.chiaro.toUpperCase()}</div>)}
+          <div className="lab">Chiave</div>{b.v.map((x, i) => <div key={i} className="c k">{x.chiave}</div>)}
+          <div className="lab">Sposta</div>{b.v.map((x, i) => <div key={i} className="c n">{decifra ? '−' : '+'}{Math.abs(x.spostamento)}</div>)}
+          <div className="lab">{decifra ? 'Chiaro' : 'Cifrato'}</div>{b.v.map((x, i) => <div key={i} className="c o">{x.cifrato.toUpperCase()}</div>)}
+        </div>
+      ))}
+      {L.length > vis.length ? <div className="xs muted">… e altre {L.length - vis.length} lettere.</div> : null}
+    </div>
+  );
+}
+
+function VigenereSim() {
+  const [testo, setTesto] = useState('Ci vediamo domani alle otto');
+  const [chiave, setChiave] = useState('LUNA');
+  const [modo, setModo] = useState('cifra');
+  const [gruppi, setGruppi] = useState(false);
+  const valida = C.normalizza(chiave).length > 0;
+  const out = valida ? (modo === 'cifra' ? C.vigenere(testo, chiave) : C.vigenereDecifra(testo, chiave)) : '';
+  const mostrato = gruppi ? (C.normalizza(out).match(/.{1,5}/g) || []).join(' ') : out;
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · cifrario di Vigenère</div>
+      <Grid cols={2}>
+        <div className="stack">
+          <Field label="Testo" htmlFor="v-testo"><textarea id="v-testo" className="input" rows={2} value={testo} onChange={e => setTesto(e.target.value)} /></Field>
+          <Field label="Chiave (una parola)" htmlFor="v-chiave"><input id="v-chiave" className="input mono" value={chiave} onChange={e => setChiave(e.target.value)} /></Field>
+          <div className="row">
+            <Btn variant={modo === 'cifra' ? 'primary' : ''} onClick={() => setModo('cifra')} aria-pressed={modo === 'cifra'}>Cifra</Btn>
+            <Btn variant={modo === 'decifra' ? 'primary' : ''} onClick={() => setModo('decifra')} aria-pressed={modo === 'decifra'}>Decifra</Btn>
+            <label className="row small dim" style={{ gap: '.4rem', minHeight: 44 }}><input type="checkbox" checked={gruppi} onChange={e => setGruppi(e.target.checked)} style={{ width: 22, height: 22 }} />Gruppi di 5</label>
+          </div>
+        </div>
+        <div className="stack">
+          <div className="label xs muted">{modo === 'cifra' ? 'Testo cifrato' : 'Testo in chiaro'}</div>
+          <div className="out big" aria-live="polite">{valida ? (mostrato || ' ') : 'La chiave deve contenere almeno una lettera.'}</div>
+          {valida ? <Allineamento testo={testo} chiave={chiave} decifra={modo === 'decifra'} max={14} /> : null}
+        </div>
+      </Grid>
+    </div>
+  );
+}
+
+function Istogramma({ valori, max, cls, evid }) {
+  return (
+    <div>
+      <div className={'freq ' + (cls || '')} role="img" aria-label="Istogramma delle frequenze delle lettere">
+        {valori.map((v, i) => <div key={i} className={'b' + (evid && 'EAIO'.includes(A[i]) ? ' ev' : '')}><i style={{ height: Math.min(100, 100 * v / max) + '%' }} /></div>)}
+      </div>
+      <div className="freq-let" aria-hidden="true">{valori.map((v, i) => <span key={i}>{A[i]}</span>)}</div>
+    </div>
+  );
+}
+
+function ConfrontoFreq() {
+  const righe = useMemo(() => {
+    const base = C.senzaAccenti(TESTO_ATT);
+    return [['Testo in chiaro', base, ''], ['Cesare (chiave 7)', C.cesare(base, 7), 'cif'], ['Vigenère (chiave ' + CHIAVE_ATT + ')', C.vigenere(base, CHIAVE_ATT), 'cif']].map(([n, t, c]) => ({ n, c, f: C.frequenze(t).percentuali, ic: C.indiceCoincidenza(t) }));
+  }, []);
+  return (
+    <div className="sim">
+      <div className="sim-title">Frequenze delle lettere, stesso testo</div>
+      {righe.map((r, i) => (
+        <div key={i} className="mt">
+          <div className="row-between"><span className="xs muted">{r.n}</span><span className="mono xs hl">IC = {r.ic.toFixed(3)}</span></div>
+          <Istogramma valori={r.f} max={13} cls={r.c} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TracciaVig() {
+  const [c, setC] = useState('T');
+  const [chiave, setChiave] = useState('LUNA');
+  const [j, setJ] = useState(1);
+  const k = C.normalizza(chiave);
+  const ch = (c || ' ')[0];
+  const maius = ch >= 'A' && ch <= 'Z', minus = ch >= 'a' && ch <= 'z';
+  let corpo;
+  if (!k.length) corpo = <p className="small dim">Serve almeno una lettera nella chiave.</p>;
+  else if (!maius && !minus) corpo = <p className="small dim">«{ch}» non è una lettera: viene copiata e <b>$j non avanza</b>.</p>;
+  else {
+    const base = maius ? 65 : 97, kl = k[j % k.length], sp = kl.charCodeAt(0) - 65, o = ch.charCodeAt(0), s = o - base + sp, m = s % 26;
+    const righe = [
+      ['$chiave[' + j + ' % ' + k.length + ']', '\'' + kl + '\''],
+      ['ord(\'' + kl + '\') − 65  (spostamento)', sp],
+      ['ord(\'' + ch + '\') − ' + base, o - base],
+      ['+ spostamento  →  ' + (o - base) + ' + ' + sp, s],
+      ['% 26', m],
+      ['chr(' + m + ' + ' + base + ')', '\'' + String.fromCharCode(m + base) + '\''],
+    ];
+    corpo = <table className="table mono"><tbody>{righe.map((r, i) => <tr key={i}><td>{r[0]}</td><td className="hl">{r[1]}</td></tr>)}</tbody></table>;
+  }
+  return (
+    <div className="sim">
+      <div className="sim-title">Una lettera, passo per passo</div>
+      <div className="row">
+        <Field label="Lettera"><input className="input mono" style={{ width: '4.5em' }} maxLength={1} value={c} onChange={e => setC(e.target.value.slice(-1))} aria-label="Lettera" /></Field>
+        <Field label="Chiave"><input className="input mono" style={{ width: '7em' }} value={chiave} onChange={e => setChiave(e.target.value)} aria-label="Chiave" /></Field>
+        <Field label={'$j = ' + j} className="grow"><input type="range" min="0" max="11" value={j} onChange={e => setJ(+e.target.value)} aria-label="Posizione nel testo" /></Field>
+      </div>
+      {corpo}
+    </div>
+  );
+}
+
+// Kasiski: ripetizioni nel cifrato, distanze, MCD delle distanze selezionate.
+function KasiskiTool() {
+  const [lmin, setLmin] = useState(4);
+  const [evid, setEvid] = useState(0);
+  const lista = useMemo(() => {
+    const out = [];
+    C.kasiski(CIFRATO_ATT, lmin).forEach(x => {
+      const dup = out.find(o => o.distanze.join() === x.distanze.join() && Math.abs(o.posizioni[0] - x.posizioni[0]) <= 3);
+      if (!dup) out.push(x);
+    });
+    return out.sort((a, b) => a.posizioni[0] - b.posizioni[0]).slice(0, 6);
+  }, [lmin]);
+  const [esclusi, setEsclusi] = useState({});
+  const attive = lista.filter(x => !esclusi[x.sequenza]);
+  const dist = attive.map(x => x.distanze[0]);
+  const m = dist.length ? mcdLista(dist) : null;
+  const corr = lista[evid] || lista[0];
+  const pezzi = useMemo(() => {
+    if (!corr) return [CIFRATO_ATT];
+    const out = []; let u = 0;
+    corr.posizioni.forEach(p => { out.push(CIFRATO_ATT.slice(u, p)); out.push(<mark key={p}>{CIFRATO_ATT.substr(p, corr.sequenza.length)}</mark>); u = p + corr.sequenza.length; });
+    out.push(CIFRATO_ATT.slice(u)); return out;
+  }, [corr]);
+  return (
+    <div className="sim">
+      <div className="row-between">
+        <div className="sim-title">Kasiski · sequenze ripetute</div>
+        <div className="row" style={{ gap: '.3rem' }}>
+          <span className="xs muted">Lunghezza minima</span>
+          {[3, 4, 5].map(n => <Btn key={n} small variant={lmin === n ? 'primary' : ''} aria-pressed={lmin === n} onClick={() => { setLmin(n); setEvid(0); setEsclusi({}); }}>{n}</Btn>)}
+        </div>
+      </div>
+      <div className="cifr" aria-label="Testo cifrato">{pezzi}</div>
+      <Table mono head={['Usa', 'Sequenza', 'Posizioni', 'Distanza']} rows={lista.map((x, i) => [
+        <input key="c" type="checkbox" style={{ width: 22, height: 22 }} checked={!esclusi[x.sequenza]} onChange={() => setEsclusi({ ...esclusi, [x.sequenza]: !esclusi[x.sequenza] })} aria-label={'Usa ' + x.sequenza} />,
+        <button key="s" type="button" className="btn sm" onClick={() => setEvid(i)} aria-pressed={evid === i}>{x.sequenza}</button>,
+        x.posizioni.join(', '), x.distanze.join(', ')])} />
+      <div className="row">
+        <span className="hl mono">MCD({dist.join(', ') || '…'}) = {m == null ? '—' : m}</span>
+        <span className="xs muted">{m != null && m > 1 ? 'La lunghezza della chiave è un divisore di questo numero.' : 'MCD = 1: qualche ripetizione è casuale. Togli la spunta alle più sospette.'}</span>
+      </div>
+    </div>
+  );
+}
+
+function ICTool() {
+  const [n, setN] = useState(4);
+  const vals = useMemo(() => Array.from({ length: 12 }, (_, i) => icMedio(CIFRATO_ATT, i + 1)), []);
+  const max = 0.08, linea = (v) => ({ bottom: (100 * v / max) + '%' });
+  const sorted = [...vals].sort((a, b) => b - a), soglia = sorted[2];
+  return (
+    <div className="sim">
+      <div className="sim-title">Indice di coincidenza medio per lunghezza della chiave</div>
+      <div className="ic-bars" role="group" aria-label="Indice di coincidenza per lunghezza">
+        <div className="linea" style={linea(0.074)} />
+        <div className="linea" style={{ ...linea(0.038), borderColor: 'var(--danger-t)' }} />
+        {vals.map((v, i) => <button key={i} type="button" className={'b' + (v >= soglia ? ' top' : '') + (n === i + 1 ? ' on' : '')} onClick={() => setN(i + 1)} aria-label={'Lunghezza ' + (i + 1) + ', IC ' + v.toFixed(3)}><i style={{ height: (100 * v / max) + '%' }} /></button>)}
+      </div>
+      <div className="ic-let" aria-hidden="true">{vals.map((v, i) => <span key={i}>{i + 1}</span>)}</div>
+      <div className="row-between mt">
+        <span className="mono hl">lunghezza {n}: IC medio = {vals[n - 1].toFixed(3)}</span>
+        <span className="xs muted">Linea ambra: italiano (0,074). Linea rossa: casuale (0,038).</span>
+      </div>
+    </div>
+  );
+}
+
+function ColonneTool() {
+  const [n, setN] = useState(4);
+  const cols = useMemo(() => colonneDi(CIFRATO_ATT, n), [n]);
+  const migliori = useMemo(() => cols.map(miglioreSpostamento), [cols]);
+  const [man, setMan] = useState({});            // correzioni manuali per colonna
+  const [auto, setAuto] = useState(false);
+  const usati = cols.map((_, j) => man[n + '-' + j] != null ? man[n + '-' + j] : (auto ? migliori[j] : 0));
+  const chiave = usati.map(s => A[mod26(s)]).join('');
+  const testo = C.vigenereDecifra(CIFRATO_ATT.slice(0, 120), chiave);
+  const muovi = (j, d) => setMan({ ...man, [n + '-' + j]: mod26(usati[j] + d) });
+  const f = (col, s) => C.frequenze(C.cesareDecifra(col, s)).percentuali;
+  return (
+    <div className="sim">
+      <div className="row-between">
+        <div className="sim-title">Frequenze per colonna</div>
+        <div className="row" style={{ gap: '.3rem' }}>
+          <span className="xs muted">Lunghezza</span>
+          {[2, 3, 4, 5, 6].map(m => <Btn key={m} small variant={n === m ? 'primary' : ''} aria-pressed={n === m} onClick={() => { setN(m); setAuto(false); }}>{m}</Btn>)}
+          <Btn small variant="info" onClick={() => { setAuto(true); setMan({}); }}>Suggerisci</Btn>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(8.5rem, 1fr))', gap: '.4rem' }}>
+        {cols.map((col, j) => (
+          <div key={j} className="colbox">
+            <div className="tt"><span>col. {j + 1}</span><span className="kl" aria-label={'Lettera della chiave ' + A[mod26(usati[j])]}>{A[mod26(usati[j])]}</span></div>
+            <Istogramma valori={f(col, usati[j])} max={14} evid />
+            <div className="row" style={{ justifyContent: 'center', gap: '.3rem' }}>
+              <button type="button" className="btn mini-btn" onClick={() => muovi(j, -1)} aria-label={'Colonna ' + (j + 1) + ' indietro'}>−</button>
+              <button type="button" className="btn mini-btn" onClick={() => muovi(j, 1)} aria-label={'Colonna ' + (j + 1) + ' avanti'}>+</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="row-between mt"><span className="mono hl">chiave provata: {chiave}</span><span className="xs muted">Cerca i picchi ambra (E, A, I, O) alti.</span></div>
+      <div className="out" aria-live="polite">{testo}…</div>
+    </div>
+  );
+}
+
+// One-time pad: dallo stesso cifrato, qualunque messaggio della stessa lunghezza è possibile.
+const OTP_CHIAVE = 'QXMZPKDW';
+const OTP_CIFRATO = C.vigenere('ATTACCHI', OTP_CHIAVE);
+function OTPDemo() {
+  const [cand, setCand] = useState('RITIRATA');
+  const [libero, setLibero] = useState('');
+  const m = C.normalizza(libero);
+  const chiaro = m.length === 8 ? m : cand;
+  const chiaveSe = OTP_CIFRATO.split('').map((c, i) => A[mod26(A.indexOf(c) - A.indexOf(chiaro[i]))]).join('');
+  return (
+    <div className="sim">
+      <div className="sim-title">Intercetti questo cifrato</div>
+      <div className="out big mono" aria-label="Testo cifrato">{OTP_CIFRATO}</div>
+      <div className="xs muted mt">Quale messaggio di 8 lettere nasconde? Proviamo a ipotizzarne uno.</div>
+      <div className="row mt">
+        {['ATTACCHI', 'RITIRATA', 'SCAPPATE'].map(t => <Btn key={t} small variant={chiaro === t ? 'primary' : ''} aria-pressed={chiaro === t} onClick={() => { setCand(t); setLibero(''); }}>{t}</Btn>)}
+        <Field label="oppure scrivine uno di 8 lettere"><input className="input mono" style={{ width: '9em' }} value={libero} onChange={e => setLibero(e.target.value)} maxLength={12} aria-label="Messaggio ipotizzato" /></Field>
+      </div>
+      <p className="mt">Se il messaggio fosse <span className="mono hl">{chiaro}</span>, la chiave usata sarebbe <span className="mono hl">{chiaveSe}</span>.</p>
+      <p className="small muted">Con una chiave casuale ogni messaggio ha una chiave che lo spiega. Il cifrato non dà nessun indizio.</p>
+    </div>
+  );
+}
+
+function ParoleDiff() {
+  const p1 = 'ATTACCHI', p2 = 'RITIRATA';
+  const c1 = C.vigenere(p1, OTP_CHIAVE), c2 = C.vigenere(p2, OTP_CHIAVE);
+  const d = (a, b) => a.split('').map((x, i) => A[mod26(A.indexOf(x) - A.indexOf(b[i]))]).join('');
+  return <Table mono head={['', 'Testo', 'Cifrato con la stessa chiave']} rows={[['1', p1, c1], ['2', p2, c2], ['differenza', d(p1, p2), d(c1, c2)]]} hlRow={2} />;
+}
+
+/* ---------- esempio svolto ---------- */
+
+const passiEsempio = TRACCIA.map((t, i) => ({
+  title: 'Lettera ' + (i + 1) + ': ' + t.chiaro + ' con la chiave ' + t.chiave,
+  content: (
+    <div className="stack">
+      <p>Il testo ha <span className="mono hl">{t.chiaro}</span> ({A.indexOf(t.chiaro)}); la chiave in questa posizione è <span className="mono hl">{t.chiave}</span>, cioè spostamento <span className="mono hl">{t.spostamento}</span>.</p>
+      <p><span className="mono">{A.indexOf(t.chiaro)} + {t.spostamento} = {A.indexOf(t.chiaro) + t.spostamento}</span>{A.indexOf(t.chiaro) + t.spostamento > 25 ? <> → oltre la Z: <span className="mono">{A.indexOf(t.chiaro) + t.spostamento} − 26 = {A.indexOf(t.cifrato)}</span></> : null} → lettera <span className="mono hl">{t.cifrato}</span>.</p>
+      <p>Finora: <span className="mono hl">{TRACCIA.slice(0, i + 1).map(x => x.cifrato).join('')}</span></p>
+    </div>
+  ),
+}));
+
+const CODICE = `<?php
+function vigenere(string $testo, string $chiave): string {
+    $chiave = strtoupper(preg_replace('/[^A-Za-z]/', '', $chiave));
+    $lunghezza = strlen($chiave);
+    $risultato = '';
+    $j = 0;                                  // lettere cifrate finora
+    for ($i = 0; $i < strlen($testo); $i++) {
+        $c = $testo[$i];
+        if (ctype_alpha($c)) {
+            $base = ctype_upper($c) ? 65 : 97;
+            $spostamento = ord($chiave[$j % $lunghezza]) - 65;
+            $risultato .= chr((ord($c) - $base + $spostamento) % 26 + $base);
+            $j++;                            // la chiave avanza
+        } else {
+            $risultato .= $c;                // spazi e simboli
+        }
+    }
+    return $risultato;
+}`;
+const SPIEGA = [
+  'Tag di apertura di PHP.',
+  'Come in Cesare, ma la chiave è una stringa: una parola.',
+  'Dalla chiave si tolgono i caratteri che non sono lettere e si passa in maiuscolo: così ogni lettera vale 0..25 con ord() − 65.',
+  'Quante lettere ha la chiave: serve per ripetere la parola.',
+  'Il risultato parte vuoto.',
+  '$j conta quante lettere abbiamo cifrato: indica la posizione nella chiave.',
+  'Un ciclo su tutti i caratteri del testo.',
+  'Il carattere corrente.',
+  'Solo le lettere si cifrano.',
+  'La base è 65 per le maiuscole e 97 per le minuscole: le maiuscole restano maiuscole.',
+  '$j % $lunghezza fa ripartire la chiave da capo quando finisce: è il resto della divisione. ord() − 65 dà lo spostamento.',
+  'Stessa formula di Cesare, ma con lo spostamento della lettera corrente della chiave.',
+  'Solo dopo una lettera la chiave passa alla successiva.',
+  'Tutto il resto del testo…',
+  '… viene copiato senza toccare $j: spazi e punteggiatura non consumano la chiave.',
+  'Fine dei casi.', 'Fine del ciclo.', 'Il testo cifrato viene restituito.', '',
+];
+const CODICE_EVID = `<?php
+function vigenere(string $testo, string $chiave): string {
+    // ... $chiave normalizzata, $j = 0
+    for ($i = 0; $i < strlen($testo); $i++) {
+        $c = $testo[$i];
+        if (ctype_alpha($c)) {
+            $base = ctype_upper($c) ? 65 : 97;
+            $spostamento = ord($chiave[$j % $lunghezza]) - 65;
+            $risultato .= chr((ord($c) - $base + $spostamento) % 26 + $base);
+            $j++;
+        }
+    }
+}`;
+
+/* ---------- le slide ---------- */
+
+const slides = [
+  { copertina: true, sezione: 'Apertura', titolo: 'Il cifrario di Vigenère',
+    sottotitolo: 'Una chiave fatta di lettere: ogni posizione ha il suo spostamento. Per tre secoli sembrò indecifrabile, finché qualcuno guardò le ripetizioni.',
+    note: ['Apertura del modulo. Il cifrario di Vigenère è un Cesare con più chiavi che si alternano: la regola è semplice, ma l\'attacco richiede strumenti nuovi (Kasiski, indice di coincidenza) che riutilizzano le frequenze viste con Cesare.', 'Tasti utili: frecce per scorrere, N per queste note, I per l\'elenco delle slide, F per lo schermo intero.'] },
+
+  { sezione: 'Idea e storia', titolo: 'Il limite di Cesare',
+    contenuto: () => (
+      <div className="stack-lg">
+        <p className="lead">Con Cesare una lettera in chiaro ha <span className="hl">sempre</span> la stessa lettera cifrata. Per questo le frequenze del linguaggio restano visibili.</p>
+        <Grid cols={2}>
+          <Card tone="danger"><h3>Il problema</h3><p>Se la E è la lettera più frequente in italiano, nel testo cifrato lo sarà la sua sostituta. Un occhio allenato la trova.</p></Card>
+          <Card tone="success"><h3>L'idea</h3><p>Usare <span className="hl">più alfabeti</span> in alternanza: la stessa lettera in chiaro viene cifrata ogni volta in modo diverso.</p></Card>
+        </Grid>
+        <p className="small muted">Un cifrario che usa un solo alfabeto è <i>monoalfabetico</i>; con più alfabeti in rotazione è <i>polialfabetico</i>.</p>
+      </div>
+    ),
+    note: 'Richiamo del limite principale di Cesare, senza riferimenti a lezioni precedenti: bastano due concetti, ogni lettera ha una sola sostituta e le frequenze si conservano. Introducete i termini monoalfabetico e polialfabetico: tornano nelle slide sull\'attacco.' },
+
+  { sezione: 'Idea e storia', titolo: 'Le chiffre indéchiffrable',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { icon: '📜', label: '1553', sub: 'Bellaso pubblica il cifrario con parola chiave', color: 'var(--accent)' },
+          { icon: '📖', label: '1586', sub: 'Vigenère lo descrive nel «Traicté des chiffres»', color: 'var(--info)' },
+          { icon: '🔒', label: 'XVIII-XIX sec.', sub: '«Le chiffre indéchiffrable»', color: 'var(--success)' },
+          { icon: '🔓', label: '1854-1863', sub: 'Babbage e Kasiski lo rompono', color: 'var(--danger)' },
+        ]} />
+        <Glow><p>Il nome è un equivoco storico: il cifrario con parola chiave è di <span className="hl">Giovan Battista Bellaso</span> (1553); a Blaise de Vigenère è rimasto il nome, ma lui descrisse una variante diversa.</p></Glow>
+        <p className="small muted">Charles Babbage lo violò in segreto verso il 1854; Friedrich Kasiski pubblicò il metodo nel 1863.</p>
+      </div>
+    ),
+    note: 'Storia in un minuto. Il cifrario fu reputato indecifrabile per circa tre secoli; il metodo di Babbage venne riconosciuto solo molto dopo, perché non lo pubblicò, e per questo il metodo porta il nome di Kasiski. Se gli studenti conoscono la storia del cifrario di Cesare, notate che qui il salto è nel concetto: più alfabeti, stessa aritmetica.' },
+
+  { sezione: 'Come funziona', titolo: 'La chiave è una serie di spostamenti',
+    contenuto: () => (
+      <div className="stack-lg">
+        <p>La chiave è una parola. Ogni sua lettera è uno spostamento: <span className="mono hl">A = 0, B = 1, … Z = 25</span>.</p>
+        <Table mono center head={CHIAVE_ATT.split('')} rows={[CHIAVE_ATT.split('').map(l => A.indexOf(l))]} />
+        <Glow><p className="center">La chiave <span className="mono hl">{CHIAVE_ATT}</span> è la serie di spostamenti <span className="mono hl">{CHIAVE_ATT.split('').map(l => A.indexOf(l)).join(', ')}</span>, che si ripete lungo il testo.</p></Glow>
+        <Box type="info" title="Rispetto a Cesare">Cesare è un Vigenère con una chiave di <b>una sola</b> lettera: lo spostamento è sempre lo stesso.</Box>
+      </div>
+    ),
+    note: 'Fate calcolare a voce gli spostamenti di altre parole (CASA, SOLE). Una chiave come «A» corrisponde a spostamento 0, quindi lascia il testo invariato: è lecita, ma una lettera A in chiave non nasconde nulla in quella posizione.' },
+
+  { sezione: 'Come funziona', titolo: 'La tavola di Vigenère',
+    contenuto: () => (
+      <div className="stack">
+        <p>La riga della <span className="hl">chiave</span> e la colonna del <span className="hl">testo in chiaro</span> si incontrano nella lettera cifrata.</p>
+        <TavolaEsplorabile />
+      </div>
+    ),
+    note: 'La tavola è una raccolta di 26 alfabeti di Cesare, uno per riga: la riga B è Cesare con chiave 1, la riga C chiave 2, e così via. Toccate le coppie in alto a destra per rivedere l\'esempio ATTACCO. Notate che la tavola è simmetrica: riga e colonna si possono scambiare. Per la carta c\'è la tavola stampata nelle schede dei bigliettini.' },
+
+  { sezione: 'Come funziona', titolo: 'Esempio svolto: ATTACCO con chiave LUNA',
+    contenuto: () => (
+      <div className="stack">
+        <Allineamento testo="ATTACCO" chiave={CHIAVE_ATT} />
+        <Steps steps={passiEsempio} />
+        <p className="small muted">Risultato finale: <span className="mono hl">ATTACCO → {CIFRATO_ES}</span></p>
+      </div>
+    ),
+    note: 'Avanzate lettera per lettera. Fate osservare i due casi notevoli: le due T diventano lettere diverse (N e G) e le due C pure; inoltre la N compare sia per T sia per C. Questo è il vantaggio rispetto a Cesare e anche la ragione per cui le frequenze non bastano più.' },
+
+  { sezione: 'Come funziona', titolo: 'La formula e la decifratura',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Glow>
+          <p className="center">Cifrare: <span className="mono hl">C<sub>i</sub> = (P<sub>i</sub> + K<sub>i mod n</sub>) mod 26</span></p>
+          <p className="center">Decifrare: <span className="mono hl">P<sub>i</sub> = (C<sub>i</sub> − K<sub>i mod n</sub>) mod 26</span></p>
+        </Glow>
+        <p className="small muted">Con <i>n</i> lunghezza della chiave: la lettera <i>i</i> usa la lettera numero <span className="mono">i mod n</span> della chiave, quindi la chiave si ripete.</p>
+        <Allineamento testo={CIFRATO_ES} chiave={CHIAVE_ATT} decifra />
+        <Box type="tip" title="Per decifrare a mano">Sposta ogni lettera cifrata <b>indietro</b> della lettera corrispondente della chiave. Con la tavola: cerca la lettera cifrata nella riga della chiave e leggi in cima la colonna.</Box>
+      </div>
+    ),
+    note: 'La formula è quella di Cesare con k che dipende dalla posizione. Se la chiave ha n lettere, il testo si divide in n «colonne»: le lettere in posizione 0, n, 2n… usano tutte lo stesso spostamento. Questa osservazione è il cuore dell\'attacco, che arriva nelle slide finali. Il caso n = 1 coincide con Cesare.' },
+
+  { sezione: 'Simulatore', titolo: 'Prova tu: cifra e decifra',
+    contenuto: () => (
+      <div className="stack">
+        <VigenereSim />
+        <div className="row">
+          <ActivityBadge href="simulazione-vigenere.html" label="Apri il simulatore (anche da smartphone)" icon="🔑" />
+        </div>
+      </div>
+    ),
+    note: 'Fate scrivere una frase e una chiave, poi provate una chiave di una lettera per verificare che si ottenga Cesare. L\'allineamento sotto il risultato mostra le lettere del testo, della chiave e gli spostamenti. Spazi e punteggiatura non consumano la chiave: questa è la convenzione usata anche nel codice PHP.' },
+
+  { sezione: 'Sicurezza', titolo: 'Perché è più forte di Cesare',
+    contenuto: () => (
+      <Grid cols={2} gap="1rem">
+        <ConfrontoFreq />
+        <div className="stack">
+          <Box type="success" title="Il profilo si appiattisce">L'indice di coincidenza (IC) misura quanto il profilo è «a picchi»: ~0,074 per l'italiano, ~0,038 per lettere casuali. Cesare lo conserva, Vigenère lo abbassa.</Box>
+          <Table mono head={['Lunghezza chiave', 'Chiavi possibili']} rows={[[1, '26'], [4, (26 ** 4).toLocaleString('it-IT')], [8, (26 ** 8).toLocaleString('it-IT')], [12, (26 ** 12).toExponential(1).replace('e+', ' · 10^')]]} />
+        </div>
+      </Grid>
+    ),
+    note: 'Il grafico è calcolato sullo stesso testo di 400 lettere. Cesare traslata il profilo ma ne conserva forma e IC; Vigenère mescola più traslazioni e l\'IC scende verso 0,04-0,05. Lo spazio delle chiavi cresce a 26 elevato alla lunghezza: una forza bruta diventa impraticabile già con 8-10 lettere. La debolezza però non sta nel numero di chiavi, come vedremo.' },
+
+  { sezione: 'Attività', titolo: 'Il gioco dei bigliettini',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2} stretch>
+          <Card tone="accent">
+            <h3>Su carta</h3>
+            <ol>
+              <li>Ogni coppia riceve alcuni bigliettini e la tavola di Vigenère.</li>
+              <li>Alcuni hanno la chiave scritta, altri un indizio.</li>
+              <li>Poi si crea un messaggio per un'altra coppia.</li>
+            </ol>
+            <ActivityBadge href="../schede/bigliettini-vigenere.html" label="Bigliettini da stampare" />
+          </Card>
+          <Card tone="info">
+            <h3>Sul telefono</h3>
+            <p>Un testo lungo cifrato con una parola chiave sconosciuta: usa Kasiski e le frequenze per colonna.</p>
+            <ActivityBadge href="gioco-rompi-vigenere.html" label="Gioco: rompi il messaggio" icon="📱" />
+          </Card>
+        </Grid>
+        <Box type="tip" title="Regola d'oro">Prima di toccare il telefono, ricorda: una volta nota la lunghezza <i>n</i>, il problema diventa <i>n</i> volte Cesare.</Box>
+      </div>
+    ),
+    note: 'Attività da 15-20 minuti. Il gioco da telefono richiede gli strumenti dell\'attacco: se gli studenti non li hanno ancora visti, proponetelo dopo le slide su Kasiski e frequenze, oppure guidatelo da proiettore. Sulla carta, i bigliettini «a indizio» sono rompibili a mano usando la parola probabile all\'inizio del messaggio.' },
+
+  { sezione: 'Codice PHP', titolo: 'Dal ragionamento al codice',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { label: 'Lettera', sub: '\'T\'' },
+          { label: 'Chiave', sub: '$chiave[$j % n]', color: 'var(--info)' },
+          { label: 'Spostamento', sub: 'ord(..) − 65', color: 'var(--info)' },
+          { label: 'Somma', sub: '(ord(c) − base + s)', color: 'var(--accent)' },
+          { label: '% 26', sub: 'riparte da A', color: 'var(--accent)' },
+          { label: 'chr(+ base)', sub: '\'N\'', color: 'var(--success)' },
+        ]} />
+        <Grid cols={2}>
+          <Card><h3><code>$j % $lunghezza</code></h3><p>Il resto fa ripartire la chiave da capo quando finisce.</p></Card>
+          <Card><h3><code>$j++</code> solo sulle lettere</h3><p>Spazi e punteggiatura non consumano lettere della chiave.</p></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Rispetto a Cesare cambia una sola cosa: lo spostamento dipende dalla posizione. Ne servono due ingredienti nuovi: un indice j che conta le lettere cifrate e il resto della divisione per scorrere ciclicamente la chiave. La differenza tra $i (posizione nel testo) e $j (posizione nella chiave) è l\'errore più comune nel laboratorio.' },
+
+  { sezione: 'Codice PHP', titolo: 'La funzione vigenere()',
+    contenuto: () => (
+      <div className="stack">
+        <Code title="vigenere.php" code={CODICE} reveal explain={SPIEGA} />
+      </div>
+    ),
+    note: 'Rivelate le righe una alla volta. Fermatevi su $j: perché non usare $i? Fate provare a voce con il testo «ciao a te» e chiave LUNA. La decifratura nel laboratorio è il livello 2 e si ottiene cambiando il segno dello spostamento: non la mostriamo qui.' },
+
+  { sezione: 'Codice PHP', titolo: 'Il codice a confronto con i numeri',
+    contenuto: () => (
+      <Grid cols={2} className="split-code">
+        <Code title="vigenere.php (estratto)" code={CODICE_EVID} highlight={[7, 8]} />
+        <TracciaVig />
+      </Grid>
+    ),
+    note: 'Cambiate lettera, chiave e posizione $j nel pannello. Provate: $j oltre la lunghezza della chiave, una cifra al posto della lettera, una minuscola. Le righe evidenziate a sinistra producono la tabella a destra.' },
+
+  { sezione: 'Attacco', titolo: 'L\'attacco: due mosse',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { icon: '📏', label: '1. Lunghezza', sub: 'Kasiski, indice di coincidenza', color: 'var(--info)' },
+          { icon: '🧩', label: '2. Colonne', sub: 'si divide il testo in n colonne', color: 'var(--accent)' },
+          { icon: '📊', label: '3. Frequenze', sub: 'ogni colonna è un Cesare', color: 'var(--success)' },
+        ]} />
+        <Box type="warn" title="L'osservazione chiave">Le lettere nelle posizioni 1, n+1, 2n+1… sono state cifrate tutte con lo <span className="hl">stesso</span> spostamento. Ogni colonna è un cifrario di Cesare: si rompe con le frequenze.</Box>
+        <p className="small muted">Resta un solo problema: non si conosce <i>n</i>. Si stima.</p>
+      </div>
+    ),
+    note: 'Questa è la slide concettuale. Se la chiave ha n lettere, il testo cifrato si divide in n colonne, e in ciascuna agisce un solo Cesare. Dopo aver trovato n restano n problemi facili. I due strumenti per stimare n sono nelle prossime slide.' },
+
+  { sezione: 'Attacco', titolo: 'Kasiski: le ripetizioni tradiscono la chiave',
+    contenuto: () => (
+      <div className="stack">
+        <p>Due frammenti uguali del testo, cifrati con la stessa parte della chiave, danno frammenti <span className="hl">uguali</span>: la loro distanza è un <span className="hl">multiplo</span> della lunghezza della chiave.</p>
+        <KasiskiTool />
+      </div>
+    ),
+    note: 'Toccate le sequenze per vederle evidenziate nel testo. Poi calcolate l\'MCD delle distanze selezionate: se compare un valore comune maggiore di 1 è un buon candidato. Alcune ripetizioni sono casuali (due frammenti uguali in posizioni non allineate con la chiave): spuntando solo quelle sospette si vede l\'MCD scendere a 1. In pratica si guardano i fattori più frequenti, non un singolo MCD.' },
+
+  { sezione: 'Attacco', titolo: 'Indice di coincidenza',
+    contenuto: () => (
+      <div className="stack">
+        <p>Per ogni lunghezza <i>n</i> si dividono le colonne e si misura l'IC medio: <span className="hl">appare un picco</span> sulle lunghezze giuste (e sui loro multipli).</p>
+        <ICTool />
+        <p className="small muted">IC = Σ f<sub>i</sub>(f<sub>i</sub> − 1) / (N (N − 1)): la probabilità che due lettere prese a caso siano uguali.</p>
+      </div>
+    ),
+    note: 'Spiegate l\'intuizione: in un testo italiano due lettere pescate a caso coincidono con probabilità circa 7,4%; in un testo casuale 1/26 ≈ 3,8%. Se la lunghezza provata è giusta, ogni colonna è un testo italiano traslato, quindi l\'IC torna alto; se è sbagliata le colonne sono miste e l\'IC resta basso. Le barre verdi sono le tre più alte.' },
+
+  { sezione: 'Attacco', titolo: 'Frequenze per colonna: la rottura',
+    contenuto: () => (
+      <div className="stack">
+        <p>Con <i>n</i> noto: per ogni colonna si cerca lo spostamento che fa comparire i picchi dell'italiano. Le lettere trovate formano la chiave.</p>
+        <ColonneTool />
+      </div>
+    ),
+    note: 'Fate provare prima con la lunghezza sbagliata (testo senza senso) e poi con quella giusta; usate i pulsanti − e + per aggiustare le colonne a mano e confrontare con «Suggerisci». Sulle colonne corte (poche lettere) la statistica può sbagliare: servono testi lunghi o più colonne. Questa è la stessa strategia del gioco da telefono.' },
+
+  { sezione: 'Debolezze', titolo: 'Chiave lunga, testo corto: fin dove si spinge?',
+    contenuto: () => (
+      <div className="stack-lg">
+        <CompareTwo
+          left={{ icon: '🔓', title: 'Quando si rompe', color: 'var(--danger)', points: ['Chiave corta e ripetuta', 'Testo lungo: molte ripetizioni', 'Lunghezza stimabile con Kasiski o IC'] }}
+          right={{ icon: '🔒', title: 'Come si rafforza', color: 'var(--success)', points: ['Chiave lunga (a limite: quanto il testo)', 'Nessuna ripetizione della chiave', 'Chiave casuale, non una parola di senso'] }} />
+        <Box type="tip" title="Il caso limite">Se la chiave è <b>lunga quanto il messaggio</b> non c'è nulla da ripetere: niente colonne, niente Kasiski, niente IC.</Box>
+      </div>
+    ),
+    note: 'Ponte verso il one-time pad: tutti gli attacchi visti sfruttano la ripetizione della chiave. Togliete la ripetizione e l\'attacco non ha più appigli. Ma una chiave che sia anche una frase di senso, per esempio un testo letterario, cede ad attacchi che sfruttano la sua struttura: serve che sia davvero casuale.' },
+
+  { sezione: 'One-time pad', titolo: 'One-time pad: sicurezza perfetta',
+    contenuto: () => (
+      <div className="stack">
+        <Grid cols={3} stretch>
+          <Card tone="accent"><h3>Lunga quanto il messaggio</h3><p className="small">Nessuna ripetizione.</p></Card>
+          <Card tone="info"><h3>Casuale</h3><p className="small">Ogni lettera uniforme, senza schema.</p></Card>
+          <Card tone="success"><h3>Usata una sola volta</h3><p className="small">Mai riutilizzata.</p></Card>
+        </Grid>
+        <OTPDemo />
+      </div>
+    ),
+    note: 'Con le tre condizioni il cifrato non porta alcuna informazione sul messaggio oltre alla lunghezza (Shannon, 1949: sicurezza perfetta). La demo mostra che da un cifrato di 8 lettere si può «spiegare» qualunque parola di 8 lettere trovando una chiave adatta: l\'attaccante non può distinguere. Nelle lezioni sui cifrati moderni l\'addizione modulo 26 diventa lo XOR sui bit.' },
+
+  { sezione: 'One-time pad', titolo: 'Perché non si usa dappertutto',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2} gap="1rem">
+          <Box type="danger" title="Una chiave per messaggio">Va generata casuale, lunga quanto il messaggio e scambiata in modo sicuro: lo stesso problema di far arrivare un segreto, ma più grande.</Box>
+          <Box type="warn" title="Mai riusarla">Con la stessa chiave la differenza dei cifrati è la differenza dei testi: la chiave sparisce e il segreto fugge.</Box>
+        </Grid>
+        <ParoleDiff />
+        <p className="small muted">Le due differenze coincidono: chi intercetta due cifrati con la stessa chiave ottiene informazioni sui messaggi. Per questo si chiama «one-time».</p>
+      </div>
+    ),
+    note: 'Il riuso della chiave è un errore storico reale (per esempio nel progetto Venona i sovietici riutilizzarono pagine di chiavi). Il risultato in tabella è calcolato con crypto.js. Il messaggio da portare a casa: la sicurezza perfetta esiste, ma costa una chiave enorme; i cifrari moderni (DES, AES) cercano un compromesso con chiavi corte e algoritmi complessi.' },
+
+  { sezione: 'Riepilogo', titolo: 'Riepilogo e prossimi passi',
+    contenuto: () => (
+      <div className="stack-lg">
+        <ul>
+          <li>Vigenère usa una <span className="hl">parola chiave</span>: <span className="mono">C = (P + K) mod 26</span>, con la chiave che si ripete.</li>
+          <li>Si rompe stimando la <span className="hl">lunghezza</span> (Kasiski, IC) e poi con le <span className="hl">frequenze per colonna</span>.</li>
+          <li>Il caso limite è il <span className="hl">one-time pad</span>: chiave casuale, lunga quanto il messaggio, usata una volta.</li>
+        </ul>
+        <Grid cols={3} stretch>
+          <Card tone="accent"><h3>Laboratorio</h3><p className="small">Scrivi in PHP cifratura, decifratura e attacco.</p><ActivityBadge href="../lab-php/03-vigenere/scheda.html" label="Scheda del lab" icon="🧪" /></Card>
+          <Card tone="info"><h3>Quiz</h3><p className="small">Verifica che i concetti siano chiari.</p><ActivityBadge href="../quiz/quiz.html" label="Vai al quiz" icon="✅" /></Card>
+          <Card tone="success"><h3>Avanti</h3><p className="small">Cambiare l'ordine invece delle lettere: la trasposizione.</p><ActivityBadge href="../modulo-4-trasposizione/slide.html" stesso label="Modulo 4" icon="➡️" /></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Tre messaggi: formula, attacco in due mosse, one-time pad come limite teorico. Il laboratorio 03 propone cifratura, decifratura e attacco guidato; il laboratorio 05 approfondisce le frequenze. Il modulo successivo cambia strada: non si sostituiscono le lettere, si cambia l\'ordine.' },
+];
+
+Deck.mount(slides, { modulo: 3, nome: 'Il cifrario di Vigenère', indice: '../index.html' });
+</script>
+</body>
+</html>

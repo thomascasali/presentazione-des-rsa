@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab PHP 03 — Il cifrario di Vigenère (scheda)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/print.css">
+<style>td, th, code, p, li { overflow-wrap: anywhere; } table { table-layout: auto; }</style>
+</head>
+<body>
+<div class="toolbar no-stampa">
+  <a href="../../index.html">← Indice</a>
+  <button onclick="window.print()">Stampa la scheda</button>
+</div>
+
+<section class="sheet">
+  <div class="meta">Laboratorio PHP 03 · Sistemi e Reti</div>
+  <h1>Il cifrario di Vigenère in PHP</h1>
+  <p>Scrivi in PHP le funzioni che cifrano, decifrano e attaccano il cifrario di Vigenère. Lavori nel file <code>esercizio.php</code>; il file <code>test.php</code> controlla il tuo codice con dei casi noti.</p>
+
+  <h2>Prima di iniziare</h2>
+  <p><b>Il cifrario.</b> La chiave è una parola; ogni sua lettera è uno spostamento (A=0, B=1, … Z=25). La <i>i</i>-esima lettera cifrata del testo si sposta di quanto vale la lettera della chiave in posizione <i>j</i> mod <i>n</i>, con <i>n</i> lunghezza della chiave. Regole di questo laboratorio:</p>
+  <ul>
+    <li>maiuscole restano maiuscole, minuscole restano minuscole;</li>
+    <li>spazi, cifre, punteggiatura e lettere accentate non si cifrano <b>e non consumano lettere della chiave</b> (il contatore <code>$j</code> avanza solo sulle lettere);</li>
+    <li>dalla chiave si tolgono i caratteri che non sono lettere; se non ne resta nessuna, si lancia <code>InvalidArgumentException</code>.</li>
+  </ul>
+  <table>
+    <tr><th>Funzione PHP</th><th>Cosa fa</th><th>Esempio</th></tr>
+    <tr><td class="mono">ctype_alpha($c)</td><td>vero se il carattere è una lettera A-Z / a-z</td><td class="mono">ctype_alpha('x') vale true</td></tr>
+    <tr><td class="mono">ctype_upper($c)</td><td>vero se è una lettera maiuscola</td><td class="mono">ctype_upper('Q') vale true</td></tr>
+    <tr><td class="mono">preg_replace('/[^A-Za-z]/', '', $s)</td><td>toglie tutto ciò che non è una lettera</td><td class="mono">'a-b c' diventa 'abc'</td></tr>
+    <tr><td class="mono">strtoupper($s)</td><td>passa in maiuscolo</td><td class="mono">'ciao' diventa 'CIAO'</td></tr>
+    <tr><td class="mono">$j % $n</td><td>posizione che si ripete ciclicamente</td><td class="mono">5 % 4 vale 1</td></tr>
+  </table>
+  <div class="nota attenzione"><b>Attenzione a $i e $j.</b> <code>$i</code> scorre tutti i caratteri del testo; <code>$j</code> conta solo le lettere già cifrate. Quale dei due va usato per scegliere la lettera della chiave?</div>
+
+  <h2><span class="livello">Livello 1</span> Completa la funzione</h2>
+  <p>In <code>esercizio.php</code> trova <code>vigenere(string $testo, string $chiave): string</code> e sostituisci i due <code>TODO</code>. Lo scheletro è questo:</p>
+<pre><code>function vigenere(string $testo, string $chiave): string
+{
+    // TODO 1: ripulisci la chiave (solo lettere, maiuscole) e controlla che non sia vuota
+    $chiave = $chiave;
+    $lunghezza = 1;
+
+    $risultato = '';
+    $j = 0;
+    for ($i = 0; $i &lt; strlen($testo); $i++) {
+        $c = $testo[$i];
+        if (ctype_alpha($c)) {
+            // TODO 2: base, spostamento della lettera $j % $lunghezza, ord/% 26/chr, poi $j++
+            $risultato .= $c;
+        } else {
+            $risultato .= $c;     // spazi, cifre, punteggiatura
+        }
+    }
+    return $risultato;
+}</code></pre>
+  <p><b>Prima di scrivere, rispondi a mano:</b> cifra <span class="mono">ATTACCO</span> con la chiave <span class="mono">LUNA</span> usando la tavola di Vigenère o gli spostamenti 11, 20, 13, 0.</p>
+  <p class="righe"></p><p class="righe"></p>
+  <p><b>Controllo:</b> da terminale <code>php test.php</code>. Il livello è finito quando tutti i test «Livello 1» sono OK.</p>
+</section>
+
+<section class="sheet">
+  <h2><span class="livello">Livello 2</span> Scrivi l'inversa</h2>
+  <p>Scrivi <code>decifraVigenere(string $testo, string $chiave): string</code>.</p>
+  <ul>
+    <li>Devi <b>usare</b> la funzione <code>vigenere()</code> già scritta, senza ricopiare il suo codice.</li>
+    <li>Idea: per tornare indietro di <i>s</i> posti basta andare avanti di <i>26 − s</i> (modulo 26). Come diventa la chiave <span class="mono">LUNA</span> se ogni suo spostamento viene sostituito dal complementare?</li>
+    <li>Con lo spostamento 0 il complementare è 0, non 26: attenzione al resto.</li>
+  </ul>
+  <p><b>Prova a mano:</b> la chiave complementare di <span class="mono">LUNA</span> è <span class="vuoto" style="min-width:8em"></span></p>
+
+  <h2><span class="livello">Livello 3</span> Scrivi l'attacco</h2>
+  <p>Un cifrato di Vigenère di cui conosci solo il testo si attacca in due mosse: stima della lunghezza della chiave e frequenze per colonna. Nel file trovi già scritte <code>frequenzeItaliane()</code> e <code>punteggioItaliano()</code> (più è basso, più il testo somiglia all'italiano). Tu scrivi:</p>
+  <ol>
+    <li><code>indiceCoincidenza(string $testo): float</code>: IC = Σ n<sub>i</sub>(n<sub>i</sub> − 1) / (N(N − 1)) sulle sole lettere, maiuscole e minuscole insieme. Suggerimento: <code>count_chars($s, 1)</code>.</li>
+    <li><code>stimaLunghezzaChiave(string $cifrato, int $max = 10): int</code>: per <i>n</i> da 1 a <code>$max</code>, divide le lettere in <i>n</i> colonne, calcola la media degli IC e restituisce la <b>prima</b> <i>n</i> in cui la media è almeno 0,062 (0 se nessuna).</li>
+    <li><code>trovaChiaveVigenere(string $cifrato, int $lunghezza): string</code>: per ogni colonna prova i 26 spostamenti e tiene quello con il punteggio più basso; restituisce la chiave in maiuscolo.</li>
+  </ol>
+  <div class="nota">Se la colonna <i>j</i> è cifrata con un solo spostamento, equivale a un cifrario di Cesare: i 26 tentativi sono 26 decifrature di Cesare.</div>
+  <p><b>Per riflettere:</b> perché il test del livello 3 accetta come lunghezza 4 e non 8, anche se 8 va bene? E cosa succede all'IC se il testo è molto corto?</p>
+  <p class="righe"></p><p class="righe"></p>
+
+  <h2>Come eseguire i test</h2>
+  <table>
+    <tr><th>Da terminale</th><td class="mono">cd lab-php/03-vigenere<br>php test.php</td></tr>
+    <tr><th>Con XAMPP</th><td>copia la cartella in <span class="mono">htdocs</span> e apri <span class="mono">http://localhost/…/03-vigenere/test.php</span></td></tr>
+  </table>
+  <p>Ogni riga è <b>OK</b> oppure <b>ERRORE</b>, con il valore atteso e quello ottenuto. In fondo c'è un riepilogo per livello.</p>
+
+  <h2>Consegna</h2>
+  <p>Il file <code>esercizio.php</code> con i tre livelli completati e il riepilogo di <code>test.php</code>.</p>
+  <p>Nome e cognome: <span class="vuoto" style="min-width:14em"></span> &nbsp; Classe: <span class="vuoto" style="min-width:5em"></span> &nbsp; Test superati: <span class="vuoto" style="min-width:4em"></span> / 29</p>
+</section>
+</body>
+</html>

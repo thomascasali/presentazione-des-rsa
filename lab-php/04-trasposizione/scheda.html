@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab PHP 04 — La trasposizione a colonne (scheda)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/print.css">
+<style>td, th, code, p, li { overflow-wrap: anywhere; } table { table-layout: auto; }</style>
+</head>
+<body>
+<div class="toolbar no-stampa">
+  <a href="../../index.html">← Indice</a>
+  <button onclick="window.print()">Stampa la scheda</button>
+</div>
+
+<section class="sheet">
+  <div class="meta">Laboratorio PHP 04 · Sistemi e Reti</div>
+  <h1>La trasposizione a colonne in PHP</h1>
+  <p>Scrivi in PHP le funzioni che cifrano, decifrano e attaccano la trasposizione a colonne con parola chiave. Lavori nel file <code>esercizio.php</code>; il file <code>test.php</code> controlla il tuo codice con dei casi noti.</p>
+
+  <h2>Prima di iniziare</h2>
+  <p><b>Il cifrario.</b> Le lettere non cambiano, cambia l'ordine. Regole usate in questo laboratorio:</p>
+  <ol>
+    <li>il testo si riduce alle sole lettere <b>A-Z maiuscole</b> (si scartano spazi, punteggiatura, cifre e accenti);</li>
+    <li>si scrive nella griglia <b>per righe</b>, larga quanto la chiave;</li>
+    <li>se l'ultima riga è incompleta si aggiunge <b>X</b> fino a riempirla;</li>
+    <li>si leggono le <b>colonne</b> dall'alto in basso, nell'ordine alfabetico delle lettere della chiave; a parità di lettera, prima la colonna più a sinistra.</li>
+  </ol>
+  <p>Esempio: <span class="mono">ATTACCOALLALBADOMANI</span> con chiave <span class="mono">ZEBRA</span> (5 colonne, 4 righe). Le colonne si leggono nell'ordine A, B, E, R, Z, cioè dalle posizioni <span class="mono">[4, 2, 1, 3, 0]</span>.</p>
+  <table>
+    <tr><th>Funzione PHP</th><th>Cosa fa</th><th>Esempio</th></tr>
+    <tr><td class="mono">str_split($s)</td><td>spezza la stringa in un array di caratteri</td><td class="mono">str_split('ABC') vale ['A','B','C']</td></tr>
+    <tr><td class="mono">usort($a, fn)</td><td>ordina un array con un confronto scelto da te</td><td class="mono">fn($x, $y) =&gt; $x &lt;=&gt; $y</td></tr>
+    <tr><td class="mono">intdiv($a, $b)</td><td>divisione intera</td><td class="mono">intdiv(20, 5) vale 4</td></tr>
+    <tr><td class="mono">$s[$i]</td><td>carattere in posizione <i>i</i> (da 0)</td><td class="mono">'ciao'[1] vale 'i'</td></tr>
+  </table>
+  <div class="nota attenzione"><b>Gli indici della griglia.</b> Il testo è una stringa, non una matrice. La lettera in riga <i>r</i> e colonna <i>c</i> di una griglia larga <i>n</i> sta nella posizione <code>$r * $n + $c</code>. Verificalo a mano sull'esempio.</div>
+
+  <h2><span class="livello">Livello 1</span> Completa le funzioni</h2>
+  <p>In <code>esercizio.php</code> completa <code>ordineColonne()</code> (TODO 1) e <code>trasposizione()</code> (TODO 2, 3, 4). Se la chiave non contiene lettere, <code>trasposizione()</code> lancia <code>InvalidArgumentException</code>. Lo scheletro principale:</p>
+<pre><code>function trasposizione(string $testo, string $chiave): string
+{
+    // TODO 2: ripulisci chiave e testo (solo A-Z, maiuscole); chiave vuota -&gt; eccezione
+    $chiave = $chiave;
+    $testo = $testo;
+    $n = 1;
+
+    // TODO 3: aggiungi X finché strlen($testo) non è multiplo di $n
+
+    $righe = intdiv(strlen($testo), $n);
+    $cifrato = '';
+    // TODO 4: per ogni colonna (nell'ordine di ordineColonne) accoda le lettere dall'alto in basso
+    return $cifrato;
+}</code></pre>
+  <p><b>Prima di scrivere, rispondi a mano:</b> con <span class="mono">LUNA</span> come chiave, quali sono le posizioni di lettura delle colonne?</p>
+  <p class="righe"></p>
+  <p><b>Controllo:</b> da terminale <code>php test.php</code>. Il livello è finito quando tutti i test «Livello 1» sono OK.</p>
+</section>
+
+<section class="sheet">
+  <h2><span class="livello">Livello 2</span> Scrivi l'inversa</h2>
+  <p>Scrivi <code>decifraTrasposizione(string $cifrato, string $chiave): string</code>. Restituisce il testo con le eventuali X di riempimento ancora in fondo (non devi toglierle).</p>
+  <ul>
+    <li>Numero di righe = lunghezza del cifrato ÷ lunghezza della chiave.</li>
+    <li>Il cifrato è fatto di blocchi da «righe» lettere: il blocco <i>p</i> è la colonna <code>ordineColonne($chiave)[$p]</code>.</li>
+    <li>Se la lunghezza non è multipla della chiave, lancia <code>InvalidArgumentException</code>.</li>
+  </ul>
+  <p><b>Prova a mano:</b> il cifrato <span class="mono">ACAT LALA</span> (senza spazio, 8 lettere) con chiave <span class="mono">BA</span> ha ____ righe; il primo blocco è <span class="vuoto" style="min-width:5em"></span> e va nella colonna numero ____.</p>
+
+  <h2><span class="livello">Livello 3</span> Scrivi l'attacco</h2>
+  <p>Non conosci la chiave, ma sai che nel messaggio compare una <i>parola probabile</i>. Nel file trovi già scritta <code>permutazioni(array $v)</code>, che restituisce tutti i riordinamenti di un array: ogni riordinamento di <code>[0, 1, …, n−1]</code> è un possibile ordine delle colonne.</p>
+  <p>Scrivi <code>attaccoTrasposizione(string $cifrato, string $parola, int $maxColonne = 7): array</code>:</p>
+  <ol>
+    <li>per ogni larghezza <i>n</i> da 2 a <code>$maxColonne</code> che <b>divide</b> la lunghezza del cifrato;</li>
+    <li>per ogni ordine delle colonne, ricostruisce il testo;</li>
+    <li>se contiene la parola (senza distinguere maiuscole e minuscole) lo aggiunge all'elenco.</li>
+  </ol>
+  <p>L'elenco restituito non ha doppioni ed è in ordine alfabetico (<code>sort()</code>); se nessun testo contiene la parola è vuoto.</p>
+  <div class="nota">Quante permutazioni deve provare il programma con 7 colonne? E con 12? Che cosa dice questo sulla robustezza della trasposizione con chiave lunga?</div>
+  <p class="righe"></p><p class="righe"></p>
+
+  <h2>Come eseguire i test</h2>
+  <table>
+    <tr><th>Da terminale</th><td class="mono">cd lab-php/04-trasposizione<br>php test.php</td></tr>
+    <tr><th>Con XAMPP</th><td>copia la cartella in <span class="mono">htdocs</span> e apri <span class="mono">http://localhost/…/04-trasposizione/test.php</span></td></tr>
+  </table>
+  <p>Ogni riga è <b>OK</b> oppure <b>ERRORE</b>, con il valore atteso e quello ottenuto. In fondo c'è un riepilogo per livello.</p>
+
+  <h2>Consegna</h2>
+  <p>Il file <code>esercizio.php</code> con i tre livelli completati e il riepilogo di <code>test.php</code>.</p>
+  <p>Nome e cognome: <span class="vuoto" style="min-width:14em"></span> &nbsp; Classe: <span class="vuoto" style="min-width:5em"></span> &nbsp; Test superati: <span class="vuoto" style="min-width:4em"></span> / 24</p>
+</section>
+</body>
+</html>

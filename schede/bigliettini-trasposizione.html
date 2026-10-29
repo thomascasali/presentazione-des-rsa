@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bigliettini della trasposizione — da ritagliare</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/print.css">
+<style>
+  .sheet.carte { padding: 8mm 10mm; }
+  .carte .griglia { grid-template-columns: repeat(2, 1fr); gap: 6mm; }
+  .carta { border: 1.5px dashed var(--p-text); border-radius: 3mm; padding: 4mm 5mm; min-height: 44mm; break-inside: avoid; display: flex; flex-direction: column; gap: 2mm; }
+  .carta .testa { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--f-mono); font-size: 9pt; color: var(--p-dim); gap: 6pt; }
+  .carta .tipo { border: 1.5px solid var(--p-text); border-radius: 10pt; padding: 0 7pt; font-weight: 600; color: var(--p-text); text-align: right; }
+  .carta .cifrato { font-family: var(--f-mono); font-size: 12pt; font-weight: 600; letter-spacing: .04em; line-height: 1.4; overflow-wrap: anywhere; }
+  .carta .indizio { font-size: 9.5pt; color: var(--p-dim); }
+  .carta .risposta { margin-top: auto; font-size: 9pt; color: var(--p-dim); }
+  .carta .riga { border-bottom: 1px solid var(--p-line); height: 6mm; }
+  table.gr { border-collapse: collapse; margin: 2mm 0 6mm; table-layout: fixed; }
+  table.gr td { border: 1.2px solid var(--p-text); width: 10mm; height: 10mm; padding: 0; }
+  table.gr tr.chiave td { background: var(--p-soft); height: 9mm; }
+  table.gr tr.num td { border-style: dotted; height: 6mm; }
+  @media (max-width: 700px) { .sheet.carte { padding: 14px; } .carte .griglia { grid-template-columns: 1fr; } table.gr td { width: 8mm; } }
+  @media print { .carte .griglia { gap: 5mm; grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="toolbar no-stampa"><a href="../index.html">← Indice</a><button onclick="window.print()">Stampa</button></div>
+<section class="sheet carte">
+  <div class="meta">Gioco dei bigliettini · trasposizione a colonne</div>
+  <h1>Bigliettini da ritagliare</h1>
+  <p><b>Come si gioca.</b> Ritagliate i bigliettini lungo le linee tratteggiate e usate la griglia vuota (ultima pagina). Con la chiave scritta: contate le lettere, calcolate le righe (lettere ÷ colonne), dividete il cifrato in blocchi e scrivete ogni blocco in una colonna, nell'ordine alfabetico della chiave; poi leggete per righe. Se ci sono delle X in fondo è il riempimento. Il cifrato è scritto a gruppi di 5 lettere solo per comodità. Con la «chiave ignota» provate gli ordini delle colonne finché compare la parola indicata.</p>
+  <div class="griglia">
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 1</span><span class="tipo">Chiave: ZEBRA</span></div>
+      <div class="cifrato">DDIOX VMALO IAMLT EONEX CIOAT</div>
+      
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 2</span><span class="tipo">Chiave: MARTEDI</span></div>
+      <div class="cifrato">AETIA CTSIS OAVOT OLESO CNALH ASV</div>
+      
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 3</span><span class="tipo">Chiave: BIRRA</span></div>
+      <div class="cifrato">AVELA XPIOT PTOLD EOIRC IERLT ARITE</div>
+      
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 4</span><span class="tipo">Chiave: CASA</span></div>
+      <div class="cifrato">LFOOG CIRSE REMII OSCEI PPERR GOT</div>
+      
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 5</span><span class="tipo">Chiave: LUNA</span></div>
+      <div class="cifrato">VIITM AOBAD FOEGA ACALS IRHER ISG</div>
+      
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 6</span><span class="tipo">Chiave: TORINO</span></div>
+      <div class="cifrato">RICLE AZAOX AONII SIMRX TSEAN LPOBD</div>
+      
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 7</span><span class="tipo">Chiave ignota · 4 colonne</span></div>
+      <div class="cifrato">OICVI AOXNT MDNLC ACROA TLUXI NAIAA SL</div>
+      <div class="indizio">Nel messaggio compare la parola <b>SCUOLA</b>.</div>
+      <div class="risposta">Testo in chiaro (e chiave: ordine delle colonne ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 8</span><span class="tipo">Chiave ignota · 4 colonne</span></div>
+      <div class="cifrato">ASDRA QEXAO STUAN XPWEI SURXL SRCTL DO</div>
+      <div class="indizio">Nel messaggio compare la parola <b>PASSWORD</b>.</div>
+      <div class="risposta">Testo in chiaro (e chiave: ordine delle colonne ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 9</span><span class="tipo">Chiave ignota · 4 colonne</span></div>
+      <div class="cifrato">ERRNE TAXLV IVLIR OIRSO EMETS ETASN RX</div>
+      <div class="indizio">Nel messaggio compare la parola <b>SERVER</b>.</div>
+      <div class="risposta">Testo in chiaro (e chiave: ordine delle colonne ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+  </div>
+</section>
+<section class="sheet carte">
+  <div class="meta">Gioco dei bigliettini · seconda parte</div>
+  <h2 style="margin-top:0">Ora tocca a voi</h2>
+  <p>Scrivete un messaggio breve (senza accenti), scegliete una parola chiave, cifratelo con la griglia e passate solo il <b>testo cifrato</b> a un'altra coppia, scrivendo (se volete) la chiave a parte. Poi fate il contrario con il loro messaggio.</p>
+  <div class="griglia">
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 1</span><span class="tipo">Chiave scelta: ________</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 2</span><span class="tipo">Chiave scelta: ________</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 3</span><span class="tipo">Chiave scelta: ________</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 4</span><span class="tipo">Chiave scelta: ________</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 5</span><span class="tipo">Chiave scelta: ________</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 6</span><span class="tipo">Chiave scelta: ________</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+  </div>
+</section>
+<section class="sheet carte">
+  <div class="meta">Gioco dei bigliettini · griglie</div>
+  <h2 style="margin-top:0">Griglie vuote</h2>
+  <p>Nella riga grigia scrivete le lettere della chiave; nella riga tratteggiata il numero d'ordine di ogni colonna (1 = lettera alfabeticamente prima, a parità la più a sinistra).</p>
+  <h3>Griglia 1</h3>
+  <table class="gr" aria-label="Griglia vuota">
+    <tr class="chiave"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr class="num"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  </table>
+  <h3>Griglia 2</h3>
+  <table class="gr" aria-label="Griglia vuota">
+    <tr class="chiave"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr class="num"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  </table>
+  <h3>Griglia 3</h3>
+  <table class="gr" aria-label="Griglia vuota">
+    <tr class="chiave"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr class="num"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  </table>
+</section>
+</body>
+</html>

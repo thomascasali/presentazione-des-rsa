@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulatore della trasposizione a colonne</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  .gt { display: grid; gap: 3px; font-family: var(--f-mono); justify-content: start; margin-bottom: .5rem; }
+  .gt .c { text-align: center; font-weight: 600; font-size: 1.05rem; padding: .2em 0; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-width: 0; }
+  .gt .hd { background: var(--bg-light); color: var(--info-t); border-color: var(--info); }
+  .gt .rk { border-color: transparent; background: transparent; color: var(--accent-alt); font-size: var(--fs-xs); padding: 0; }
+  .gt .c.letta { background: color-mix(in srgb, var(--accent) 18%, var(--bg)); border-color: var(--accent); color: var(--accent-alt); }
+  .gt .c.pad { color: var(--danger-t); border-style: dashed; }
+  .tabs { display: flex; gap: .4rem; margin: .5rem 0 .8rem; }
+  .tabs .btn { flex: 1; }
+  .scambia { display: flex; gap: 3px; margin-top: 3px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Btn, Field, Box, Grid, PaginaGioco } = UI;
+const C = window.Cripto;
+
+function GrigliaTrasp({ testo, chiave, letti }) {
+  let g;
+  try { g = C.trasposizioneGriglia(testo, chiave); } catch (e) { return null; }
+  const n = g.larghezza, orig = C.normalizza(testo).length;
+  return (
+    <div className="gt" style={{ gridTemplateColumns: 'repeat(' + n + ', minmax(0, 2.2em))' }} role="group" aria-label="Griglia">
+      {g.chiave.split('').map((k, i) => <div key={'h' + i} className="c hd">{k}</div>)}
+      {g.rango.map((r, i) => <div key={'r' + i} className="c rk">{r}</div>)}
+      {g.righe.map((riga, ri) => riga.map((ch, ci) => <div key={ri + '-' + ci} className={'c' + (ri * n + ci >= orig ? ' pad' : '') + (g.rango[ci] <= letti ? ' letta' : '')}>{ch}</div>))}
+    </div>
+  );
+}
+
+function Cifra() {
+  const [testo, setTesto] = useState(() => UI.carica('col-testo', 'Ci vediamo domani alle otto'));
+  const [chiave, setChiave] = useState(() => UI.carica('col-chiave', 'ZEBRA'));
+  const [modo, setModo] = useState('cifra');
+  const [letti, setLetti] = useState(99);
+  const valida = C.normalizza(chiave).length > 0, n = C.normalizza(chiave).length;
+  const l = Math.min(letti, n);
+  let out = '', errore = null;
+  if (valida) {
+    try {
+      out = modo === 'cifra' ? C.trasposizioneGriglia(testo, chiave).colonne.slice(0, l).join('') : C.trasposizioneColonneDecifra(testo, chiave);
+    } catch (e) { errore = e.message; }
+  }
+  const salva = (t, k) => { UI.salva('col-testo', t); UI.salva('col-chiave', k); };
+  return (
+    <div>
+      <p>Il testo si scrive per righe sotto la chiave; le colonne si leggono nell'ordine alfabetico delle lettere della chiave (il numero sotto ogni lettera). Spazi e accenti vengono tolti; se manca qualche lettera si riempie con X.</p>
+      <div className="sim">
+        <div className="row">
+          <Btn variant={modo === 'cifra' ? 'primary' : ''} onClick={() => setModo('cifra')} aria-pressed={modo === 'cifra'}>Cifra</Btn>
+          <Btn variant={modo === 'decifra' ? 'primary' : ''} onClick={() => setModo('decifra')} aria-pressed={modo === 'decifra'}>Decifra</Btn>
+        </div>
+        <Field label="Testo" htmlFor="testo"><textarea id="testo" className="input" rows={2} value={testo} onChange={e => { setTesto(e.target.value); salva(e.target.value, chiave); }} /></Field>
+        <Field label="Parola chiave" htmlFor="chiave"><input id="chiave" className="input mono" value={chiave} autoCapitalize="characters" onChange={e => { setChiave(e.target.value); salva(testo, e.target.value); }} /></Field>
+        {modo === 'cifra' && valida ? <Field label={'Colonne lette: ' + l + ' di ' + n}><input type="range" min="0" max={n} value={l} onChange={e => setLetti(+e.target.value)} aria-label="Colonne lette" /></Field> : null}
+        <div className="xs muted" style={{ textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600 }}>{modo === 'cifra' ? 'Testo cifrato' : 'Testo in chiaro (X finali = riempimento)'}</div>
+        <div className="out big" aria-live="polite">{!valida ? 'La chiave deve contenere almeno una lettera.' : (errore || out || ' ')}</div>
+      </div>
+      {modo === 'cifra' && valida ? <div className="sim"><div className="sim-title">La griglia</div><GrigliaTrasp testo={testo} chiave={chiave} letti={l} /></div> : null}
+      <Box type="tip" title="Per decifrare a mano">Dividi il cifrato in tanti blocchi quante sono le colonne; scrivi ogni blocco in una colonna, nell'ordine alfabetico della chiave; poi leggi le righe.</Box>
+    </div>
+  );
+}
+
+const MESSAGGI = [['CI VEDIAMO ALLA STAZIONE ALLE OTTO', 'CAVOLI'], ['LA CHIAVE E NASCOSTA SOTTO IL VASO', 'MARTEDI'], ['PORTA IL PORTATILE E IL CAVO DI RETE', 'BIRRA'], ['LA RIUNIONE SI TIENE IN LABORATORIO', 'TASTO']];
+function Attacco() {
+  const [i, setI] = useState(0);
+  const [n, setN] = useState(null);
+  const [ord, setOrd] = useState(null);
+  const [svelato, setSvelato] = useState(false);
+  const [m, k] = MESSAGGI[i];
+  const cifrato = useMemo(() => C.trasposizioneColonne(m, k), [i]);
+  const L = cifrato.length;
+  const divisori = []; for (let d = 2; d <= 10; d++) if (L % d === 0) divisori.push(d);
+  const w = n || divisori[0], r = L / w, o = ord && ord.length === w ? ord : Array.from({ length: w }, (_, x) => x);
+  const blocchi = Array.from({ length: w }, (_, x) => cifrato.substr(x * r, r));
+  const righe = []; for (let ri = 0; ri < r; ri++) righe.push(o.map(b => blocchi[b][ri]));
+  const scambia = (p, q) => { if (q < 0 || q >= w) return; const t = [...o]; [t[p], t[q]] = [t[q], t[p]]; setOrd(t); };
+  const nuovo = () => { setI((i + 1) % MESSAGGI.length); setN(null); setOrd(null); setSvelato(false); };
+  return (
+    <div>
+      <p>Un messaggio è stato cifrato con una trasposizione a colonne e una chiave sconosciuta. Scegli la larghezza, poi riordina le colonne finché le righe formano parole.</p>
+      <div className="intercetto out mono">{cifrato}</div>
+      <p className="small mt">{L} lettere. Larghezze possibili:</p>
+      <div className="row">{divisori.map(d => <Btn key={d} small variant={w === d ? 'primary' : ''} aria-pressed={w === d} onClick={() => { setN(d); setOrd(null); }}>{d}</Btn>)}</div>
+      <div className="gt mt" style={{ gridTemplateColumns: 'repeat(' + w + ', minmax(0, 2.2em))' }}>
+        {righe.map((riga, ri) => riga.map((ch, ci) => <div key={ri + '-' + ci} className="c">{ch}</div>))}
+      </div>
+      <div className="scambia" style={{ width: 'min(100%, ' + (w * 2.6) + 'em)' }}>
+        {o.map((b, p) => <div key={p} style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <button type="button" className="btn" style={{ minWidth: 0, padding: 0 }} onClick={() => scambia(p, p - 1)} disabled={p === 0} aria-label={'Colonna ' + (p + 1) + ' a sinistra'}>◀</button>
+          <button type="button" className="btn" style={{ minWidth: 0, padding: 0 }} onClick={() => scambia(p, p + 1)} disabled={p === w - 1} aria-label={'Colonna ' + (p + 1) + ' a destra'}>▶</button>
+        </div>)}
+      </div>
+      <p className="small muted mt">Suggerimento: le parole più frequenti sono «IL», «LA», «DI», «E». Se compaiono X in fondo, è il riempimento.</p>
+      <div className="row mt">
+        <Btn variant="ghost" onClick={() => setSvelato(true)} disabled={svelato}>Mi arrendo, mostra il messaggio</Btn>
+        <Btn variant="primary" onClick={nuovo}>Nuovo messaggio</Btn>
+      </div>
+      {svelato ? <div className="feedback mt" role="status">Messaggio: «{m}», chiave <b>{k}</b>.</div> : null}
+    </div>
+  );
+}
+
+function App() {
+  const [scheda, setScheda] = useState('cifra');
+  return (
+    <PaginaGioco titolo="Trasposizione a colonne" indietro="slide.html#10" indietroEtichetta="Modulo 4">
+      <div className="tabs" role="group" aria-label="Sezioni">
+        <Btn variant={scheda === 'cifra' ? 'primary' : ''} aria-pressed={scheda === 'cifra'} onClick={() => setScheda('cifra')}>Cifra e decifra</Btn>
+        <Btn variant={scheda === 'rompi' ? 'primary' : ''} aria-pressed={scheda === 'rompi'} onClick={() => setScheda('rompi')}>Prova a rompere</Btn>
+      </div>
+      {scheda === 'cifra' ? <Cifra /> : <Attacco />}
+      <p className="small muted mt-lg">Niente viene salvato fuori da questo dispositivo.</p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>

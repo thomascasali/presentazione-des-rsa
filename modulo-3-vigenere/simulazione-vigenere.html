@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulatore di Vigenère</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  .allin { display: grid; gap: 3px; font-family: var(--f-mono); margin-bottom: .7rem; }
+  .allin .lab { font-size: var(--fs-xs); color: var(--text-muted); display: flex; align-items: center; padding-right: .3em; }
+  .allin .c { text-align: center; font-weight: 600; font-size: var(--fs-sm); padding: .3em 0; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-width: 0; min-height: 36px; display: flex; align-items: center; justify-content: center; }
+  .allin button.c { cursor: pointer; font-family: inherit; }
+  .allin .c.k { color: var(--info-t); }
+  .allin .c.n { color: var(--text-muted); font-weight: 400; font-size: var(--fs-xs); border-color: transparent; background: transparent; }
+  .allin .c.o { background: color-mix(in srgb, var(--accent) 16%, var(--bg)); border-color: var(--accent); color: var(--accent-alt); }
+  .allin .c.sel { outline: 3px solid var(--info-t); }
+  .alfa { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 3px; }
+  .alfa-label { font-family: var(--f-mono); font-size: var(--fs-xs); color: var(--text-muted); margin: .35rem 0 .15rem; }
+  .alfa .c { text-align: center; font-family: var(--f-mono); font-weight: 600; font-size: var(--fs-sm); padding: .25em 0; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  .alfa .c.cif { background: color-mix(in srgb, var(--accent) 16%, var(--bg)); border-color: var(--accent); color: var(--accent-alt); }
+  .alfa .c.sel { outline: 3px solid var(--info-t); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+const { Btn, Field, Box, PaginaGioco } = UI;
+const C = window.Cripto, A = C.ALFABETO;
+
+function RigaChiave({ k, sel }) {
+  const mezza = (da) => (
+    <div>
+      <div className="alfa-label">Testo in chiaro</div>
+      <div className="alfa">{Array.from({ length: 13 }, (_, i) => da + i).map(i => <div key={i} className={'c' + (i === sel ? ' sel' : '')}>{A[i]}</div>)}</div>
+      <div className="alfa-label">Riga della chiave {A[k]} (spostamento {k})</div>
+      <div className="alfa">{Array.from({ length: 13 }, (_, i) => da + i).map(i => <div key={i} className={'c cif' + (i === sel ? ' sel' : '')}>{A[(i + k) % 26]}</div>)}</div>
+    </div>
+  );
+  return <div>{mezza(0)}{mezza(13)}</div>;
+}
+
+function Allineamento({ tr, decifra, sel, onPick }) {
+  const SIZE = 8, blocchi = [];
+  for (let i = 0; i < tr.length; i += SIZE) blocchi.push({ da: i, v: tr.slice(i, i + SIZE) });
+  return (
+    <div>
+      {blocchi.map((b, bi) => (
+        <div key={bi} className="allin" style={{ gridTemplateColumns: '3.6em repeat(' + b.v.length + ', minmax(0, 1fr))' }}>
+          <div className="lab">{decifra ? 'Cifrato' : 'Chiaro'}</div>{b.v.map((x, i) => <button key={i} type="button" className={'c' + (sel === b.da + i ? ' sel' : '')} onClick={() => onPick(b.da + i)} aria-label={'Lettera ' + (b.da + i + 1)}>{x.chiaro.toUpperCase()}</button>)}
+          <div className="lab">Chiave</div>{b.v.map((x, i) => <div key={i} className="c k">{x.chiave}</div>)}
+          <div className="lab">Sposta</div>{b.v.map((x, i) => <div key={i} className="c n">{decifra ? '−' : '+'}{Math.abs(x.spostamento)}</div>)}
+          <div className="lab">{decifra ? 'Chiaro' : 'Cifrato'}</div>{b.v.map((x, i) => <div key={i} className="c o">{x.cifrato.toUpperCase()}</div>)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function App() {
+  const [testo, setTesto] = useState(() => UI.carica('vig-testo', 'Ci vediamo domani'));
+  const [chiave, setChiave] = useState(() => UI.carica('vig-chiave', 'LUNA'));
+  const [modo, setModo] = useState('cifra');
+  const [sel, setSel] = useState(0);
+  const salva = (t, k) => { UI.salva('vig-testo', t); UI.salva('vig-chiave', k); };
+  const valida = C.normalizza(chiave).length > 0;
+  const decifra = modo === 'decifra';
+  const tr = valida ? C.vigenereTraccia(testo, chiave, decifra).filter(x => x.lettera) : [];
+  const out = valida ? (decifra ? C.vigenereDecifra(testo, chiave) : C.vigenere(testo, chiave)) : '';
+  const s = tr[Math.min(sel, tr.length - 1)];
+  return (
+    <PaginaGioco titolo="Simulatore di Vigenère" indietro="slide.html#8" indietroEtichetta="Modulo 3">
+      <p>Scrivi un testo e una parola chiave. Ogni lettera del testo si sposta di quanto vale la lettera corrispondente della chiave, che si ripete.</p>
+      <div className="sim">
+        <div className="row">
+          <Btn variant={!decifra ? 'primary' : ''} onClick={() => setModo('cifra')} aria-pressed={!decifra}>Cifra</Btn>
+          <Btn variant={decifra ? 'primary' : ''} onClick={() => setModo('decifra')} aria-pressed={decifra}>Decifra</Btn>
+        </div>
+        <Field label="Testo" htmlFor="testo"><textarea id="testo" className="input" rows={2} value={testo} onChange={e => { setTesto(e.target.value); salva(e.target.value, chiave); }} /></Field>
+        <Field label="Chiave (una parola)" htmlFor="chiave"><input id="chiave" className="input mono" value={chiave} onChange={e => { setChiave(e.target.value); salva(testo, e.target.value); }} autoCapitalize="characters" /></Field>
+        <div className="xs muted" style={{ textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600 }}>{decifra ? 'Testo in chiaro' : 'Testo cifrato'}</div>
+        <div className="out big" aria-live="polite">{valida ? (out || ' ') : 'La chiave deve contenere almeno una lettera.'}</div>
+      </div>
+      {valida && tr.length ? (
+        <div className="sim">
+          <div className="sim-title">Lettera per lettera</div>
+          <p className="small muted">Tocca una lettera per vedere la riga della chiave.</p>
+          <Allineamento tr={tr} decifra={decifra} sel={Math.min(sel, tr.length - 1)} onPick={setSel} />
+          {s ? <p className="small">{decifra
+            ? <>La <b className="hl">{s.chiaro.toUpperCase()}</b> con la chiave <b className="hl">{s.chiave}</b> torna alla <b className="hl">{s.cifrato.toUpperCase()}</b> (si va indietro di {Math.abs(s.spostamento)}).</>
+            : <>La <b className="hl">{s.chiaro.toUpperCase()}</b> con la chiave <b className="hl">{s.chiave}</b> diventa <b className="hl">{s.cifrato.toUpperCase()}</b> (si va avanti di {s.spostamento}).</>}</p> : null}
+          {s ? <RigaChiave k={A.indexOf(s.chiave)} sel={decifra ? A.indexOf(s.cifrato.toUpperCase()) : A.indexOf(s.chiaro.toUpperCase())} /> : null}
+        </div>
+      ) : null}
+      <Box type="tip" title="Prova">Con una chiave di una sola lettera ottieni il cifrario di Cesare. Con chiave A non cambia nulla: è spostamento 0.</Box>
+      <p className="small muted mt">Pronto alla sfida? <a className="text-link" href="gioco-rompi-vigenere.html">Gioco: rompi il messaggio</a></p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gioco: rompi il messaggio di Vigenère</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  .intercetto { font-family: var(--f-mono); font-size: 1.05rem; line-height: 1.5; letter-spacing: .03em; color: var(--accent-alt); background: #0e0c0a; border: 1px solid var(--border); border-radius: 10px; padding: .7rem .9rem; overflow-wrap: anywhere; max-height: 13rem; overflow-y: auto; }
+  .intercetto mark { background: color-mix(in srgb, var(--info) 45%, transparent); color: var(--text); border-radius: 3px; padding: 0 1px; }
+  .tentativo { font-family: var(--f-mono); font-size: 1rem; line-height: 1.5; color: var(--text); background: var(--bg); border: 1px dashed var(--border); border-radius: 10px; padding: .6rem .9rem; overflow-wrap: anywhere; min-height: 4.5em; }
+  .statistiche { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; text-align: center; }
+  .statistiche div { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: .4rem; }
+  .statistiche b { display: block; font-family: var(--f-mono); font-size: 1.4rem; color: var(--accent-alt); }
+  .statistiche span { font-size: .8rem; color: var(--text-muted); }
+  .tabs { display: flex; gap: .4rem; margin: .5rem 0 .8rem; }
+  .tabs .btn { flex: 1; padding-left: .3em; padding-right: .3em; }
+  .freq { display: flex; align-items: flex-end; gap: 1px; height: 3.4rem; }
+  .freq .b { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .freq .b i { display: block; width: 100%; background: var(--info); border-radius: 2px 2px 0 0; min-height: 1px; }
+  .freq .b.ev i { background: var(--accent); }
+  .freq-let { display: flex; gap: 1px; }
+  .freq-let span { flex: 1 1 0; text-align: center; font-family: var(--f-mono); font-size: 9px; color: var(--text-muted); }
+  .colbox { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: .5rem; margin-bottom: .5rem; }
+  .colbox .tt { display: flex; justify-content: space-between; align-items: center; font-family: var(--f-mono); font-size: var(--fs-xs); color: var(--text-muted); }
+  .colbox .kl { font-size: 1.8rem; font-weight: 800; color: var(--accent-alt); font-family: var(--f-title); min-width: 1.4em; text-align: center; }
+  .colbox .ctl { display: flex; gap: .4rem; align-items: center; justify-content: space-between; margin-top: .3rem; }
+  .colbox .ctl .btn { min-width: 52px; font-size: 1.2rem; }
+  .ic-r { display: flex; align-items: center; gap: .5rem; font-family: var(--f-mono); font-size: var(--fs-sm); margin: .2rem 0; }
+  .ic-r .bar { flex: 1; height: 12px; background: var(--bg-light); border-radius: 6px; overflow: hidden; }
+  .ic-r .bar i { display: block; height: 100%; background: var(--info); }
+  .ic-r.top .bar i { background: var(--success); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Btn, Field, Box, Chip, Table, PaginaGioco } = UI;
+const C = window.Cripto, A = C.ALFABETO;
+const mod26 = (n) => ((n % 26) + 26) % 26;
+
+// Testi lunghi (300+ lettere): servono molte lettere per colonna perché le frequenze emergano.
+const FRASI = [
+  'Per quasi tre secoli il cifrario di Vigenère fu considerato impossibile da violare. Il segreto stava nella chiave: una parola che si ripete sotto il messaggio e cambia lo spostamento a ogni lettera. Ma anche una parola ripetuta lascia delle tracce, perché due frammenti uguali del testo, cifrati con la stessa parte della chiave, producono frammenti uguali. Charles Babbage prima e Friedrich Kasiski poi capirono come usare queste ripetizioni per scoprire la lunghezza della chiave.',
+  'Una rete informatica è un insieme di computer collegati tra loro per scambiarsi dati. Ogni messaggio viene diviso in piccoli pacchetti che attraversano router e switch fino a raggiungere il destinatario. Chi si trova nel mezzo può leggere i pacchetti se non sono protetti, ed è per questo che si usano protocolli cifrati come il sicuro HTTPS e la connessione remota SSH. La cifratura trasforma il contenuto in una sequenza di lettere senza senso.',
+  'Durante la seconda guerra mondiale i servizi segreti di molti paesi cercavano di leggere i messaggi del nemico. I tedeschi usavano una macchina chiamata Enigma, che cambiava la cifratura a ogni lettera. A Bletchley Park un gruppo di matematici e ingegneri costruì macchine speciali per provare moltissime chiavi in poco tempo. Il loro lavoro accorciò la guerra e diede inizio all\'informatica moderna.',
+  'Il laboratorio di informatica si trova al secondo piano della scuola. Ogni postazione ha un computer collegato alla rete interna e un armadio con i cavi per le prove di cablaggio. Prima di iniziare l\'esercitazione bisogna accendere il server, controllare che gli switch siano in funzione e verificare che tutti i computer riescano a comunicare tra loro. Alla fine della lezione si spegne tutto con attenzione.',
+  'Una buona password non deve essere una parola che si trova nel dizionario e non deve contenere il nome di chi la usa. Conviene scegliere una frase lunga e facile da ricordare, magari mescolando lettere maiuscole, numeri e simboli. Non si deve mai usare la stessa password per servizi diversi, perché se un sito viene attaccato i ladri provano subito le stesse credenziali altrove. Un gestore di password aiuta a tenere tutto in ordine.',
+  'Giulio Cesare spostava ogni lettera di tre posti, ma un nemico paziente poteva provare tutte le chiavi in pochi minuti. Per questo i cifrari si sono evoluti nel tempo: prima con più alfabeti, poi con le macchine, infine con i computer. Oggi gli algoritmi sono pubblici e la sicurezza dipende soltanto dalla chiave, che deve essere abbastanza lunga da rendere impossibile ogni tentativo di forza bruta.',
+  'Internet nacque come un piccolo esperimento tra università americane e poi crebbe fino a collegare miliardi di dispositivi. Ogni indirizzo identifica una macchina e ogni protocollo stabilisce le regole del dialogo. Quando apriamo un sito il nostro computer chiede a un server la pagina, il server risponde e il browser la mostra sullo schermo. Tutto questo avviene in una frazione di secondo e senza che ce ne accorgiamo.',
+  'Immagina di dover mandare un segreto a un amico che non hai mai incontrato. Se vi accordate su una chiave, qualcuno potrebbe ascoltare la conversazione e rubarla. Per risolvere questo problema i matematici hanno inventato la crittografia a chiave pubblica, in cui ciascuno possiede due chiavi diverse: una si può distribuire a tutti, l\'altra resta segreta per sempre.',
+];
+const CHIAVI = { facile: ['SOL', 'MAR', 'LUNA', 'VELA', 'ROSA', 'CIAO', 'MONDO'], difficile: ['TORRE', 'FIORE', 'PORTA', 'GATTO', 'NOTTE', 'LIBRO', 'CHIAVE', 'TASTO'] };
+
+const colonneDi = (t, n) => { const s = C.normalizza(t); return Array.from({ length: n }, (_, j) => { let o = ''; for (let i = j; i < s.length; i += n) o += s[i]; return o; }); };
+const icMedio = (t, n) => colonneDi(t, n).reduce((a, c) => a + C.indiceCoincidenza(c), 0) / n;
+const migliore = (col) => { let b = 0, bp = Infinity; for (let k = 0; k < 26; k++) { const p = C.punteggioItaliano(C.cesareDecifra(col, k)); if (p < bp) { bp = p; b = k; } } return b; };
+const raggruppa = (t) => (C.normalizza(t).match(/.{1,5}/g) || []).join(' ');
+
+function nuovaPartita(livello, prec) {
+  let i; do { i = Math.floor(Math.random() * FRASI.length); } while (i === prec);
+  const pool = CHIAVI[livello];
+  return { i, chiave: pool[Math.floor(Math.random() * pool.length)] };
+}
+
+function Istogramma({ valori }) {
+  const max = 14;
+  return (
+    <div>
+      <div className="freq" role="img" aria-label="Frequenze delle lettere della colonna">
+        {valori.map((v, i) => <div key={i} className={'b' + ('EAIO'.includes(A[i]) ? ' ev' : '')}><i style={{ height: Math.min(100, 100 * v / max) + '%' }} /></div>)}
+      </div>
+      <div className="freq-let" aria-hidden="true">{valori.map((v, i) => <span key={i}>{A[i]}</span>)}</div>
+    </div>
+  );
+}
+
+function Kasiski({ norm }) {
+  const lista = useMemo(() => {
+    const prendi = (L) => { const out = []; C.kasiski(norm, L).forEach(x => { if (!out.find(o => o.distanze.join() === x.distanze.join() && Math.abs(o.posizioni[0] - x.posizioni[0]) <= 3)) out.push(x); }); return out; };
+    let l = prendi(4); if (l.length < 3) l = prendi(3);
+    return l.sort((a, b) => b.posizioni.length - a.posizioni.length || a.posizioni[0] - b.posizioni[0]).slice(0, 7);
+  }, [norm]);
+  const tally = useMemo(() => {
+    const t = {}; lista.forEach(x => x.distanze.forEach(d => { for (let f = 2; f <= 10; f++) if (d % f === 0) t[f] = (t[f] || 0) + 1; }));
+    return Object.entries(t).sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+  }, [lista]);
+  return (
+    <div>
+      <p className="small">Sequenze che compaiono più volte nel cifrato. La distanza tra due ripetizioni è un multiplo della lunghezza della chiave (se non è un caso).</p>
+      <Table mono head={['Sequenza', 'Posizioni', 'Distanze']} rows={lista.map(x => [x.sequenza, x.posizioni.join(', '), x.distanze.join(', ')])} />
+      <p className="small mt">Divisori più frequenti nelle distanze:</p>
+      <div className="row">{tally.slice(0, 5).map(([f, n]) => <Chip key={f} color="info">{f} ×{n}</Chip>)}</div>
+      <p className="xs muted mt">Un divisore che compare quasi sempre è un buon candidato. Qualche ripetizione è casuale: non fidarti di una sola riga.</p>
+    </div>
+  );
+}
+
+function IC({ norm }) {
+  const vals = useMemo(() => Array.from({ length: 8 }, (_, i) => icMedio(norm, i + 1)), [norm]);
+  const ord = [...vals].sort((a, b) => b - a);
+  return (
+    <div>
+      <p className="small">Indice di coincidenza medio delle colonne per ogni lunghezza. Con la lunghezza giusta sale verso 0,07 (italiano); con quella sbagliata resta vicino a 0,04.</p>
+      {vals.map((v, i) => <div key={i} className={'ic-r' + (v >= ord[2] && v > 0.06 ? ' top' : '')}><span style={{ minWidth: '4.2em' }}>n = {i + 1}</span><div className="bar"><i style={{ width: (100 * v / 0.08) + '%' }} /></div><span>{v.toFixed(3)}</span></div>)}
+      <p className="xs muted mt">Se più valori alti sono multipli tra loro (es. 3 e 6), la lunghezza è la più piccola.</p>
+    </div>
+  );
+}
+
+function Gioco() {
+  const [livello, setLivello] = useState(() => UI.carica('rompiv-livello', 'facile'));
+  const [partita, setPartita] = useState(() => nuovaPartita(UI.carica('rompiv-livello', 'facile'), -1));
+  const [tab, setTab] = useState('kasiski');
+  const [n, setN] = useState(3);
+  const [sp, setSp] = useState({});
+  const [errori, setErrori] = useState(0);
+  const [aiuti, setAiuti] = useState(0);
+  const [esito, setEsito] = useState(null);
+  const [stat, setStat] = useState(() => UI.carica('rompiv-stat', { punti: 0, risolti: 0, serie: 0, migliore: 0 }));
+  const difficile = livello === 'difficile';
+
+  const chiaro = FRASI[partita.i];
+  const cifrato = useMemo(() => C.vigenere(C.senzaAccenti(chiaro), partita.chiave), [partita]);
+  const norm = useMemo(() => C.normalizza(cifrato), [cifrato]);
+  const mostrato = difficile ? raggruppa(cifrato) : cifrato.toUpperCase();
+  const cols = useMemo(() => colonneDi(norm, n), [norm, n]);
+  const val = (j) => sp[n + '-' + j] || 0;
+  const chiaveProvata = cols.map((_, j) => A[mod26(val(j))]).join('');
+  const prova = C.vigenereDecifra(cifrato, chiaveProvata);
+  const provaMostrata = difficile ? raggruppa(prova) : prova.toUpperCase();
+  const chiuso = esito && (esito.tipo === 'ok' || esito.tipo === 'resa');
+
+  const salvaStat = (s) => { setStat(s); UI.salva('rompiv-stat', s); };
+  const reset = (liv, prec) => { setPartita(nuovaPartita(liv, prec)); setSp({}); setN(3); setErrori(0); setAiuti(0); setEsito(null); setTab('kasiski'); };
+  const cambiaLivello = (l) => { setLivello(l); UI.salva('rompiv-livello', l); reset(l, -1); };
+  const muovi = (j, d) => { if (chiuso) return; setSp({ ...sp, [n + '-' + j]: mod26(val(j) + d) }); if (esito) setEsito(null); };
+  const suggerisci = (j) => { if (chiuso) return; setSp({ ...sp, [n + '-' + j]: migliore(cols[j]) }); setAiuti(aiuti + 1); };
+  const conferma = () => {
+    if (chiuso) return;
+    if (C.normalizza(prova) === C.normalizza(chiaro)) {
+      const punti = Math.max(10, 150 - 10 * errori - 20 * aiuti) * (difficile ? 2 : 1), serie = stat.serie + 1;
+      salvaStat({ punti: stat.punti + punti, risolti: stat.risolti + 1, serie, migliore: Math.max(stat.migliore, serie) });
+      setEsito({ tipo: 'ok', punti });
+    } else { setErrori(errori + 1); setEsito({ tipo: 'ko' }); if (stat.serie) salvaStat({ ...stat, serie: 0 }); }
+  };
+  const arrenditi = () => { setEsito({ tipo: 'resa' }); if (stat.serie) salvaStat({ ...stat, serie: 0 }); };
+
+  return (
+    <div>
+      <div className="statistiche" aria-label="Statistiche">
+        <div><b>{stat.punti}</b><span>punti</span></div>
+        <div><b>{stat.serie}</b><span>serie (record {stat.migliore})</span></div>
+        <div><b>{stat.risolti}</b><span>risolti</span></div>
+      </div>
+      <div className="tabs" role="group" aria-label="Livello">
+        <Btn variant={!difficile ? 'primary' : ''} aria-pressed={!difficile} onClick={() => cambiaLivello('facile')}>Facile (chiave 3-7)</Btn>
+        <Btn variant={difficile ? 'primary' : ''} aria-pressed={difficile} onClick={() => cambiaLivello('difficile')}>Difficile (gruppi, ×2)</Btn>
+      </div>
+
+      <h2>Messaggio intercettato</h2>
+      <div className="intercetto" aria-label="Testo cifrato">{mostrato}</div>
+      <p className="small muted mt">{norm.length} lettere, cifrate con Vigenère e una parola chiave sconosciuta. Trovala.</p>
+
+      <h2>1. Quanto è lunga la chiave?</h2>
+      <div className="tabs" role="group" aria-label="Strumento">
+        <Btn variant={tab === 'kasiski' ? 'primary' : ''} aria-pressed={tab === 'kasiski'} onClick={() => setTab('kasiski')}>Kasiski</Btn>
+        <Btn variant={tab === 'ic' ? 'primary' : ''} aria-pressed={tab === 'ic'} onClick={() => setTab('ic')}>Indice di coincidenza</Btn>
+      </div>
+      {tab === 'kasiski' ? <Kasiski norm={norm} /> : <IC norm={norm} />}
+
+      <h2>2. Frequenze per colonna</h2>
+      <div className="row">
+        <span className="small">Lunghezza scelta:</span>
+        <Btn small onClick={() => { setN(Math.max(2, n - 1)); }} aria-label="Lunghezza meno uno" disabled={n <= 2}>−</Btn>
+        <b className="mono hl" style={{ fontSize: '1.4rem' }}>{n}</b>
+        <Btn small onClick={() => { setN(Math.min(8, n + 1)); }} aria-label="Lunghezza più uno" disabled={n >= 8}>+</Btn>
+      </div>
+      <p className="small muted mt">Per ogni colonna sposta la lettera della chiave finché i picchi ambra (E, A, I, O) diventano alti. «Suggerisci» costa 20 punti.</p>
+      {cols.map((col, j) => (
+        <div className="colbox" key={n + '-' + j}>
+          <div className="tt"><span>colonna {j + 1} · {col.length} lettere</span><span className="kl" aria-label={'Lettera della chiave ' + A[mod26(val(j))]}>{A[mod26(val(j))]}</span></div>
+          <Istogramma valori={C.frequenze(C.cesareDecifra(col, val(j))).percentuali} />
+          <div className="ctl">
+            <Btn onClick={() => muovi(j, -1)} disabled={chiuso} aria-label={'Colonna ' + (j + 1) + ' indietro'}>−</Btn>
+            <Btn small variant="ghost" onClick={() => suggerisci(j)} disabled={chiuso}>Suggerisci</Btn>
+            <Btn onClick={() => muovi(j, 1)} disabled={chiuso} aria-label={'Colonna ' + (j + 1) + ' avanti'}>+</Btn>
+          </div>
+        </div>
+      ))}
+
+      <h2>3. Il tentativo</h2>
+      <p className="small">Chiave provata: <b className="mono hl">{chiaveProvata}</b></p>
+      <div className="tentativo" aria-live="polite">{provaMostrata}</div>
+      <div className="row mt">
+        <Btn variant="primary" onClick={conferma} disabled={chiuso}>È questa la chiave!</Btn>
+        {!chiuso ? <Btn variant="ghost" onClick={arrenditi}>Mi arrendo</Btn> : null}
+      </div>
+
+      {esito && esito.tipo === 'ko' ? <div className="feedback ko mt" role="status">Il testo non ha ancora senso compiuto. Errori: {errori}. Controlla la lunghezza e le colonne con i picchi bassi.</div> : null}
+      {esito && esito.tipo === 'ok' ? <div className="feedback ok mt" role="status"><b>Esatto!</b> La chiave era {partita.chiave}. +{esito.punti} punti.</div> : null}
+      {esito && esito.tipo === 'resa' ? <div className="feedback mt" role="status">La chiave era <b>{partita.chiave}</b>. Il messaggio: «{chiaro}». La serie riparte da zero.</div> : null}
+
+      <div className="row mt">
+        <Btn variant={chiuso ? 'primary' : 'ghost'} onClick={() => reset(livello, partita.i)}>Nuovo messaggio</Btn>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <PaginaGioco titolo="Rompi il messaggio" indietro="slide.html#17" indietroEtichetta="Modulo 3">
+      <Gioco />
+      <p className="small muted mt-lg">Punteggi e record restano solo su questo dispositivo. Non viene raccolto nessun dato. <a className="text-link" href="simulazione-vigenere.html">Torna al simulatore</a></p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>

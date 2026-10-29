@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modulo 4 — La trasposizione</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  /* Stili specifici di questo modulo */
+  .gt { display: grid; gap: 3px; font-family: var(--f-mono); justify-content: start; margin-bottom: .5rem; }
+  .gt .c { text-align: center; font-weight: 600; font-size: var(--fs-body); padding: .15em 0; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-width: 0; }
+  .gt .hd { background: var(--bg-light); color: var(--info-t); border-color: var(--info); }
+  .gt .rk { border-color: transparent; background: transparent; color: var(--accent-alt); font-size: var(--fs-xs); padding: 0; }
+  .gt .c.letta { background: color-mix(in srgb, var(--accent) 18%, var(--bg)); border-color: var(--accent); color: var(--accent-alt); }
+  .gt .c.pad { color: var(--danger-t); border-style: dashed; }
+  .gt .c.vuota { color: var(--text-muted); border-style: dashed; }
+  .gt .c.nuova { outline: 3px solid var(--info-t); }
+  .blocchi { display: flex; flex-wrap: wrap; gap: .3rem; }
+  .blocchi .bl { font-family: var(--f-mono); font-size: var(--fs-sm); padding: .15em .5em; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text-dim); }
+  .blocchi .bl.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--bg)); color: var(--accent-alt); }
+  .freq { display: flex; align-items: flex-end; gap: 2px; height: 3.2rem; }
+  .freq .b { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .freq .b i { display: block; width: 100%; background: var(--info); border-radius: 2px 2px 0 0; min-height: 1px; }
+  .freq.cif .b i { background: var(--danger); }
+  .freq-let { display: flex; gap: 2px; }
+  .freq-let span { flex: 1 1 0; text-align: center; font-family: var(--f-mono); font-size: 10px; color: var(--text-muted); }
+  .scambia { display: flex; gap: 3px; margin-top: 3px; }
+  .scambia button { flex: 1 1 0; min-width: 0; min-height: 36px; padding: 0; }
+  @media (min-width: 901px) { .split-code { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) !important; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Box, Glow, Chip, Grid, Card, Btn, Field, Table, Flow, CompareTwo, ActivityBadge, Steps, Code } = UI;
+const C = window.Cripto;
+const A = C.ALFABETO;
+
+/* ---------- componenti specifici del modulo ---------- */
+
+// Griglia della trasposizione. `letti` = quante colonne (in ordine alfabetico della chiave) sono già state lette.
+function GrigliaTrasp({ testo, chiave, letti, senzaRango, originali }) {
+  let g;
+  try { g = C.trasposizioneGriglia(testo, chiave); } catch (e) { return <p className="small dim">Serve almeno una lettera nella chiave.</p>; }
+  const n = g.larghezza, orig = originali != null ? originali : C.normalizza(testo).length;
+  const l = letti == null ? 0 : letti;
+  return (
+    <div className="gt" style={{ gridTemplateColumns: 'repeat(' + n + ', minmax(0, 2.4em))' }} role="group" aria-label={'Griglia ' + g.righe.length + ' righe per ' + n + ' colonne'}>
+      {g.chiave.split('').map((k, i) => <div key={'h' + i} className="c hd">{k}</div>)}
+      {senzaRango ? null : g.rango.map((r, i) => <div key={'r' + i} className="c rk">{r}</div>)}
+      {g.righe.map((riga, ri) => riga.map((ch, ci) => {
+        const pad = ri * n + ci >= orig;
+        return <div key={ri + '-' + ci} className={'c' + (pad ? ' pad' : '') + (g.rango[ci] <= l ? ' letta' : '')}>{ch}</div>;
+      }))}
+    </div>
+  );
+}
+const cifratoParziale = (testo, chiave, letti) => C.trasposizioneGriglia(testo, chiave).colonne.slice(0, letti).join('');
+
+// Griglia di decifratura: i blocchi del cifrato vengono messi nelle colonne nell'ordine alfabetico della chiave.
+function GrigliaDec({ cifrato, chiave, messe }) {
+  const k = C.normalizza(chiave), n = k.length, r = cifrato.length / n;
+  const ordine = C.trasposizioneGriglia('A', chiave).ordine;
+  const blocchi = []; for (let i = 0; i < n; i++) blocchi.push(cifrato.substr(i * r, r));
+  const colDi = {}; ordine.forEach((col, pos) => { colDi[col] = pos; });
+  const celle = [];
+  k.split('').forEach((ch, i) => celle.push(<div key={'h' + i} className="c hd">{ch}</div>));
+  for (let ri = 0; ri < r; ri++) for (let ci = 0; ci < n; ci++) {
+    const pos = colDi[ci], dentro = pos < messe;
+    celle.push(<div key={ri + '-' + ci} className={'c' + (dentro ? ' letta' : ' vuota') + (dentro && pos === messe - 1 ? ' nuova' : '')}>{dentro ? blocchi[pos][ri] : '·'}</div>);
+  }
+  return (
+    <div>
+      <div className="blocchi" aria-label="Blocchi del testo cifrato">{blocchi.map((b, i) => <span key={i} className={'bl' + (i < messe ? ' on' : '')}>{b}</span>)}</div>
+      <div className="gt mt" style={{ gridTemplateColumns: 'repeat(' + n + ', minmax(0, 2.4em))' }}>{celle}</div>
+    </div>
+  );
+}
+
+function Istogramma({ valori, max, cls }) {
+  return (
+    <div>
+      <div className={'freq ' + (cls || '')} role="img" aria-label="Istogramma delle frequenze delle lettere">
+        {valori.map((v, i) => <div key={i} className="b"><i style={{ height: Math.min(100, 100 * v / max) + '%' }} /></div>)}
+      </div>
+      <div className="freq-let" aria-hidden="true">{valori.map((v, i) => <span key={i}>{A[i]}</span>)}</div>
+    </div>
+  );
+}
+
+const TESTO_FREQ = 'La crittografia è l\'arte di nascondere il significato di un messaggio. Chi scrive trasforma le parole con una regola e una chiave, chi legge usa la stessa chiave per tornare al testo originale. Nei secoli questa idea è stata usata per proteggere lettere, ordini militari e segreti di stato, ma anche per giocare con gli amici.';
+function FreqInvarianti() {
+  const dati = useMemo(() => {
+    const chiaro = C.normalizza(TESTO_FREQ), trasp = C.trasposizioneColonne(TESTO_FREQ, 'CHIAVE'), cesare = C.cesare(chiaro, 7);
+    const f = (t) => C.frequenze(t);
+    const uguali = f(chiaro).conteggi.every((c, i) => c === f(trasp).conteggi[i]);
+    return [
+      { n: 'Testo in chiaro', t: chiaro, f: f(chiaro).percentuali, ic: C.indiceCoincidenza(chiaro), c: '' },
+      { n: 'Dopo la trasposizione (chiave CHIAVE)', t: trasp, f: f(trasp).percentuali, ic: C.indiceCoincidenza(trasp), c: '' },
+      { n: 'Dopo Cesare (chiave 7)', t: cesare, f: f(cesare).percentuali, ic: C.indiceCoincidenza(cesare), c: 'cif' },
+    ].map(x => ({ ...x, uguali }));
+  }, []);
+  return (
+    <div className="sim">
+      <div className="sim-title">Stesso testo, tre profili</div>
+      {dati.map((d, i) => (
+        <div key={i} className="mt">
+          <div className="row-between"><span className="xs muted">{d.n}</span><span className="mono xs hl">IC = {d.ic.toFixed(3)}</span></div>
+          <Istogramma valori={d.f} max={13} cls={d.c} />
+        </div>
+      ))}
+      <p className="small mt">{dati[0].uguali ? 'Le lettere di chiaro e trasposto sono esattamente le stesse, nelle stesse quantità: gli istogrammi coincidono.' : ''}</p>
+    </div>
+  );
+}
+
+// Simulatore inline.
+function TraspSim() {
+  const [testo, setTesto] = useState('Ci vediamo domani alle otto');
+  const [chiave, setChiave] = useState('ZEBRA');
+  const [modo, setModo] = useState('cifra');
+  const [letti, setLetti] = useState(null);
+  const valida = C.normalizza(chiave).length > 0;
+  let out = '', errore = null, g = null;
+  if (valida) {
+    try {
+      if (modo === 'cifra') { g = C.trasposizioneGriglia(testo, chiave); out = g.cifrato; }
+      else out = C.trasposizioneColonneDecifra(testo, chiave);
+    } catch (e) { errore = e.message; }
+  }
+  const n = valida ? C.normalizza(chiave).length : 0, l = letti == null ? n : Math.min(letti, n);
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · trasposizione a colonne</div>
+      <Grid cols={2}>
+        <div className="stack">
+          <Field label="Testo" htmlFor="t-testo"><textarea id="t-testo" className="input" rows={2} value={testo} onChange={e => setTesto(e.target.value)} /></Field>
+          <Field label="Parola chiave" htmlFor="t-chiave"><input id="t-chiave" className="input mono" value={chiave} onChange={e => setChiave(e.target.value)} /></Field>
+          <div className="row">
+            <Btn variant={modo === 'cifra' ? 'primary' : ''} onClick={() => setModo('cifra')} aria-pressed={modo === 'cifra'}>Cifra</Btn>
+            <Btn variant={modo === 'decifra' ? 'primary' : ''} onClick={() => setModo('decifra')} aria-pressed={modo === 'decifra'}>Decifra</Btn>
+          </div>
+          {modo === 'cifra' && valida ? <Field label={'Colonne lette: ' + l + ' di ' + n}><input type="range" min="0" max={n} value={l} onChange={e => setLetti(+e.target.value)} aria-label="Colonne lette" /></Field> : null}
+        </div>
+        <div className="stack">
+          <div className="label xs muted">{modo === 'cifra' ? 'Testo cifrato' : 'Testo in chiaro (con le X di riempimento in fondo)'}</div>
+          <div className="out big" aria-live="polite">{!valida ? 'La chiave deve contenere almeno una lettera.' : errore ? errore : (modo === 'cifra' ? cifratoParziale(testo, chiave, l) || ' ' : out || ' ')}</div>
+          {modo === 'cifra' && valida ? <GrigliaTrasp testo={testo} chiave={chiave} letti={l} /> : null}
+        </div>
+      </Grid>
+    </div>
+  );
+}
+
+function DoppiaTrasp() {
+  const [testo, setTesto] = useState('ATTACCO ALL\'ALBA DI DOMANI');
+  const [k1, setK1] = useState('ZEBRA');
+  const [k2, setK2] = useState('LUNA');
+  const ok = C.normalizza(k1).length && C.normalizza(k2).length;
+  const c1 = ok ? C.trasposizioneColonne(testo, k1) : '', c2 = ok ? C.trasposizioneColonne(c1, k2) : '';
+  const solo = ok ? C.trasposizioneColonne(testo, k1) : '';
+  return (
+    <div className="sim">
+      <div className="sim-title">Doppia trasposizione</div>
+      <Field label="Testo" htmlFor="d-testo"><input id="d-testo" className="input mono" value={testo} onChange={e => setTesto(e.target.value)} /></Field>
+      <div className="row">
+        <Field label="Prima chiave" className="grow"><input className="input mono" value={k1} onChange={e => setK1(e.target.value)} aria-label="Prima chiave" /></Field>
+        <Field label="Seconda chiave" className="grow"><input className="input mono" value={k2} onChange={e => setK2(e.target.value)} aria-label="Seconda chiave" /></Field>
+      </div>
+      <div className="stack mt">
+        <div><span className="xs muted">Dopo la prima trasposizione</span><div className="out mono">{solo || ' '}</div></div>
+        <div><span className="xs muted">Dopo la seconda (cifrato finale)</span><div className="out mono hl">{c2 || ' '}</div></div>
+      </div>
+    </div>
+  );
+}
+
+// Attacco: si prova una larghezza e si riordinano i blocchi finché le righe si leggono.
+function AttaccoColonne({ cifrato, rivela }) {
+  const L = cifrato.length;
+  const divisori = useMemo(() => { const d = []; for (let n = 2; n <= 10; n++) if (L % n === 0) d.push(n); return d; }, [L]);
+  const [n, setN] = useState(divisori[0]);
+  const [ord, setOrd] = useState(() => Array.from({ length: divisori[0] }, (_, i) => i));
+  const r = L / n;
+  const blocchi = Array.from({ length: n }, (_, i) => cifrato.substr(i * r, r));
+  const scegli = (m) => { setN(m); setOrd(Array.from({ length: m }, (_, i) => i)); };
+  const scambia = (p, q) => { if (q < 0 || q >= n) return; const o = [...ord]; [o[p], o[q]] = [o[q], o[p]]; setOrd(o); };
+  const righe = []; for (let ri = 0; ri < r; ri++) righe.push(ord.map(b => blocchi[b][ri]).join(''));
+  return (
+    <div className="sim">
+      <div className="sim-title">Attacco: prova una larghezza e riordina le colonne</div>
+      <div className="out mono small">{cifrato}</div>
+      <div className="row mt"><span className="small">Lunghezze possibili ({L} lettere):</span>
+        {divisori.map(m => <Btn key={m} small variant={n === m ? 'primary' : ''} aria-pressed={n === m} onClick={() => scegli(m)}>{m}</Btn>)}
+      </div>
+      <div className="gt mt" style={{ gridTemplateColumns: 'repeat(' + n + ', minmax(0, 2.4em))' }}>
+        {righe.map((riga, ri) => riga.split('').map((ch, ci) => <div key={ri + '-' + ci} className="c">{ch}</div>))}
+      </div>
+      <div className="scambia" style={{ width: 'min(100%, ' + (n * 2.9) + 'em)' }}>
+        {ord.map((b, p) => <div key={p} style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <button type="button" className="btn" onClick={() => scambia(p, p - 1)} disabled={p === 0} aria-label={'Sposta colonna ' + (p + 1) + ' a sinistra'}>◀</button>
+          <button type="button" className="btn" onClick={() => scambia(p, p + 1)} disabled={p === n - 1} aria-label={'Sposta colonna ' + (p + 1) + ' a destra'}>▶</button>
+        </div>)}
+      </div>
+      <p className="small muted mt">Leggi le righe: devono comporre parole. Se non ci riesci, cambia la larghezza.</p>
+      {rivela ? <div className="mt"><Btn small variant="ghost" onClick={rivela.azione}>{rivela.etichetta}</Btn></div> : null}
+    </div>
+  );
+}
+
+/* ---------- dati calcolati con crypto.js ---------- */
+
+const MSG = 'ATTACCOALLALBADOMANI';           // 20 lettere
+const KZ = 'ZEBRA', KC = 'CASA', KL = 'LUNA';
+const MSG_PAD = 'ATTACCOALLALBA';             // 14 lettere: serve il riempimento
+const GZ = C.trasposizioneGriglia(MSG, KZ);
+const CIF_Z = GZ.cifrato;
+const GL = C.trasposizioneGriglia(MSG_PAD, KL);
+const ATT_CIF = C.trasposizioneColonne('CI VEDIAMO ALLA STAZIONE ALLE OTTO', 'CAVOLI');
+
+const passiEsempio = (() => {
+  const n = GZ.larghezza;
+  const out = [
+    { title: 'Testo e chiave', content: <div className="stack"><p>Testo: <span className="mono hl">{MSG}</span> ({MSG.length} lettere). Chiave: <span className="mono hl">{KZ}</span> ({n} lettere).</p><p>La griglia avrà <span className="mono hl">{n}</span> colonne, una per lettera della chiave.</p></div> },
+    { title: 'Si scrive per righe', content: <div className="stack"><p>Il testo si scrive nella griglia da sinistra a destra, riga dopo riga, sotto le lettere della chiave.</p><GrigliaTrasp testo={MSG} chiave={KZ} letti={0} senzaRango /></div> },
+    { title: 'Si numerano le colonne', content: <div className="stack"><p>Le lettere della chiave in ordine alfabetico: <span className="mono hl">{GZ.ordine.map(c => KZ[c]).join(' < ')}</span>. Il numero sotto ogni lettera è il suo turno di lettura.</p><GrigliaTrasp testo={MSG} chiave={KZ} letti={0} /></div> },
+  ];
+  GZ.ordine.forEach((col, i) => out.push({ title: 'Si legge la colonna ' + (i + 1) + ' (' + KZ[col] + ')', content: <div className="stack"><GrigliaTrasp testo={MSG} chiave={KZ} letti={i + 1} /><p>Cifrato finora: <span className="mono hl">{cifratoParziale(MSG, KZ, i + 1)}</span></p></div> }));
+  return out;
+})();
+
+const passiDec = (() => {
+  const n = KZ.length, r = CIF_Z.length / n;
+  const out = [
+    { title: 'Quante righe?', content: <div className="stack"><p>Il cifrato ha <span className="mono hl">{CIF_Z.length}</span> lettere, la chiave <span className="mono hl">{n}</span>: righe = {CIF_Z.length} ÷ {n} = <span className="mono hl">{r}</span>.</p><p>Ogni colonna ha quindi <span className="mono">{r}</span> lettere: il cifrato si divide in {n} blocchi da {r}.</p><GrigliaDec cifrato={CIF_Z} chiave={KZ} messe={0} /></div> },
+  ];
+  GZ.ordine.forEach((col, i) => out.push({ title: 'Il blocco ' + (i + 1) + ' va nella colonna ' + KZ[col], content: <div className="stack"><p>Il blocco {i + 1} è la colonna col turno {i + 1} (lettera <span className="mono hl">{KZ[col]}</span>): si scrive dall'alto in basso.</p><GrigliaDec cifrato={CIF_Z} chiave={KZ} messe={i + 1} /></div> }));
+  out.push({ title: 'Si legge per righe', content: <div className="stack"><GrigliaDec cifrato={CIF_Z} chiave={KZ} messe={n} /><p>Leggendo le righe: <span className="mono hl">{C.trasposizioneColonneDecifra(CIF_Z, KZ)}</span></p></div> });
+  return out;
+})();
+
+const CODICE = `<?php
+function ordineColonne(string $chiave): array {
+    $lettere = str_split($chiave);
+    $posizioni = range(0, count($lettere) - 1);
+    usort($posizioni, fn($a, $b) => [$lettere[$a], $a] <=> [$lettere[$b], $b]);
+    return $posizioni;
+}
+
+function trasposizione(string $testo, string $chiave): string {
+    $chiave = strtoupper(preg_replace('/[^A-Za-z]/', '', $chiave));
+    $testo = strtoupper(preg_replace('/[^A-Za-z]/', '', $testo));
+    $n = strlen($chiave);
+    while (strlen($testo) % $n !== 0) {
+        $testo .= 'X';
+    }
+    $righe = intdiv(strlen($testo), $n);
+    $cifrato = '';
+    foreach (ordineColonne($chiave) as $col) {
+        for ($r = 0; $r < $righe; $r++) {
+            $cifrato .= $testo[$r * $n + $col];
+        }
+    }
+    return $cifrato;
+}`;
+const SPIEGA = [
+  'Tag di apertura di PHP.',
+  'Restituisce le posizioni delle colonne nell\'ordine in cui vanno lette.',
+  'La chiave diventa un array di lettere: [\'Z\',\'E\',\'B\',\'R\',\'A\'].',
+  'Le posizioni delle colonne: 0, 1, 2, 3, 4.',
+  'Si ordinano le posizioni per lettera della chiave; a parità di lettera conta la posizione (da sinistra a destra). L\'operatore <=> confronta le due coppie.',
+  'Per ZEBRA il risultato è [4, 2, 1, 3, 0].',
+  'Fine della funzione.', '',
+  'La funzione principale.',
+  'La chiave in maiuscolo, senza spazi né simboli.',
+  'Lo stesso per il testo: la trasposizione lavora solo sulle lettere A-Z.',
+  'La larghezza della griglia: una colonna per lettera della chiave.',
+  'Finché le lettere non riempiono un numero intero di righe…',
+  '… si aggiunge la X di riempimento.',
+  'Fine del riempimento.',
+  'Quante righe ha la griglia (divisione intera).',
+  'Il cifrato parte vuoto.',
+  'Si visita ogni colonna nell\'ordine alfabetico della chiave.',
+  'E per ogni colonna si scorrono le righe, dall\'alto in basso.',
+  'La lettera nella riga $r e colonna $col sta in posizione $r * $n + $col nel testo scritto per righe.',
+  'Fine delle righe.', 'Fine delle colonne.',
+  'Il testo cifrato viene restituito.', '',
+];
+
+/* ---------- le slide ---------- */
+
+const slides = [
+  { copertina: true, sezione: 'Apertura', titolo: 'La trasposizione',
+    sottotitolo: 'Non cambiare le lettere: cambiare l\'ordine. Una famiglia di cifrari che ancora oggi è un ingrediente dei cifrari a blocchi.',
+    note: ['Apertura del modulo. Sin qui abbiamo sostituito lettere; qui le lettere restano e si permuta la posizione. L\'idea è antica e si combina con la sostituzione nei cifrari moderni.', 'Tasti utili: frecce per scorrere, N per queste note, I per l\'elenco delle slide, F per lo schermo intero.'] },
+
+  { sezione: 'Idea', titolo: 'Sostituzione contro trasposizione',
+    contenuto: () => (
+      <div className="stack-lg">
+        <CompareTwo
+          left={{ icon: '🔤', title: 'Sostituzione', color: 'var(--info)', points: ['Cambia le lettere, la posizione resta', 'ATTACCO → ' + C.cesare('ATTACCO', 3) + ' (Cesare, chiave 3)', 'Le lettere in chiaro e cifrate sono diverse'] }}
+          right={{ icon: '🔀', title: 'Trasposizione', color: 'var(--accent)', points: ['Cambia la posizione, le lettere restano', 'ATTACCO → ' + C.trasposizioneColonne('ATTACCO', 'CHIAVE').slice(0, 7) + '… (colonne)', 'Il cifrato è un anagramma del chiaro'] }} />
+        <Box type="info" title="Una domanda">Se un attaccante vede solo il testo cifrato, quali informazioni ha ancora su ciascuno dei due tipi? Ci torniamo nelle prossime slide.</Box>
+      </div>
+    ),
+    note: 'Contrapponete i due approcci con gli esempi calcolati. Nella sostituzione la posizione di ogni lettera è nota ma il valore è nascosto; nella trasposizione il valore è noto ma la posizione è nascosta. Le due idee sono complementari e vengono combinate più avanti.' },
+
+  { sezione: 'Idea', titolo: 'Le frequenze non cambiano',
+    contenuto: () => (
+      <Grid cols={2} gap="1rem">
+        <FreqInvarianti />
+        <div className="stack">
+          <Box type="warn" title="Cosa significa">Le lettere sono le stesse: nel cifrato la E, la A, la I compaiono con la stessa frequenza dell'italiano. Un attacco a frequenze <b>non</b> dice nulla sulla chiave.</Box>
+          <Box type="success" title="Ma anche un indizio">Se un cifrato ha le frequenze dell'italiano, è quasi certamente una <span className="hl">trasposizione</span> e non una sostituzione: l'indice di coincidenza lo rivela.</Box>
+        </div>
+      </Grid>
+    ),
+    note: 'Il grafico è calcolato su un testo di 330 lettere: il profilo del chiaro e quello del trasposto coincidono esattamente, quello di Cesare è lo stesso profilo traslato. Mostra anche che l\'indice di coincidenza è identico per chiaro e trasposto: serve all\'analista per riconoscere il tipo di cifrario prima di attaccarlo.' },
+
+  { sezione: 'Idea', titolo: 'Dalla scitala a ADFGVX',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2}>
+          <Card tone="accent"><h3>La scitala spartana</h3><p>Una striscia di cuoio avvolta a spirale su un bastone: si scrive nel senso della lunghezza, poi si svolge. Letta srotolata, il testo appare mescolato; solo un bastone dello stesso diametro lo rimette in ordine.</p></Card>
+          <Card tone="info"><h3>Trasposizione a colonne</h3><p>La striscia diventa una griglia: il numero di colonne è il «diametro» e la parola chiave decide l'ordine di lettura.</p></Card>
+        </Grid>
+        <Glow><p>Nel 1918 i tedeschi usarono il cifrario <span className="hl">ADFGVX</span>: una sostituzione seguita da una trasposizione a colonne. Il francese Georges Painvin lo ruppe in pochi mesi.</p></Glow>
+      </div>
+    ),
+    note: 'Scitala: la fonte è Plutarco, la datazione è dibattuta; usare il condizionale e non entrare nei dettagli. ADFGVX (marzo 1918) è il primo grande esempio di cifrario a prodotto in uso militare: sostituzione più trasposizione. Vedremo più avanti perché la combinazione è potente.' },
+
+  { sezione: 'Come funziona', titolo: 'La trasposizione a colonne',
+    contenuto: () => (
+      <div className="stack-lg">
+        <ol className="lead">
+          <li>Si sceglie una <span className="hl">parola chiave</span>: la sua lunghezza è il numero di colonne.</li>
+          <li>Si scrive il testo nella griglia <span className="hl">per righe</span>.</li>
+          <li>Si numerano le colonne secondo l'<span className="hl">ordine alfabetico</span> delle lettere della chiave.</li>
+          <li>Si leggono le colonne <span className="hl">una alla volta</span>, in quell'ordine, dall'alto in basso.</li>
+        </ol>
+        <Box type="tip" title="Quindi la chiave">è fatta di due informazioni: la <b>larghezza</b> e l'<b>ordine</b> delle colonne.</Box>
+      </div>
+    ),
+    note: 'Le quattro regole in sequenza. Fate notare che la chiave non è un numero ma una parola: serve solo a definire una permutazione delle colonne. Si usano solo le lettere A-Z: spazi, punteggiatura e accenti vengono tolti prima di cifrare (convenzione del motore e del laboratorio).' },
+
+  { sezione: 'Come funziona', titolo: 'Esempio svolto con la chiave ZEBRA',
+    contenuto: () => (
+      <div className="stack">
+        <Steps steps={passiEsempio} />
+        <p className="small muted">Risultato finale: <span className="mono hl">{MSG} → {CIF_Z}</span></p>
+      </div>
+    ),
+    note: 'Procedete con Avanti. Al terzo passo spiegate l\'ordine: A (colonna 5) viene prima di B, E, R, Z. Le colonne si leggono nell\'ordine 5, 3, 2, 4, 1. Controllate l\'ultimo passo: il cifrato è composto dalle stesse lettere del testo, in un ordine diverso.' },
+
+  { sezione: 'Come funziona', titolo: 'Lettere ripetute nella chiave',
+    contenuto: () => (
+      <div className="stack">
+        <p>Se una lettera compare più volte, la colonna <span className="hl">più a sinistra</span> ha la precedenza. Con la chiave <span className="mono hl">{KC}</span> le due A hanno i turni 1 e 2.</p>
+        <Grid cols={2}>
+          <div className="stack">
+            <GrigliaTrasp testo={MSG} chiave={KC} letti={0} />
+            <p className="small muted">Ordine di lettura: <span className="mono">{C.trasposizioneGriglia(MSG, KC).ordine.map(c => (c + 1)).join(', ')}</span> (numeri di colonna).</p>
+          </div>
+          <div className="stack">
+            <Table mono center head={KC.split('')} rows={[C.trasposizioneGriglia(MSG, KC).rango]} />
+            <Box type="tip" title="Cifrato">{MSG} → <span className="mono hl">{C.trasposizioneColonne(MSG, KC)}</span></Box>
+          </div>
+        </Grid>
+      </div>
+    ),
+    note: 'La regola «a parità di lettera, da sinistra a destra» è una convenzione ed è ciò che fa il motore e il laboratorio: senza di essa la decifratura sarebbe ambigua. Altre convenzioni esistono (per esempio numerare le lettere uguali prima di ordinarle), ma bisogna sceglierne una e dichiararla.' },
+
+  { sezione: 'Come funziona', titolo: 'Quando il testo non riempie la griglia',
+    contenuto: () => (
+      <div className="stack">
+        <p>Il testo ha <span className="mono hl">{MSG_PAD.length}</span> lettere e la chiave <span className="mono hl">{KL}</span> ha 4 colonne: l'ultima riga resta incompleta, si completa con <span className="mono" style={{ color: 'var(--danger-t)' }}>X</span>.</p>
+        <GrigliaTrasp testo={MSG_PAD} chiave={KL} letti={0} />
+        <p className="small muted">Cifrato: <span className="mono hl">{GL.cifrato}</span> ({GL.cifrato.length} lettere, multiplo di 4).</p>
+        <Box type="warn" title="Convenzione di questo corso">Si riempie sempre con <span className="mono">X</span> fino a una griglia completa. Decifrando si ottengono le X finali, da riconoscere e ignorare.</Box>
+      </div>
+    ),
+    note: 'Il riempimento ha due scopi: rende tutte le colonne di uguale lunghezza (decifratura semplice) e nasconde la lunghezza esatta del messaggio. Il rovescio è che la X finale compare nel testo decifrato. Esiste la variante senza riempimento, con colonne di lunghezza diversa: si presenta nella slide sulla decifratura.' },
+
+  { sezione: 'Come funziona', titolo: 'Decifrare: dal cifrato alla griglia',
+    contenuto: () => (
+      <div className="stack">
+        <Steps steps={passiDec} />
+      </div>
+    ),
+    note: 'La decifratura è la costruzione al contrario. Si calcola il numero di righe (lunghezza del cifrato diviso la larghezza), si divide il cifrato in blocchi da r lettere e si riempiono le colonne nell\'ordine alfabetico della chiave; poi si legge per righe. Variante senza riempimento: se L non è multiplo di n, le prime (L mod n) colonne in ordine di posizione (da sinistra) hanno una riga in più, e si tagliano i blocchi di conseguenza. Nel motore e nel laboratorio il cifrato è sempre completo e la funzione solleva un errore se non lo è.' },
+
+  { sezione: 'Simulatore', titolo: 'Prova tu: cifra e decifra',
+    contenuto: () => (
+      <div className="stack">
+        <TraspSim />
+        <div className="row">
+          <ActivityBadge href="simulazione-colonne.html" label="Apri il simulatore (anche da smartphone)" icon="🧱" />
+        </div>
+      </div>
+    ),
+    note: 'Fate muovere il cursore «Colonne lette» per vedere la costruzione del cifrato. In modalità decifra il testo deve avere lunghezza multipla della chiave, altrimenti compare l\'errore: è una buona occasione per parlare della convenzione. Provate chiavi con lettere ripetute.' },
+
+  { sezione: 'Combinare', titolo: 'Doppia trasposizione',
+    contenuto: () => (
+      <div className="stack">
+        <p>Si ripete la trasposizione sul risultato, con la stessa chiave o con un'altra: le colonne si mescolano due volte.</p>
+        <DoppiaTrasp />
+        <p className="small muted">Le due permutazioni si compongono in una sola permutazione più complessa dell'intero testo.</p>
+      </div>
+    ),
+    note: 'Nella prima guerra mondiale e anche dopo la doppia trasposizione era considerata un cifrario da campo robusto. Il testo si disorganizza perché il secondo passaggio rimescola lettere che il primo aveva portato in colonne diverse. Ma è comunque una permutazione fissa dell\'intero testo: con due messaggi della stessa lunghezza cifrati con la stessa chiave l\'attaccante può risolvere la permutazione.' },
+
+  { sezione: 'Combinare', titolo: 'Sostituzione più trasposizione',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { icon: '📜', label: 'Testo', sub: MSG },
+          { icon: '🔤', label: 'Sostituzione', sub: C.vigenere(MSG, 'LUNA'), color: 'var(--info)' },
+          { icon: '🔀', label: 'Trasposizione', sub: C.trasposizioneColonne(C.vigenere(MSG, 'LUNA'), 'ZEBRA'), color: 'var(--accent)' },
+        ]} />
+        <Grid cols={2}>
+          <Card tone="info"><h3>Confusione</h3><p>Rende complicato il legame tra chiave e cifrato. Si ottiene con la <b>sostituzione</b>.</p></Card>
+          <Card tone="accent"><h3>Diffusione</h3><p>Sparge l'effetto di ogni lettera su molte posizioni. Si ottiene con la <b>trasposizione</b>.</p></Card>
+        </Grid>
+        <Box type="tip" title="Ponte verso i cifrari moderni">Claude Shannon (1949) indicò confusione e diffusione come i due ingredienti di un buon cifrario. DES li alterna per 16 round: S-box (sostituzioni) e permutazioni.</Box>
+      </div>
+    ),
+    note: 'Qui è il collegamento con i moduli sui cifrari moderni: nessuna delle due idee da sola regge (le frequenze tradiscono la sostituzione, le anagrammi la trasposizione), ma combinate e ripetute producono i cifrari a blocchi. Il flusso mostra Vigenère seguito da una trasposizione: è un cifrario a prodotto, calcolato con il motore.' },
+
+  { sezione: 'Attività', titolo: 'Il gioco dei bigliettini',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2} stretch>
+          <Card tone="accent">
+            <h3>Su carta</h3>
+            <ol>
+              <li>Ogni coppia riceve alcuni bigliettini e una griglia vuota.</li>
+              <li>Con la chiave scritta si decifra; con un indizio si prova a ricostruire.</li>
+              <li>Poi si crea un messaggio per un'altra coppia.</li>
+            </ol>
+            <ActivityBadge href="../schede/bigliettini-trasposizione.html" label="Bigliettini da stampare" />
+          </Card>
+          <Card tone="info">
+            <h3>Sul telefono</h3>
+            <p>La griglia animata e uno strumento per riordinare le colonne di un cifrato sconosciuto.</p>
+            <ActivityBadge href="simulazione-colonne.html" label="Simulatore e attacco" icon="📱" />
+          </Card>
+        </Grid>
+        <Box type="tip" title="Regola d'oro">Per decifrare conta le lettere: se la lunghezza è un multiplo della chiave, le colonne hanno tutte la stessa altezza.</Box>
+      </div>
+    ),
+    note: 'Attività da 15 minuti. I bigliettini con chiave scritta si decifrano con la griglia; quelli «a indizio» riportano la larghezza e una parola probabile. Ricordate agli studenti di togliere gli spazi e di ignorare le X finali. Passate tra i banchi.' },
+
+  { sezione: 'Codice PHP', titolo: 'Dal ragionamento al codice',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { label: 'Pulizia', sub: 'solo A-Z, maiuscole', color: 'var(--info)' },
+          { label: 'Riempimento', sub: 'X fino a multiplo di n', color: 'var(--info)' },
+          { label: 'Ordine', sub: 'ordineColonne()', color: 'var(--accent)' },
+          { label: 'Lettura', sub: 'indice r·n + col', color: 'var(--accent)' },
+          { label: 'Cifrato', sub: CIF_Z, color: 'var(--success)' },
+        ]} />
+        <Grid cols={2}>
+          <Card><h3>Indice nella griglia</h3><p>La lettera in riga <code>r</code>, colonna <code>col</code> è in posizione <code>r * n + col</code> del testo scritto per righe.</p></Card>
+          <Card><h3>Ordine delle colonne</h3><p>Si ordinano le posizioni per lettera, e a parità per posizione: <code>usort</code> con <code>&lt;=&gt;</code>.</p></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Prima del codice, lo schema. Il passaggio chiave è l\'indice: non serve costruire la griglia come matrice, basta calcolare la posizione nella stringa. La funzione ordineColonne è l\'unica parte non ovvia; si può anche ordinare le coppie (lettera, posizione).' },
+
+  { sezione: 'Codice PHP', titolo: 'La funzione trasposizione()',
+    contenuto: () => (
+      <div className="stack">
+        <Code title="trasposizione.php" code={CODICE} reveal explain={SPIEGA} />
+      </div>
+    ),
+    note: 'Rivelate le righe una alla volta e chiedete di prevedere la successiva. La decifratura (livello 2 del laboratorio) si scrive al contrario: si calcola il numero di righe e si riempiono le colonne in questo stesso ordine. Non la mostriamo qui.' },
+
+  { sezione: 'Attacco', titolo: 'Come si rompe: anagrammi e lunghezze',
+    contenuto: () => (
+      <div className="stack">
+        <p>Le frequenze non servono. Si prova una <span className="hl">larghezza</span> (un divisore della lunghezza) e si riordinano le colonne finché le righe formano parole: è un anagramma.</p>
+        <AttaccoColonne cifrato={ATT_CIF} />
+      </div>
+    ),
+    note: 'La demo ha un cifrato di 30 lettere. I divisori accettabili sono pochi (la lunghezza limita le scelte). Fate provare le larghezze e spostare le colonne con le frecce: per larghezze piccole si riesce a occhio, per quelle grandi servono una parola probabile o un programma che provi tutte le permutazioni (laboratorio 04, livello 3). Un attaccante fa conto anche sulle coppie di lettere frequenti.' },
+
+  { sezione: 'Riepilogo', titolo: 'Riepilogo e prossimi passi',
+    contenuto: () => (
+      <div className="stack-lg">
+        <ul>
+          <li>La trasposizione cambia l'<span className="hl">ordine</span> delle lettere, non le lettere: le frequenze restano.</li>
+          <li>A colonne: griglia per righe, lettura per colonne nell'ordine alfabetico della chiave, riempimento con <span className="mono">X</span>.</li>
+          <li>Sostituzione (<span className="hl">confusione</span>) più trasposizione (<span className="hl">diffusione</span>) è l'idea dei cifrari moderni.</li>
+        </ul>
+        <Grid cols={3} stretch>
+          <Card tone="accent"><h3>Laboratorio</h3><p className="small">Scrivi in PHP cifratura, decifratura e attacco.</p><ActivityBadge href="../lab-php/04-trasposizione/scheda.html" label="Scheda del lab" icon="🧪" /></Card>
+          <Card tone="info"><h3>Quiz</h3><p className="small">Verifica che i concetti siano chiari.</p><ActivityBadge href="../quiz/quiz.html" label="Vai al quiz" icon="✅" /></Card>
+          <Card tone="success"><h3>Avanti</h3><p className="small">Dai caratteri ai bit: i cifrari moderni.</p><ActivityBadge href="../modulo-5-cifrari-moderni/slide.html" stesso label="Modulo 5" icon="➡️" /></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Tre messaggi: trasposizione e sostituzione sono complementari; la chiave è larghezza più ordine; combinate formano la base di DES. Il laboratorio 05 sulle frequenze mostra in pratica perché l\'analisi delle frequenze rompe la sostituzione ma non la trasposizione.' },
+];
+
+Deck.mount(slides, { modulo: 4, nome: 'La trasposizione', indice: '../index.html' });
+</script>
+</body>
+</html>

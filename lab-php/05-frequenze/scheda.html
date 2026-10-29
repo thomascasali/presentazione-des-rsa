@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab PHP 05 — Analisi delle frequenze (scheda)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/print.css">
+<style>td, th, code, p, li { overflow-wrap: anywhere; } table { table-layout: auto; }</style>
+</head>
+<body>
+<div class="toolbar no-stampa">
+  <a href="../../index.html">← Indice</a>
+  <button onclick="window.print()">Stampa la scheda</button>
+</div>
+
+<section class="sheet">
+  <div class="meta">Laboratorio PHP 05 · Sistemi e Reti</div>
+  <h1>Analisi delle frequenze in PHP</h1>
+  <p>Conti le lettere di un testo, disegni un istogramma testuale e scrivi un attacco automatico che rompe il cifrario di Cesare con la statistica. Lavori nel file <code>esercizio.php</code>; il file <code>test.php</code> controlla il tuo codice con dei casi noti.</p>
+
+  <h2>Prima di iniziare</h2>
+  <p><b>L'idea.</b> In italiano alcune lettere (E, A, I, O) sono molto più frequenti di altre (Z, Q, H). Un cifrario che sostituisce sempre la stessa lettera con la stessa lettera conserva questo profilo, solo traslato. Confrontando il profilo del cifrato con quello dell'italiano si trova la chiave.</p>
+  <p>Si contano solo le lettere A-Z / a-z, maiuscole e minuscole insieme; spazi, cifre, punteggiatura e lettere accentate si ignorano.</p>
+  <table>
+    <tr><th>Funzione PHP</th><th>Cosa fa</th><th>Esempio</th></tr>
+    <tr><td class="mono">count_chars($s, 1)</td><td>quante volte compare ogni carattere, come array [codice ASCII =&gt; volte]</td><td class="mono">count_chars('aab', 1) vale [97 =&gt; 2, 98 =&gt; 1]</td></tr>
+    <tr><td class="mono">strtoupper($s)</td><td>passa in maiuscolo</td><td class="mono">'ciao' diventa 'CIAO'</td></tr>
+    <tr><td class="mono">array_sum($a)</td><td>somma dei valori di un array</td><td class="mono">array_sum([1, 2, 3]) vale 6</td></tr>
+    <tr><td class="mono">str_repeat('#', $n)</td><td>ripete una stringa <i>n</i> volte</td><td class="mono">str_repeat('#', 3) vale '###'</td></tr>
+    <tr><td class="mono">round($x)</td><td>arrotonda all'intero più vicino</td><td class="mono">round(2.5) vale 3</td></tr>
+  </table>
+  <div class="nota attenzione"><b>Maiuscole e minuscole.</b> La 'e' e la 'E' sono la stessa lettera per le statistiche. Dove conviene convertire il testo?</div>
+
+  <h2><span class="livello">Livello 1</span> Completa le funzioni</h2>
+  <p>In <code>esercizio.php</code> completa <code>contaLettere()</code> (TODO 1) e <code>percentuali()</code> (TODO 2).</p>
+  <ul>
+    <li><code>contaLettere($testo)</code> restituisce un array con 26 elementi: <code>['A' =&gt; 3, 'B' =&gt; 0, …, 'Z' =&gt; 1]</code>.</li>
+    <li><code>percentuali($conteggi)</code> divide ogni conteggio per il totale e moltiplica per 100 (tutto a 0.0 se il totale è 0).</li>
+  </ul>
+  <p><b>Prima di scrivere, rispondi a mano:</b> nella frase «Ciao Mondo» quante volte compare la O? Quale percentuale sul totale delle lettere?</p>
+  <p class="righe"></p>
+  <p><b>Controllo:</b> da terminale <code>php test.php</code>. Il livello è finito quando tutti i test «Livello 1» sono OK.</p>
+</section>
+
+<section class="sheet">
+  <h2><span class="livello">Livello 2</span> Disegna l'istogramma</h2>
+  <p>Scrivi <code>istogramma(array $conteggi, int $larghezza = 20): string</code>. Ogni lettera con conteggio maggiore di 0 diventa una riga nel formato <code>A ####</code>:</p>
+  <ul>
+    <li>la lettera più frequente ha <code>$larghezza</code> barre; le altre sono in proporzione, arrotondate con <code>round()</code>, ma sempre almeno 1;</li>
+    <li>le righe sono separate da <code>"\n"</code>, senza <code>"\n"</code> finale; senza lettere restituisce una stringa vuota.</li>
+  </ul>
+  <p>Esempio: <code>istogramma(['A' =&gt; 4, 'B' =&gt; 2, 'C' =&gt; 0], 8)</code> deve dare due righe, la prima con 8 barre e la seconda con 4.</p>
+  <p><b>Prova a mano:</b> con A=10, B=6, C=3 e larghezza 10, quante barre hanno B e C? <span class="vuoto" style="min-width:6em"></span></p>
+
+  <h2><span class="livello">Livello 3</span> Rompi Cesare con la statistica</h2>
+  <p>Nel file trovi già scritte <code>frequenzeItaliane()</code> (percentuali dell'italiano, indice 0 = A) e <code>decifraCesare($t, $k)</code>. Scrivi:</p>
+  <ol>
+    <li><code>chiQuadro(string $testo): float</code>: la somma, per le 26 lettere, di <i>(trovate − attese)² / attese</i>, dove «attese» è la percentuale italiana della lettera per il numero di lettere del testo diviso 100. Più è basso, più il testo somiglia all'italiano. Senza lettere restituisce <code>INF</code>.</li>
+    <li><code>rompiCesare(string $cifrato): array</code>: prova le chiavi da 0 a 25, sceglie quella che dà il <code>chiQuadro()</code> più basso (a parità la più piccola) e restituisce <code>['chiave' =&gt; …, 'testo' =&gt; …]</code>.</li>
+  </ol>
+  <div class="nota">Alternativa più semplice, ma meno affidabile: assumere che la lettera più frequente del cifrato sia la E. Quando fallirebbe? Prova a pensare a un testo breve.</div>
+  <p><b>Per riflettere:</b> perché lo stesso programma non basta a rompere Vigenère? Che cosa va fatto prima?</p>
+  <p class="righe"></p><p class="righe"></p>
+
+  <h2>Come eseguire i test</h2>
+  <table>
+    <tr><th>Da terminale</th><td class="mono">cd lab-php/05-frequenze<br>php test.php</td></tr>
+    <tr><th>Con XAMPP</th><td>copia la cartella in <span class="mono">htdocs</span> e apri <span class="mono">http://localhost/…/05-frequenze/test.php</span></td></tr>
+  </table>
+  <p>Ogni riga è <b>OK</b> oppure <b>ERRORE</b>, con il valore atteso e quello ottenuto. In fondo c'è un riepilogo per livello.</p>
+
+  <h2>Consegna</h2>
+  <p>Il file <code>esercizio.php</code> con i tre livelli completati e il riepilogo di <code>test.php</code>.</p>
+  <p>Nome e cognome: <span class="vuoto" style="min-width:14em"></span> &nbsp; Classe: <span class="vuoto" style="min-width:5em"></span> &nbsp; Test superati: <span class="vuoto" style="min-width:4em"></span> / 22</p>
+</section>
+</body>
+</html>
