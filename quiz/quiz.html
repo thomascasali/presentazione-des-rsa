@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz di crittografia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<script src="domande.js"></script>
+<style>
+  .elenco { display: grid; grid-template-columns: 1fr; gap: .5rem; }
+  .voce { display: flex; align-items: center; justify-content: space-between; gap: .6rem; text-align: left; width: 100%; min-height: 56px; }
+  .voce .n { font-family: var(--f-mono); font-weight: 600; color: var(--accent-alt); min-width: 1.6em; }
+  .voce .t { flex: 1; }
+  .voce .rec { font-size: .8rem; color: var(--text-muted); white-space: nowrap; }
+  .barra { height: 8px; border-radius: 4px; background: var(--bg-card); border: 1px solid var(--border); overflow: hidden; }
+  .barra > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-alt)); }
+  .domanda { font-size: 1.15rem; line-height: 1.45; font-weight: 600; }
+  .opzioni { display: grid; gap: .5rem; }
+  .opz { text-align: left; width: 100%; min-height: 52px; justify-content: flex-start; line-height: 1.35; }
+  .opz.giusta { border-color: var(--success); color: var(--success-t); }
+  .opz.sbagliata { border-color: var(--danger); color: var(--danger-t); }
+  .vfgrid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+  .punti { display: flex; justify-content: space-between; font-size: .9rem; color: var(--text-muted); }
+  .grande { font-family: var(--f-title); font-size: 3rem; font-weight: 700; color: var(--accent-alt); text-align: center; line-height: 1.1; }
+  .errore { border: 1px solid var(--border); border-radius: 10px; padding: .7rem .9rem; background: var(--bg-card); }
+  .errore p { margin: .25rem 0; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Btn, Box, Chip, PaginaGioco } = UI;
+const C = window.Cripto;
+
+const MODULI = [
+  { n: 0, cartella: 'modulo-0-introduzione', nome: 'Introduzione' },
+  { n: 1, cartella: 'modulo-1-cesare', nome: 'Il cifrario di Cesare' },
+  { n: 2, cartella: 'modulo-2-cesare-generalizzato', nome: 'Cesare generalizzato' },
+  { n: 3, cartella: 'modulo-3-vigenere', nome: 'Vigenère' },
+  { n: 4, cartella: 'modulo-4-trasposizione', nome: 'Trasposizione' },
+  { n: 5, cartella: 'modulo-5-cifrari-moderni', nome: 'Cifrari moderni: bit e XOR' },
+  { n: 6, cartella: 'modulo-6-des', nome: 'DES' },
+  { n: 7, cartella: 'modulo-7-matematica-rsa', nome: 'La matematica di RSA' },
+  { n: 8, cartella: 'modulo-8-rsa', nome: 'RSA' },
+  { n: 9, cartella: 'modulo-9-ibrida', nome: 'Crittografia ibrida' },
+];
+const N_FINALE = 20;
+
+function mescola(a) {
+  const r = a.slice();
+  for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; }
+  return r;
+}
+const chiaveRecord = (sel) => 'quiz-record-' + sel;
+const caricaRecord = (sel) => UI.carica(chiaveRecord(sel), null);
+
+// Prepara le domande di un quiz: ordine e opzioni mescolati, risposta attesa calcolata ora.
+function costruisci(sel) {
+  const tutte = window.DOMANDE || [];
+  const base = sel === 'finale' ? mescola(tutte).slice(0, N_FINALE) : mescola(tutte.filter(d => d.modulo === +sel));
+  return base.map(d => {
+    const q = Object.assign({}, d);
+    if (d.tipo === 'scelta') q.opzioni = mescola(d.opzioni);
+    if (d.tipo === 'numero' || d.tipo === 'testo') {
+      const a = typeof d.atteso === 'function' ? d.atteso() : d.atteso;
+      q.attesoStr = String(a);
+    }
+    return q;
+  });
+}
+
+const norm = (s) => String(s).toUpperCase().replace(/\s+/g, '').replace(/[ÀÁ]/g, 'A').replace(/[ÈÉ]/g, 'E').replace(/[ÌÍ]/g, 'I').replace(/[ÒÓ]/g, 'O').replace(/[ÙÚ]/g, 'U');
+function controlla(q, risposta) {
+  if (q.tipo === 'vf') return risposta === q.vero;
+  if (q.tipo === 'scelta') return risposta === q.giusta;
+  if (q.tipo === 'numero') {
+    const v = Number(String(risposta).trim().replace(',', '.'));
+    return risposta.trim() !== '' && !isNaN(v) && v === Number(q.attesoStr);
+  }
+  return norm(risposta) === norm(q.attesoStr);
+}
+const mostraRisposta = (q, r) => q.tipo === 'vf' ? (r ? 'Vero' : 'Falso') : String(r);
+const rispostaGiusta = (q) => q.tipo === 'vf' ? (q.vero ? 'Vero' : 'Falso') : q.tipo === 'scelta' ? q.giusta : q.attesoStr;
+const nomeModulo = (n) => (MODULI[n] || {}).nome;
+
+function Selezione({ avvia }) {
+  const conteggio = (n) => (window.DOMANDE || []).filter(d => d.modulo === n).length;
+  const etichettaRecord = (sel) => { const r = caricaRecord(sel); return r ? 'Record ' + r.punti + '/' + r.totale : ''; };
+  return (
+    <div>
+      <p className="lead">Scegli il quiz di un modulo, oppure la verifica finale con {N_FINALE} domande mescolate da tutti i moduli. È un'autovalutazione: nessun voto, nessun dato raccolto.</p>
+      <h2>Verifica finale</h2>
+      <Btn variant="primary" className="voce" onClick={() => avvia('finale')}>
+        <span className="t">Verifica finale ({N_FINALE} domande a caso)</span>
+        <span className="rec">{etichettaRecord('finale')}</span>
+      </Btn>
+      <h2>Quiz per modulo</h2>
+      <div className="elenco">
+        {MODULI.map(m => (
+          <Btn key={m.n} className="voce" onClick={() => avvia(String(m.n))}>
+            <span className="n">{m.n}</span>
+            <span className="t">{m.nome} <span className="xs muted">({conteggio(m.n)} domande)</span></span>
+            <span className="rec">{etichettaRecord(String(m.n))}</span>
+          </Btn>
+        ))}
+      </div>
+      <p className="small muted mt-lg">I record restano solo su questo dispositivo. Le domande sono ordinate a caso a ogni tentativo.</p>
+    </div>
+  );
+}
+
+function Domanda({ q, indice, totale, punti, onRisposta, onAvanti, esito }) {
+  const [testo, setTesto] = useState('');
+  const chiusa = !!esito;
+  const classeOpz = (o) => {
+    if (!chiusa) return '';
+    if (o === q.giusta) return ' giusta';
+    if (o === esito.risposta) return ' sbagliata';
+    return '';
+  };
+  return (
+    <div>
+      <div className="punti"><span>Domanda {indice + 1} di {totale}</span><span>Punti: {punti}</span></div>
+      <div className="barra mt" role="progressbar" aria-valuemin="0" aria-valuemax={totale} aria-valuenow={indice + (chiusa ? 1 : 0)}><i style={{ width: ((indice + (chiusa ? 1 : 0)) / totale * 100) + '%' }} /></div>
+      <div className="stack mt-lg">
+        <div className="domanda" data-qid={q.id}>{q.testo}</div>
+
+        {q.tipo === 'scelta' ? (
+          <div className="opzioni">
+            {q.opzioni.map((o, i) => (
+              <Btn key={i} className={'opz' + classeOpz(o)} disabled={chiusa} onClick={() => onRisposta(o)} data-opz={o === q.giusta ? 'giusta' : 'altra'}>{o}</Btn>
+            ))}
+          </div>
+        ) : null}
+
+        {q.tipo === 'vf' ? (
+          <div className="vfgrid">
+            {[true, false].map(v => (
+              <Btn key={String(v)} className={'opz' + (chiusa ? (v === q.vero ? ' giusta' : (v === esito.risposta ? ' sbagliata' : '')) : '')} disabled={chiusa} onClick={() => onRisposta(v)} data-opz={v === q.vero ? 'giusta' : 'altra'}>{v ? 'Vero' : 'Falso'}</Btn>
+            ))}
+          </div>
+        ) : null}
+
+        {q.tipo === 'numero' || q.tipo === 'testo' ? (
+          <form onSubmit={e => { e.preventDefault(); if (!chiusa && testo.trim() !== '') onRisposta(testo); }} className="stack">
+            <label className="small muted" htmlFor="risp">{q.tipo === 'numero' ? 'Scrivi un numero' : (q.suggerimento || 'Scrivi la risposta')}</label>
+            <input id="risp" className="input mono" type="text" inputMode={q.tipo === 'numero' ? 'decimal' : 'text'} autoComplete="off" autoCapitalize="characters" spellCheck="false"
+              value={testo} onChange={e => setTesto(e.target.value)} disabled={chiusa} />
+            <Btn variant="primary" type="submit" disabled={chiusa || testo.trim() === ''}>Conferma</Btn>
+          </form>
+        ) : null}
+
+        {chiusa ? (
+          <div>
+            <div className={'feedback ' + (esito.giusta ? 'ok' : 'ko')} role="status" data-esito={esito.giusta ? 'ok' : 'ko'}>
+              <b>{esito.giusta ? 'Esatto!' : 'Non è corretto.'}</b>
+              {esito.giusta ? null : <span> La risposta giusta: <span className="mono">{rispostaGiusta(q)}</span>.</span>}
+              <p style={{ margin: '.4rem 0 0' }}>{q.spiegazione}</p>
+            </div>
+            <Btn variant="primary" className="mt" onClick={onAvanti} autoFocus>{indice + 1 < totale ? 'Prossima domanda' : 'Vedi il riepilogo'}</Btn>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function Riepilogo({ sel, quiz, esiti, record, nuovoRecord, rifai, esci }) {
+  const punti = esiti.filter(e => e.giusta).length;
+  const totale = quiz.length;
+  const perc = Math.round(punti / totale * 100);
+  const sbagliate = quiz.map((q, i) => ({ q, e: esiti[i] })).filter(x => !x.e.giusta);
+  const giudizio = perc === 100 ? 'Perfetto!' : perc >= 80 ? 'Ottimo lavoro.' : perc >= 60 ? 'Buono, ma c\'è da ripassare.' : 'Conviene rivedere le slide e riprovare.';
+  const moduliDaRivedere = [...new Set(sbagliate.map(x => x.q.modulo))].sort((a, b) => a - b);
+  return (
+    <div className="stack-lg">
+      <div>
+        <div className="grande" data-punteggio>{punti}/{totale}</div>
+        <p className="center" style={{ textAlign: 'center' }}>{perc}% · {giudizio}</p>
+        {nuovoRecord ? <div className="feedback ok" role="status">Nuovo record per questo quiz!</div> : <p className="small muted" style={{ textAlign: 'center' }}>Il tuo record: {record.punti}/{record.totale}</p>}
+      </div>
+      <div className="row">
+        <Btn variant="primary" onClick={rifai}>Rifai il quiz</Btn>
+        <Btn onClick={esci}>Altri quiz</Btn>
+      </div>
+      {sbagliate.length === 0 ? <Box type="success" title="Nessun errore">Hai risposto bene a tutte le domande.</Box> : (
+        <div>
+          <h2>Da rivedere ({sbagliate.length})</h2>
+          <div className="stack">
+            {sbagliate.map(({ q, e }, i) => {
+              const m = MODULI[q.modulo];
+              return (
+                <div className="errore" key={i}>
+                  <p><b>{q.testo}</b></p>
+                  <p className="small">La tua risposta: <span className="mono t-danger">{mostraRisposta(q, e.risposta)}</span></p>
+                  <p className="small">Risposta giusta: <span className="mono t-success">{rispostaGiusta(q)}</span></p>
+                  <p className="small muted">{q.spiegazione}</p>
+                  <p className="small"><a className="text-link" href={'../' + m.cartella + '/slide.html'}>Ripassa: modulo {m.n}, {m.nome}</a></p>
+                </div>
+              );
+            })}
+          </div>
+          {moduliDaRivedere.length > 1 ? <p className="small muted mt">Moduli da ripassare: {moduliDaRivedere.join(', ')}.</p> : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const iniziale = (() => {
+    const p = new URLSearchParams(window.location.search).get('modulo');
+    if (p === 'finale') return 'finale';
+    if (p !== null && /^\d+$/.test(p) && +p >= 0 && +p <= 9) return p;
+    return null;
+  })();
+  const [sel, setSel] = useState(iniziale);
+  const [quiz, setQuiz] = useState(() => iniziale !== null ? costruisci(iniziale) : []);
+  const [i, setI] = useState(0);
+  const [esiti, setEsiti] = useState([]);
+  const [fine, setFine] = useState(null);
+
+  const avvia = (s) => { setSel(s); setQuiz(costruisci(s)); setI(0); setEsiti([]); setFine(null); window.scrollTo(0, 0); };
+  const esci = () => { setSel(null); setQuiz([]); setI(0); setEsiti([]); setFine(null); window.scrollTo(0, 0); };
+  const esito = esiti[i];
+  const punti = esiti.filter(e => e.giusta).length;
+
+  const rispondi = (risposta) => {
+    if (esiti[i]) return;
+    setEsiti(esiti.concat([{ risposta, giusta: controlla(quiz[i], risposta) }]));
+  };
+  const avanti = () => {
+    if (i + 1 < quiz.length) { setI(i + 1); window.scrollTo(0, 0); return; }
+    const totale = quiz.length, p = esiti.filter(e => e.giusta).length;
+    const prec = caricaRecord(sel);
+    const migliore = !prec || p / totale > prec.punti / prec.totale;
+    const record = migliore ? { punti: p, totale } : prec;
+    if (migliore) UI.salva(chiaveRecord(sel), record);
+    setFine({ record, nuovoRecord: migliore });
+    window.scrollTo(0, 0);
+  };
+
+  const titolo = sel === null ? 'Quiz' : sel === 'finale' ? 'Verifica finale' : 'Quiz: modulo ' + sel;
+  return (
+    <PaginaGioco titolo={titolo} indietro={sel === null ? '../index.html' : undefined} indietroEtichetta="Indice">
+      {sel !== null && !fine ? <p className="small"><a className="text-link" href="#" onClick={e => { e.preventDefault(); esci(); }}>← Tutti i quiz</a>{sel !== 'finale' ? <span className="muted"> · {nomeModulo(+sel)}</span> : null}</p> : null}
+      {sel === null ? <Selezione avvia={avvia} /> : null}
+      {sel !== null && quiz.length === 0 ? <Box type="warn" title="Nessuna domanda">Non ci sono domande per questa scelta. <a className="text-link" href="#" onClick={e => { e.preventDefault(); esci(); }}>Torna all'elenco</a>.</Box> : null}
+      {sel !== null && quiz.length > 0 && !fine ? <Domanda key={i} q={quiz[i]} indice={i} totale={quiz.length} punti={punti} esito={esito} onRisposta={rispondi} onAvanti={avanti} /> : null}
+      {sel !== null && fine ? <Riepilogo sel={sel} quiz={quiz} esiti={esiti} record={fine.record} nuovoRecord={fine.nuovoRecord} rifai={() => avvia(sel)} esci={esci} /> : null}
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>
