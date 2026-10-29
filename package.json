@@ -1,0 +1,13 @@
+{
+  "name": "presentazione-des-rsa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Presentazione didattica interattiva su crittografia: cifrari classici, DES, RSA",
+  "scripts": {
+    "test": "node --test tests/crypto.test.js",
+    "verifica": "node tests/verifica.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1"
+  }
+}

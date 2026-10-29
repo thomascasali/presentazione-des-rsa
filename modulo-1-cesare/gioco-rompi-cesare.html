@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gioco: rompi il messaggio di Cesare</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  .intercetto { font-family: var(--f-mono); font-size: 1.35rem; line-height: 1.5; letter-spacing: .04em; color: var(--accent-alt); background: #0e0c0a; border: 1px solid var(--border); border-radius: 10px; padding: .8rem 1rem; overflow-wrap: anywhere; }
+  .tentativo { font-family: var(--f-mono); font-size: 1.1rem; line-height: 1.5; color: var(--text); background: var(--bg); border: 1px dashed var(--border); border-radius: 10px; padding: .6rem 1rem; overflow-wrap: anywhere; min-height: 3.5em; }
+  .k-ctrl { display: flex; align-items: center; justify-content: center; gap: .6rem; }
+  .k-ctrl .btn { min-width: 56px; font-size: 1.3rem; }
+  .k-val { font-family: var(--f-title); font-size: 2.4rem; font-weight: 700; color: var(--accent-alt); min-width: 2.2em; text-align: center; line-height: 1; }
+  .statistiche { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; text-align: center; }
+  .statistiche div { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: .4rem; }
+  .statistiche b { display: block; font-family: var(--f-mono); font-size: 1.4rem; color: var(--accent-alt); }
+  .statistiche span { font-size: .8rem; color: var(--text-muted); }
+  .tabs { display: flex; gap: .4rem; margin: .5rem 0 .8rem; }
+  .tabs .btn { flex: 1; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Btn, Field, Box, Chip, PaginaGioco } = UI;
+const C = window.Cripto;
+
+// Frasi italiane con gli accenti corretti: per cifrare si tolgono (la sostituzione agisce solo su A-Z).
+const FRASI = [
+  'Domani niente compiti per chi ha studiato tutto il weekend',
+  'La password migliore è quella che nessuno riesce a indovinare',
+  'Il router della scuola è acceso ma il wifi non funziona',
+  'Chi ben comincia è a metà dell\'opera',
+  'Ogni computer ha bisogno di un buon sistema operativo',
+  'Non lasciare mai la tua chiave sotto lo zerbino',
+  'Il gatto dorme sulla tastiera e scrive messaggi misteriosi',
+  'Domenica pomeriggio partita a scacchi con il professore',
+  'La rete della scuola è più lenta di una tartaruga',
+  'Porta la merenda e una bottiglia d\'acqua alla gita',
+  'Il segreto è custodito nella cassaforte del terzo piano',
+  'Prima di inviare il file controlla sempre il destinatario',
+  'Il progetto di sistemi e reti va consegnato venerdì',
+  'Meglio un messaggio cifrato che una cartolina aperta',
+  'Il cane dell\'amico ha mangiato il cavo ethernet',
+  'Incontriamoci davanti al laboratorio alle otto in punto',
+  'Un buon programmatore commenta sempre il proprio codice',
+  'Oggi si studia la storia dei cifrari antichi',
+  'Il server è sempre acceso anche quando nessuno lo guarda',
+  'Chi trova una chiave USB abbandonata non deve inserirla',
+  'La luna sorge presto e il bar apre alle sette',
+  'Salvare spesso il lavoro evita molte lacrime',
+  'Gli antichi romani scrivevano lettere segrete ai generali',
+  'Questa frase nasconde un indizio per la caccia al tesoro',
+  'Il professore ha dimenticato gli appunti sul tavolo',
+  'Nessun algoritmo è sicuro se la chiave è troppo corta',
+  'La campanella suona e tutti corrono verso l\'uscita',
+  'Un bit può valere zero oppure uno e basta',
+  'Per vincere il gioco devi provare tutte le chiavi',
+  'Con pazienza e una buona statistica ogni cifrario cade',
+];
+
+function nuovaPartita(prec) {
+  let i; do { i = Math.floor(Math.random() * FRASI.length); } while (FRASI.length > 1 && i === prec);
+  return { i, chiave: 1 + Math.floor(Math.random() * 25) };
+}
+function formatta(testo, difficile) {
+  const t = difficile ? (C.normalizza(testo).match(/.{1,5}/g) || []).join(' ') : testo.toUpperCase();
+  return t;
+}
+
+function Gioco() {
+  const [livello, setLivello] = useState(() => UI.carica('rompi-livello', 'facile'));
+  const [partita, setPartita] = useState(() => nuovaPartita(-1));
+  const [k, setK] = useState(0);
+  const [errori, setErrori] = useState(0);
+  const [aiuto, setAiuto] = useState(false);
+  const [esito, setEsito] = useState(null);                 // null | 'ok' | 'ko' | 'resa'
+  const [stat, setStat] = useState(() => UI.carica('rompi-stat', { punti: 0, risolti: 0, serie: 0, migliore: 0 }));
+  const difficile = livello === 'difficile';
+
+  const chiaro = FRASI[partita.i];
+  const cifrato = useMemo(() => formatta(C.cesare(C.senzaAccenti(chiaro), partita.chiave), difficile), [partita, difficile]);
+  const tentativo = formatta(C.cesareDecifra(C.cesare(C.senzaAccenti(chiaro), partita.chiave), k), difficile);
+  const freq = useMemo(() => {
+    const f = C.frequenze(cifrato);
+    return f.conteggi.map((c, i) => [C.ALFABETO[i], c]).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  }, [cifrato]);
+
+  const salvaStat = (s) => { setStat(s); UI.salva('rompi-stat', s); };
+  const cambiaLivello = (l) => { setLivello(l); UI.salva('rompi-livello', l); };
+  const prossima = () => { setPartita(nuovaPartita(partita.i)); setK(0); setErrori(0); setAiuto(false); setEsito(null); };
+  const conferma = () => {
+    if (esito === 'ok' || esito === 'resa') return;
+    if (k === partita.chiave) {
+      const punti = Math.max(10, (100 - 8 * errori - (aiuto ? 25 : 0))) * (difficile ? 2 : 1);
+      const serie = stat.serie + 1;
+      salvaStat({ punti: stat.punti + punti, risolti: stat.risolti + 1, serie, migliore: Math.max(stat.migliore, serie) });
+      setEsito({ tipo: 'ok', punti });
+    } else {
+      setErrori(errori + 1); setEsito({ tipo: 'ko' });
+      if (stat.serie) salvaStat({ ...stat, serie: 0 });
+    }
+  };
+  const arrenditi = () => { setK(partita.chiave); setEsito({ tipo: 'resa' }); if (stat.serie) salvaStat({ ...stat, serie: 0 }); };
+  const cambiaK = (n) => { setK(((n % 26) + 26) % 26); if (esito && esito.tipo === 'ko') setEsito(null); };
+  const chiuso = esito && (esito.tipo === 'ok' || esito.tipo === 'resa');
+
+  return (
+    <div>
+      <div className="statistiche" aria-label="Statistiche">
+        <div><b>{stat.punti}</b><span>punti</span></div>
+        <div><b>{stat.serie}</b><span>serie (record {stat.migliore})</span></div>
+        <div><b>{stat.risolti}</b><span>risolti</span></div>
+      </div>
+
+      <div className="tabs" role="group" aria-label="Livello">
+        <Btn variant={!difficile ? 'primary' : ''} aria-pressed={!difficile} onClick={() => cambiaLivello('facile')}>Facile (con spazi)</Btn>
+        <Btn variant={difficile ? 'primary' : ''} aria-pressed={difficile} onClick={() => cambiaLivello('difficile')}>Difficile (a gruppi, punti ×2)</Btn>
+      </div>
+
+      <h2>Messaggio intercettato</h2>
+      <div className="intercetto" aria-label="Testo cifrato">{cifrato}</div>
+      <p className="small muted mt">Il testo è stato cifrato con Cesare e una chiave sconosciuta (da 1 a 25). Trovala.</p>
+
+      <h2>Il tuo decifratore</h2>
+      <div className="k-ctrl">
+        <Btn onClick={() => cambiaK(k - 1)} disabled={chiuso} aria-label="Chiave meno uno">−</Btn>
+        <div className="k-val" aria-live="polite" aria-label={'Chiave provata ' + k}>{k}</div>
+        <Btn onClick={() => cambiaK(k + 1)} disabled={chiuso} aria-label="Chiave più uno">+</Btn>
+      </div>
+      <p className="xs muted mt" style={{ textAlign: 'center' }}>Con chiave {k} il messaggio diventa:</p>
+      <div className="tentativo" aria-live="polite">{tentativo}</div>
+
+      <div className="row mt">
+        <Btn variant="primary" onClick={conferma} disabled={chiuso}>È questa la chiave!</Btn>
+        <Btn onClick={() => setAiuto(true)} disabled={chiuso || aiuto}>Aiuto: frequenze (−25)</Btn>
+      </div>
+
+      {aiuto && !chiuso ? (
+        <Box type="tip" title="Frequenze nel testo cifrato">
+          Lettere più frequenti: {freq.map(([l, c]) => <Chip key={l} color="info">{l} ×{c}</Chip>)}{' '}
+          <span className="small">In italiano le lettere più comuni sono E, A, I, O: confronta e ragiona sullo spostamento.</span>
+        </Box>
+      ) : null}
+
+      {esito && esito.tipo === 'ko' ? <div className="feedback ko mt" role="status">Non è la chiave giusta: con {k} il testo non ha senso compiuto. Errori: {errori}. Riprova.</div> : null}
+      {esito && esito.tipo === 'ok' ? <div className="feedback ok mt" role="status"><b>Esatto!</b> La chiave era {partita.chiave}. +{esito.punti} punti. Il messaggio: «{chiaro}»</div> : null}
+      {esito && esito.tipo === 'resa' ? <div className="feedback mt" role="status">La chiave era {partita.chiave}. Il messaggio: «{chiaro}». La serie riparte da zero.</div> : null}
+
+      <div className="row mt">
+        <Btn variant={chiuso ? 'primary' : 'ghost'} onClick={prossima}>Nuovo messaggio</Btn>
+        {!chiuso ? <Btn variant="ghost" onClick={arrenditi}>Mi arrendo</Btn> : null}
+      </div>
+    </div>
+  );
+}
+
+function Sfida() {
+  const [testo, setTesto] = useState('');
+  const [k, setK] = useState(5);
+  const [mostra, setMostra] = useState(true);
+  const out = C.cesare(testo, k).toUpperCase();
+  return (
+    <div>
+      <h2>Crea una sfida per un compagno</h2>
+      <p>Scrivi un messaggio e scegli una chiave. Passa al compagno solo il testo cifrato: la chiave la tieni tu.</p>
+      <div className="sim">
+        <Field label="Messaggio" htmlFor="msg"><textarea id="msg" className="input" rows={3} value={testo} onChange={e => setTesto(e.target.value)} placeholder="Scrivi qui il tuo messaggio" /></Field>
+        <Field label={'Chiave: ' + k}><input type="range" min="1" max="25" value={k} onChange={e => setK(+e.target.value)} aria-label="Chiave" /></Field>
+        <div className="xs muted" style={{ textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600 }}>Da passare al compagno</div>
+        <div className="intercetto">{out || ' '}</div>
+        <label className="row small dim" style={{ gap: '.5rem', minHeight: 44 }}><input type="checkbox" checked={mostra} onChange={e => setMostra(e.target.checked)} style={{ width: 22, height: 22 }} />Ricorda la chiave a me</label>
+        {mostra ? <p className="small muted">La chiave usata è {k}: tienila per controllare la risposta.</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [scheda, setScheda] = useState('gioca');
+  return (
+    <PaginaGioco titolo="Rompi il messaggio" indietro="slide.html#10" indietroEtichetta="Modulo 1">
+      <div className="tabs" role="group" aria-label="Sezioni">
+        <Btn variant={scheda === 'gioca' ? 'primary' : ''} aria-pressed={scheda === 'gioca'} onClick={() => setScheda('gioca')}>Gioca</Btn>
+        <Btn variant={scheda === 'sfida' ? 'primary' : ''} aria-pressed={scheda === 'sfida'} onClick={() => setScheda('sfida')}>Crea una sfida</Btn>
+      </div>
+      {scheda === 'gioca' ? <Gioco /> : <Sfida />}
+      <p className="small muted mt-lg">Punteggi e record restano solo su questo dispositivo. Non viene raccolto nessun dato. <a className="text-link" href="simulazione-ruota.html">Prova la ruota di Cesare</a></p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>

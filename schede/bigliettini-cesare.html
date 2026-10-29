@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bigliettini di Cesare — da ritagliare</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/print.css">
+<style>
+  .sheet.carte { padding: 8mm 10mm; }
+  .carte .griglia { grid-template-columns: repeat(2, 1fr); gap: 6mm; }
+  .carta { border: 1.5px dashed var(--p-text); border-radius: 3mm; padding: 4mm 5mm; min-height: 44mm; break-inside: avoid; display: flex; flex-direction: column; gap: 2mm; }
+  .carta .testa { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--f-mono); font-size: 9pt; color: var(--p-dim); }
+  .carta .tipo { border: 1.5px solid var(--p-text); border-radius: 10pt; padding: 0 7pt; font-weight: 600; color: var(--p-text); }
+  .carta .cifrato { font-family: var(--f-mono); font-size: 12pt; font-weight: 600; letter-spacing: .04em; line-height: 1.4; overflow-wrap: anywhere; }
+  .carta .risposta { margin-top: auto; font-size: 9pt; color: var(--p-dim); }
+  .carta .riga { border-bottom: 1px solid var(--p-line); height: 6mm; }
+  @media (max-width: 700px) { .sheet.carte { padding: 14px; } .carte .griglia { grid-template-columns: 1fr; } }
+  @media print { .carte .griglia { gap: 5mm; grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="toolbar no-stampa"><a href="../index.html">← Indice</a><button onclick="window.print()">Stampa</button></div>
+<section class="sheet carte">
+  <div class="meta">Gioco dei bigliettini · cifrario di Cesare</div>
+  <h1>Bigliettini da ritagliare</h1>
+  <p><b>Come si gioca.</b> Ritagliate i bigliettini lungo le linee tratteggiate. Quelli con la chiave scritta si decifrano subito; quelli con «chiave ignota» vanno rotti provando le chiavi o ragionando sulle lettere. Scrivete il testo in chiaro sotto il messaggio e mostratelo all'insegnante.</p>
+  <div class="griglia">
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 1</span><span class="tipo">Chiave: 3</span></div>
+      <div class="cifrato">OD FKLDYH H LO VHJUHWR, O'DOJRULWPR SXR HVVHUH SXEEOLFR</div>
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 2</span><span class="tipo">Chiave: 7</span></div>
+      <div class="cifrato">JP CLKPHTV PU SHIVYHAVYPV HSSL UVCL</div>
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 3</span><span class="tipo">Chiave: 11</span></div>
+      <div class="cifrato">AZCEL TW NLGZ OT CPEP P TW AZCELETWP</div>
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 4</span><span class="tipo">Chiave: 5</span></div>
+      <div class="cifrato">TLSN QJYYJWF XN XUTXYF IN RTQYN UTXYN</div>
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 5</span><span class="tipo">Chiave: 19</span></div>
+      <div class="cifrato">BE IKHYXLLHKX AT GTLVHLMH NG BGWBSBH LHMMH ET VTMMXWKT</div>
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 6</span><span class="tipo">Chiave: 14</span></div>
+      <div class="cifrato">PFOJO! VOW RSQWTFOHC WZ DFWAC ASGGOUUWC</div>
+      <div class="risposta">Testo in chiaro:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 7</span><span class="tipo">Chiave ignota</span></div>
+      <div class="cifrato">RU PJCCX MNU ERLRWX QJ BYNWCX RU BNAENA</div>
+      <div class="risposta">Testo in chiaro (e chiave trovata: ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 8</span><span class="tipo">Chiave ignota</span></div>
+      <div class="cifrato">GIFMR KLKKV CV TYZRMZ: JFEF JFCF MVEKZTZEHLV</div>
+      <div class="risposta">Testo in chiaro (e chiave trovata: ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 9</span><span class="tipo">Chiave ignota</span></div>
+      <div class="cifrato">EGTEC NC NGVVGTC RKW HTGSWGPVG G TCIKQPC</div>
+      <div class="risposta">Testo in chiaro (e chiave trovata: ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 10</span><span class="tipo">Chiave ignota · gruppi di 5</span></div>
+      <div class="cifrato">ZKIWJ ERANE BEYWZ EOEOP AIEAN APE</div>
+      <div class="risposta">Testo in chiaro (e chiave trovata: ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 11</span><span class="tipo">Chiave ignota · gruppi di 5</span></div>
+      <div class="cifrato">VYGRF BEBFV GEBIN IVPVA BNYYN ZNPPU VARGG NQRYP NSSR</div>
+      <div class="risposta">Testo in chiaro (e chiave trovata: ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Bigliettino 12</span><span class="tipo">Chiave ignota · gruppi di 5</span></div>
+      <div class="cifrato">INOJK IOLXG WAKYZ USKYY GMMOU NGBOT ZUORM OUIU</div>
+      <div class="risposta">Testo in chiaro (e chiave trovata: ____ ):</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+  </div>
+</section>
+<section class="sheet carte">
+  <div class="meta">Gioco dei bigliettini · seconda parte</div>
+  <h2 style="margin-top:0">Ora tocca a voi</h2>
+  <p>Scrivete un messaggio breve, scegliete una chiave, cifratelo e passate solo il <b>testo cifrato</b> a un'altra coppia, scrivendo (se volete) la chiave a parte. Poi fate il contrario con il loro messaggio.</p>
+  <div class="griglia">
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 1</span><span class="tipo">Chiave scelta: ____</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 2</span><span class="tipo">Chiave scelta: ____</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 3</span><span class="tipo">Chiave scelta: ____</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 4</span><span class="tipo">Chiave scelta: ____</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 5</span><span class="tipo">Chiave scelta: ____</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+    <div class="carta">
+      <div class="testa"><span>Il mio messaggio 6</span><span class="tipo">Chiave scelta: ____</span></div>
+      <div class="risposta">Testo in chiaro (resta a te):</div>
+      <div class="riga"></div>
+      <div class="risposta">Testo cifrato da passare a un'altra coppia:</div>
+      <div class="riga"></div><div class="riga"></div>
+    </div>
+  </div>
+</section>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab PHP 01 — Il cifrario di Cesare (scheda)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/print.css">
+</head>
+<body>
+<div class="toolbar no-stampa">
+  <a href="../../index.html">← Indice</a>
+  <button onclick="window.print()">Stampa la scheda</button>
+</div>
+
+<section class="sheet">
+  <div class="meta">Laboratorio PHP 01 · Sistemi e Reti</div>
+  <h1>Il cifrario di Cesare in PHP</h1>
+  <p>Scrivi in PHP le funzioni che cifrano, decifrano e attaccano il cifrario di Cesare. Lavori nel file <code>esercizio.php</code>; il file <code>test.php</code> controlla il tuo codice con dei casi noti.</p>
+
+  <h2>Prima di iniziare</h2>
+  <p><b>Il cifrario.</b> Ogni lettera si sposta di <i>k</i> posti nell'alfabeto, ripartendo da A dopo la Z. Con le posizioni A=0, B=1, … Z=25 la regola è <code>(x + k) mod 26</code>. Le lettere maiuscole restano maiuscole, le minuscole restano minuscole, tutto il resto (spazi, cifre, punteggiatura) non cambia.</p>
+  <table>
+    <tr><th>Funzione PHP</th><th>Cosa fa</th><th>Esempio</th></tr>
+    <tr><td class="mono">ord($c)</td><td>codice numerico del carattere</td><td class="mono">ord('A') vale 65, ord('a') vale 97</td></tr>
+    <tr><td class="mono">chr($n)</td><td>carattere con quel codice</td><td class="mono">chr(66) vale 'B'</td></tr>
+    <tr><td class="mono">$a % $b</td><td>resto della divisione</td><td class="mono">27 % 26 vale 1</td></tr>
+    <tr><td class="mono">strlen($s)</td><td>numero di caratteri</td><td class="mono">strlen('ciao') vale 4</td></tr>
+    <tr><td class="mono">$s[$i]</td><td>carattere in posizione <i>i</i> (da 0)</td><td class="mono">'ciao'[1] vale 'i'</td></tr>
+  </table>
+  <div class="nota attenzione"><b>Attenzione ai negativi.</b> In PHP il resto di un numero negativo è negativo: <code>-3 % 26</code> vale <code>-3</code>, non 23. Come si ottiene sempre un valore tra 0 e 25?</div>
+
+  <h2><span class="livello">Livello 1</span> Completa la funzione</h2>
+  <p>In <code>esercizio.php</code> trova la funzione <code>cesare(string $testo, int $k): string</code> e sostituisci i tre <code>TODO</code>. Lo scheletro è questo:</p>
+<pre><code>function cesare(string $testo, int $k): string
+{
+    // TODO 1: porta $k nell'intervallo 0..25
+    $k = $k;
+
+    $risultato = '';
+    for ($i = 0; $i &lt; strlen($testo); $i++) {
+        $c = $testo[$i];
+        if ($c &gt;= 'A' &amp;&amp; $c &lt;= 'Z') {
+            // TODO 2: cifra la maiuscola (ord, % 26, chr)
+            $risultato .= $c;
+        } elseif ($c &gt;= 'a' &amp;&amp; $c &lt;= 'z') {
+            // TODO 3: stessa cosa per le minuscole
+            $risultato .= $c;
+        } else {
+            $risultato .= $c;     // spazi, cifre, punteggiatura
+        }
+    }
+    return $risultato;
+}</code></pre>
+  <p><b>Prima di scrivere, rispondi a mano:</b> con <i>k</i> = 3, qual è il numero ottenuto da <code>ord('X') - 65 + 3</code>? E quale lettera si ottiene dopo <code>% 26</code> e <code>+ 65</code>?</p>
+  <p class="righe"></p><p class="righe"></p>
+  <p><b>Controllo:</b> da terminale <code>php test.php</code>. Il livello è finito quando tutti i test «Livello 1» sono OK.</p>
+</section>
+
+<section class="sheet">
+  <h2><span class="livello">Livello 2</span> Scrivi l'inversa</h2>
+  <p>Scrivi la funzione <code>decifraCesare(string $testo, int $k): string</code> che riporta in chiaro un testo cifrato con la chiave <i>k</i>.</p>
+  <ul>
+    <li>Devi <b>usare</b> la funzione <code>cesare()</code> già scritta, senza ricopiare il suo codice.</li>
+    <li>Pensa alla slide sul percorso inverso: di quanto si sposta chi decifra rispetto a chi cifra?</li>
+    <li>La tua funzione deve funzionare anche con chiavi negative e maggiori di 25.</li>
+  </ul>
+  <p><b>Prova a mano:</b> decifra <span class="mono">Khoor</span> con chiave 3 e scrivi il risultato: <span class="vuoto" style="min-width:8em"></span></p>
+
+  <h2><span class="livello">Livello 3</span> Scrivi l'attacco a forza bruta</h2>
+  <p>Un messaggio cifrato con Cesare ha solo 25 chiavi possibili. Scrivi due funzioni:</p>
+  <ol>
+    <li><code>forzaBruta(string $cifrato): array</code> prova tutte le chiavi da 1 a 25 e restituisce un array con la chiave come indice e il testo decifrato come valore, cioè <code>[1 =&gt; '…', 2 =&gt; '…', …, 25 =&gt; '…']</code>.</li>
+    <li><code>trovaChiave(string $cifrato, string $parola): ?int</code> usa <code>forzaBruta()</code> e restituisce la chiave per cui il testo contiene la <code>$parola</code> (senza distinguere maiuscole e minuscole), oppure <code>null</code> se nessuna va bene. Ti può servire <code>stripos()</code>.</li>
+  </ol>
+  <div class="nota">Una parola che sai (o immagini) essere nel messaggio, come «attacco» o «ciao», si chiama <i>parola probabile</i>: è un indizio molto potente per chi attacca un cifrario.</div>
+  <p><b>Per riflettere:</b> perché <code>forzaBruta()</code> parte da 1 e non da 0? Quante volte, al massimo, deve ripetere il ciclo?</p>
+  <p class="righe"></p><p class="righe"></p>
+
+  <h2>Come eseguire i test</h2>
+  <table>
+    <tr><th>Da terminale</th><td class="mono">cd lab-php/01-cesare<br>php test.php</td></tr>
+    <tr><th>Con XAMPP</th><td>copia la cartella in <span class="mono">htdocs</span> e apri <span class="mono">http://localhost/…/01-cesare/test.php</span></td></tr>
+  </table>
+  <p>Ogni riga è <b>OK</b> oppure <b>ERRORE</b>, con il valore atteso e quello ottenuto. In fondo c'è un riepilogo per livello.</p>
+
+  <h2>Consegna</h2>
+  <p>Il file <code>esercizio.php</code> con i tre livelli completati e il riepilogo di <code>test.php</code>.</p>
+  <p>Nome e cognome: <span class="vuoto" style="min-width:14em"></span> &nbsp; Classe: <span class="vuoto" style="min-width:5em"></span> &nbsp; Test superati: <span class="vuoto" style="min-width:4em"></span> / 23</p>
+</section>
+</body>
+</html>

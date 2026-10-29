@@ -1,0 +1,49 @@
+/* ==========================================================================
+   print.css — tema chiaro per pagine stampabili (schede, lab, dispensa, bigliettini).
+   Schermo: foglio bianco centrato; stampa: A4 senza sfondi, risparmio inchiostro.
+   Uso: <link rel="stylesheet" href="../assets/print.css"> (Google Fonts facoltativi).
+   ========================================================================== */
+:root {
+  --p-text: #1b1712; --p-dim: #4a4137; --p-line: #8a7d6b; --p-soft: #efe8dc; --p-accent: #7a4b00; --p-info: #0b5b80;
+  --p-ok: #1d6b2f; --p-bad: #a02a12;
+  --f-title: 'Fraunces', Georgia, serif;
+  --f-text: 'Public Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { background: #d9d3c9; }
+body { margin: 0; font-family: var(--f-text); color: var(--p-text); font-size: 11pt; line-height: 1.45; }
+.sheet { background: #fff; max-width: 210mm; margin: 12px auto; padding: 14mm 16mm; box-shadow: 0 2px 12px rgba(0,0,0,.25); }
+.sheet + .sheet { page-break-before: always; }
+h1, h2, h3 { font-family: var(--f-title); line-height: 1.2; margin: 0 0 .4em; color: var(--p-text); }
+h1 { font-size: 20pt; } h2 { font-size: 14pt; border-bottom: 2px solid var(--p-line); padding-bottom: 2pt; margin-top: 1.1em; } h3 { font-size: 12pt; }
+p { margin: 0 0 .6em; } ul, ol { margin: 0 0 .6em; padding-left: 1.4em; }
+a { color: var(--p-info); }
+.meta { font-family: var(--f-mono); font-size: 9pt; color: var(--p-dim); text-transform: uppercase; letter-spacing: .08em; }
+.nota { border-left: 4px solid var(--p-line); background: var(--p-soft); padding: 6pt 10pt; margin: .6em 0; break-inside: avoid; }
+.nota.attenzione { border-left-color: var(--p-bad); }
+.livello { display: inline-block; font-family: var(--f-mono); font-size: 9pt; font-weight: 600; border: 1.5px solid var(--p-text); border-radius: 12pt; padding: 0 9pt; margin-right: 6pt; }
+pre, code { font-family: var(--f-mono); }
+pre { background: var(--p-soft); border: 1px solid var(--p-line); border-radius: 4px; padding: 6pt 9pt; font-size: 9.5pt; line-height: 1.4; overflow-x: auto; white-space: pre; break-inside: avoid; margin: 0 0 .7em; }
+code { font-size: .92em; background: var(--p-soft); padding: 0 3pt; border-radius: 3px; }
+pre code { background: none; padding: 0; }
+.vuoto { border-bottom: 1.5px solid var(--p-text); display: inline-block; min-width: 4em; }
+.righe { height: 1.9em; border-bottom: 1px solid var(--p-line); }
+table { border-collapse: collapse; width: 100%; margin-bottom: .7em; font-size: 10pt; }
+th, td { border: 1px solid var(--p-line); padding: 3pt 6pt; text-align: left; }
+th { background: var(--p-soft); }
+td.mono, .mono { font-family: var(--f-mono); }
+.griglia { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; }
+.ritaglio { border: 1.5px dashed var(--p-text); padding: 8pt 10pt; break-inside: avoid; }
+.no-stampa { }
+.toolbar { max-width: 210mm; margin: 12px auto; display: flex; gap: 8px; justify-content: flex-end; }
+.toolbar button, .toolbar a { font: 600 14px var(--f-text); background: #1b1712; color: #fff; border: 0; border-radius: 6px; padding: 10px 16px; min-height: 44px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+@media (max-width: 700px) { .sheet { margin: 0; padding: 14px; box-shadow: none; } pre { font-size: 12px; } }
+@page { size: A4; margin: 12mm; }
+@media print {
+  html, body { background: #fff; }
+  .sheet { margin: 0; padding: 0; box-shadow: none; max-width: none; }
+  .no-stampa, .toolbar { display: none !important; }
+  a { color: inherit; text-decoration: none; }
+  h2 { break-after: avoid; }
+}

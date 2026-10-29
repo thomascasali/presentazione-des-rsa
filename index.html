@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crittografia: dai cifrari classici a DES e RSA</title>
+<meta name="description" content="Presentazione interattiva per la 5ª ITIS Informatica: cifrari classici, DES e RSA, con simulatori, giochi, laboratori PHP e OpenSSL.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  body { font-size: 17px; }
+  .hero { padding: 40px 0 24px; }
+  .hero .eyebrow { margin-bottom: 14px; }
+  .hero h1 { font-family: var(--f-title); font-weight: 900; font-size: clamp(34px, 6vw, 60px); line-height: 1.08; background: linear-gradient(135deg, var(--accent), var(--accent-alt)); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 14px; }
+  .hero p { font-size: clamp(18px, 2.2vw, 22px); color: var(--text-dim); max-width: 46rem; }
+  .hero .meta { margin-top: 12px; font-size: 15px; color: var(--text-muted); }
+  .sezione { margin-top: 40px; }
+  .sezione > h2 { font-family: var(--f-title); font-size: clamp(24px, 3.4vw, 32px); color: var(--accent); margin: 0 0 4px; }
+  .sezione > p.sub { color: var(--text-muted); font-size: 16px; margin: 0 0 16px; }
+  .gruppo { margin-top: 26px; }
+  .gruppo > h3 { font-family: var(--f-mono); font-size: 13px; text-transform: uppercase; letter-spacing: .14em; color: var(--text-muted); margin: 0 0 10px; font-weight: 500; }
+  .griglia-card { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 14px; }
+  a.scheda { display: flex; flex-direction: column; gap: 6px; text-decoration: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; min-height: 44px; color: var(--text); border-top: 4px solid var(--accent); }
+  a.scheda:hover { border-color: var(--info); background: var(--bg-light); }
+  a.scheda .num { font-family: var(--f-mono); font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+  a.scheda h4 { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.25; }
+  a.scheda p { margin: 0; font-size: 16px; color: var(--text-dim); line-height: 1.45; }
+  a.scheda .vai { margin-top: auto; padding-top: 6px; font-size: 14px; font-weight: 600; color: var(--info-t); }
+  a.scheda.classici { border-top-color: var(--accent); }
+  a.scheda.moderni { border-top-color: var(--info); }
+  a.scheda.des { border-top-color: var(--purple); }
+  a.scheda.rsa { border-top-color: var(--success); }
+  a.scheda.altro { border-top-color: var(--danger); }
+  a.scheda.piccola { padding: 12px 16px; }
+  a.scheda.piccola h4 { font-size: 18px; }
+  .legenda { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 14px 0 0; font-size: 14px; color: var(--text-muted); }
+  .legenda span::before { content: ''; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+  footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+  footer kbd { font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="bg-texture"></div>
+<div class="page wide">
+
+  <header class="hero">
+    <div class="eyebrow">5ª ITIS Informatica · Sistemi e Reti</div>
+    <h1>Crittografia: dai cifrari classici a DES e RSA</h1>
+    <p>Dieci moduli autonomi con simulatori, giochi da smartphone e da carta, laboratori in PHP e OpenSSL. Si può partire da qualsiasi punto, ma il percorso numerato va dal più semplice al più avanzato.</p>
+    <div class="legenda" aria-label="Legenda dei colori">
+      <span style="--c: var(--accent)">Cifrari classici</span>
+      <span style="--c: var(--info)">Cifrari moderni</span>
+      <span style="--c: var(--purple)">DES</span>
+      <span style="--c: var(--success)">RSA</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="sezione" id="moduli" aria-labelledby="h-moduli">
+      <h2 id="h-moduli">Moduli</h2>
+      <p class="sub">Ogni modulo è una presentazione con note per il docente (tasto <kbd>N</kbd>), simulatori integrati e rimandi a giochi, laboratori e quiz.</p>
+      <div class="griglia-card">
+        <a class="scheda classici" href="modulo-0-introduzione/slide.html"><span class="num">Modulo 0</span><h4>Introduzione</h4><p>Perché si cifra, vocabolario di base, obiettivi della crittografia e panorama dei cifrari.</p><span class="vai">Apri le slide →</span></a>
+        <a class="scheda classici" href="modulo-1-cesare/slide.html"><span class="num">Modulo 1</span><h4>Il cifrario di Cesare</h4><p>Spostamento dell'alfabeto, aritmetica modulo 26, codice PHP, forza bruta e frequenze.</p><span class="vai">Apri le slide →</span></a>
+        <a class="scheda classici" href="modulo-2-cesare-generalizzato/slide.html"><span class="num">Modulo 2</span><h4>Cesare generalizzato</h4><p>Il cifrario affine: moltiplicare e sommare, chiavi valide, inverso modulare.</p><span class="vai">Apri le slide →</span></a>
+        <a class="scheda classici" href="modulo-3-vigenere/slide.html"><span class="num">Modulo 3</span><h4>Il cifrario di Vigenère</h4><p>Una chiave a parola, più alfabeti, indice di coincidenza e metodo di Kasiski.</p><span class="vai">Apri le slide →</span></a>
+        <a class="scheda classici" href="modulo-4-trasposizione/slide.html"><span class="num">Modulo 4</span><h4>Trasposizione a colonne</h4><p>Mescolare senza sostituire: griglia, chiave, riempimento e come si attacca.</p><span class="vai">Apri le slide →</span></a>
+        <a class="scheda moderni" href="modulo-5-cifrari-moderni/slide.html"><span class="num">Modulo 5</span><h4>Cifrari moderni</h4><p>Bit e XOR, confusione e diffusione, cifrari a blocchi e a flusso.</p><span class="vai">Apri le slide →</span></a>
+        <a class="scheda des" href="modulo-6-des/slide.html"><span class="num">Modulo 6</span><h4>DES</h4><p>Rete di Feistel, S-DES a mano, DES reale, modalità ECB, 3DES e AES.</p><span class="vai">Apri le slide →</span></a>
+        <a class="scheda rsa" href="modulo-7-matematica-rsa/slide.html"><span class="num">Modulo 7</span><h4>La matematica di RSA</h4><p>Modulo, MCD, Euclide esteso, inverso, potenza modulare e numeri primi.</p><span class="vai">Apri le slide →</span></a>
+        <a class="scheda rsa" href="modulo-8-rsa/slide.html"><span class="num">Modulo 8</span><h4>RSA</h4><p>Generazione delle chiavi, cifratura, firma digitale e perché fattorizzare è difficile.</p><span class="vai">Apri le slide →</span></a>
+        <a class="scheda rsa" href="modulo-9-ibrida/slide.html"><span class="num">Modulo 9</span><h4>Crittografia ibrida</h4><p>Simmetrica più asimmetrica insieme: TLS, SSH e il ponte verso il laboratorio OpenSSL.</p><span class="vai">Apri le slide →</span></a>
+      </div>
+    </section>
+
+    <section class="sezione" id="simulazioni" aria-labelledby="h-sim">
+      <h2 id="h-sim">Simulazioni e giochi</h2>
+      <p class="sub">Pagine pensate per lo smartphone: si aprono da un indirizzo o da un codice QR, senza server e senza registrazione. I punteggi restano nel dispositivo.</p>
+
+      <div class="gruppo">
+        <h3>Simulazioni</h3>
+        <div class="griglia-card">
+          <a class="scheda classici piccola" href="modulo-1-cesare/simulazione-ruota.html"><h4>Ruota di Cesare</h4><p>Il disco di cifratura che ruota: cifra e decifra con la chiave scelta.</p></a>
+          <a class="scheda classici piccola" href="modulo-2-cesare-generalizzato/simulazione-affine.html"><h4>Cifrario affine</h4><p>Scegli a e b e guarda la tabella di sostituzione.</p></a>
+          <a class="scheda classici piccola" href="modulo-3-vigenere/simulazione-vigenere.html"><h4>Vigenère</h4><p>La chiave scorre sul testo, lettera per lettera.</p></a>
+          <a class="scheda classici piccola" href="modulo-4-trasposizione/simulazione-colonne.html"><h4>Trasposizione a colonne</h4><p>Griglia, ordine delle colonne e lettura del cifrato.</p></a>
+          <a class="scheda moderni piccola" href="modulo-5-cifrari-moderni/simulazione-xor.html"><h4>XOR bit a bit</h4><p>Clicca i bit del messaggio e della chiave.</p></a>
+          <a class="scheda des piccola" href="modulo-6-des/simulazione-sdes.html"><h4>S-DES passo per passo</h4><p>Chiavi, permutazioni, S-box e i due round.</p></a>
+          <a class="scheda des piccola" href="modulo-6-des/simulazione-des.html"><h4>DES: 16 round</h4><p>La traccia completa di L, R e sottochiave per ogni round.</p></a>
+          <a class="scheda rsa piccola" href="modulo-7-matematica-rsa/simulazione-euclide.html"><h4>Euclide esteso</h4><p>La tabella dei resti e dei coefficienti.</p></a>
+          <a class="scheda rsa piccola" href="modulo-7-matematica-rsa/simulazione-potenza-modulare.html"><h4>Potenza modulare</h4><p>Square-and-multiply, un bit alla volta.</p></a>
+          <a class="scheda rsa piccola" href="modulo-8-rsa/simulazione-rsa.html"><h4>RSA con numeri piccoli</h4><p>Dalle chiavi alla firma, con p e q a scelta.</p></a>
+          <a class="scheda rsa piccola" href="modulo-9-ibrida/simulazione-ibrida.html"><h4>Crittografia ibrida</h4><p>Chiave di sessione cifrata con RSA, messaggio cifrato in blocchi.</p></a>
+        </div>
+      </div>
+
+      <div class="gruppo">
+        <h3>Giochi e sfide</h3>
+        <div class="griglia-card">
+          <a class="scheda classici piccola" href="modulo-1-cesare/gioco-rompi-cesare.html"><h4>Rompi il messaggio di Cesare</h4><p>Messaggio casuale e chiave ignota: trovala prima possibile.</p></a>
+          <a class="scheda classici piccola" href="modulo-3-vigenere/gioco-rompi-vigenere.html"><h4>Rompi Vigenère</h4><p>Lunghezza della chiave, poi le singole lettere.</p></a>
+          <a class="scheda des piccola" href="modulo-6-des/gioco-sdes-a-mano.html"><h4>S-DES a mano</h4><p>Calcola tu i passi, la pagina verifica ogni risultato.</p></a>
+          <a class="scheda rsa piccola" href="modulo-8-rsa/gioco-rsa-di-classe.html"><h4>RSA di classe</h4><p>Ognuno genera le sue chiavi, pubblica quella pubblica e riceve un messaggio.</p></a>
+          <a class="scheda altro piccola" href="schede/bigliettini-cesare.html"><h4>Bigliettini di Cesare</h4><p>Scheda stampabile da ritagliare: messaggi con e senza chiave.</p></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="sezione" id="laboratori" aria-labelledby="h-lab">
+      <h2 id="h-lab">Laboratori</h2>
+      <p class="sub">Ogni laboratorio ha tre livelli: completare una funzione, scrivere l'inversa, scrivere l'attacco. Un file di test controlla il lavoro.</p>
+
+      <div class="gruppo">
+        <h3>Lab PHP</h3>
+        <div class="griglia-card">
+          <a class="scheda classici piccola" href="lab-php/01-cesare/scheda.html"><h4>01 · Cesare</h4><p>Cifratura, decifratura e forza bruta con ord(), chr() e %.</p></a>
+          <a class="scheda classici piccola" href="lab-php/02-cesare-generalizzato/scheda.html"><h4>02 · Cesare generalizzato</h4><p>Cifrario affine e inverso modulare.</p></a>
+          <a class="scheda classici piccola" href="lab-php/03-vigenere/scheda.html"><h4>03 · Vigenère</h4><p>Cifrare con una parola chiave e attaccare con l'indice di coincidenza.</p></a>
+          <a class="scheda classici piccola" href="lab-php/04-trasposizione/scheda.html"><h4>04 · Trasposizione</h4><p>Griglia a colonne con riempimento.</p></a>
+          <a class="scheda classici piccola" href="lab-php/05-frequenze/scheda.html"><h4>05 · Analisi delle frequenze</h4><p>Contare le lettere e indovinare la chiave.</p></a>
+          <a class="scheda rsa piccola" href="lab-php/06-rsa-giocattolo/scheda.html"><h4>06 · RSA giocattolo</h4><p>MCD, Euclide esteso, square-and-multiply con interi piccoli.</p></a>
+          <a class="scheda des piccola" href="lab-php/07-des-openssl/scheda.html"><h4>07 · DES con openssl_encrypt()</h4><p>Cifrare con la libreria, osservare ECB e CBC.</p></a>
+        </div>
+      </div>
+
+      <div class="gruppo">
+        <h3>Lab OpenSSL</h3>
+        <div class="griglia-card">
+          <a class="scheda altro piccola" href="lab-openssl/scheda.html"><h4>OpenSSL da terminale</h4><p>Chiavi RSA, cifratura simmetrica, firme e certificati con la riga di comando.</p></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="sezione" id="materiali" aria-labelledby="h-mat">
+      <h2 id="h-mat">Dispensa, quiz e schede</h2>
+      <p class="sub">Per studiare, ripassare e verificare.</p>
+      <div class="griglia-card">
+        <a class="scheda altro" href="dispensa/dispensa.html"><span class="num">Dispensa</span><h4>Testo completo</h4><p>Tutta la teoria con gli esempi svolti, pronta da stampare.</p><span class="vai">Apri la dispensa →</span></a>
+        <a class="scheda altro" href="quiz/quiz.html"><span class="num">Quiz</span><h4>Quiz per modulo e verifica finale</h4><p>Domande a risposta chiusa con correzione immediata.</p><span class="vai">Apri il quiz →</span></a>
+        <a class="scheda altro" href="schede/bigliettini-cesare.html"><span class="num">Schede</span><h4>Attività da stampare</h4><p>Bigliettini, esercizi su carta e schede di lavoro.</p><span class="vai">Apri le schede →</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Scorciatoie nelle presentazioni: <kbd>←</kbd> <kbd>→</kbd> per scorrere, <kbd>N</kbd> note, <kbd>I</kbd> elenco slide, <kbd>F</kbd> schermo intero.
+    I materiali funzionano anche aperti da file locale. Gli esempi crittografici sono didattici: non usarli per proteggere dati reali.
+  </footer>
+</div>
+</body>
+</html>

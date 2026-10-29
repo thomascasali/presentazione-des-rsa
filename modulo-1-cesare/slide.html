@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modulo 1 — Il cifrario di Cesare</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  /* Stili specifici di questo modulo */
+  .alfa { display: grid; grid-template-columns: repeat(26, minmax(0, 1fr)); gap: 3px; }
+  .alfa-label { font-family: var(--f-mono); font-size: var(--fs-xs); color: var(--text-muted); margin: .35rem 0 .15rem; }
+  .alfa .c { text-align: center; font-family: var(--f-mono); font-weight: 600; font-size: var(--fs-sm); padding: .25em 0; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  .alfa .c.cif { background: color-mix(in srgb, var(--accent) 16%, var(--bg)); border-color: var(--accent); color: var(--accent-alt); }
+  .alfa .c.sel { outline: 3px solid var(--info-t); outline-offset: 0; }
+  .alfa .c.num { border-color: transparent; background: transparent; color: var(--text-muted); font-size: var(--fs-xs); }
+  .alfa-m { display: none; }
+  .freq { display: flex; align-items: flex-end; gap: 3px; height: 5.2rem; }
+  .freq .b { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+  .freq .b i { display: block; width: 100%; background: var(--info); border-radius: 3px 3px 0 0; min-height: 1px; }
+  .freq.cif .b i { background: var(--accent); }
+  .freq-let { display: flex; gap: 3px; }
+  .freq-let span { flex: 1 1 0; text-align: center; font-family: var(--f-mono); font-size: 11px; color: var(--text-muted); }
+  .bf-cell { display: flex; gap: .5em; align-items: baseline; padding: .15em .5em; border-radius: 6px; border: 1px solid transparent; font-family: var(--f-mono); font-size: var(--fs-xs); color: var(--text-dim); min-width: 0; }
+  .bf-cell b { color: var(--accent-alt); min-width: 2.3em; }
+  .bf-cell span { overflow-wrap: anywhere; }
+  .bf-cell.best { border-color: var(--success); background: color-mix(in srgb, var(--success) 14%, var(--bg)); color: var(--text); }
+  @media (min-width: 901px) { .split-code { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) !important; } }
+  @media (max-width: 900px) {
+    .alfa { grid-template-columns: repeat(13, minmax(0, 1fr)); }
+    .alfa-d { display: none; } .alfa-m { display: block; }
+    .bf-cell { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Box, Glow, Chip, Grid, Card, Btn, Field, Table, Flow, CompareTwo, ActivityBadge, Steps, Code } = UI;
+const C = window.Cripto;
+const A = C.ALFABETO;
+
+/* ---------- componenti specifici del modulo ---------- */
+
+// Due alfabeti affiancati: sopra il chiaro, sotto il cifrato (spostato di k). `sel` = indici da evidenziare.
+function RigheAlfabeto({ k, da, a, sel }) {
+  const cif = (i) => A[(i + k) % 26];
+  const idx = []; for (let i = da; i < a; i++) idx.push(i);
+  return (
+    <div>
+      <div className="alfa-label">Testo in chiaro</div>
+      <div className="alfa">{idx.map(i => <div key={i} className={'c' + (sel && sel.includes(i) ? ' sel' : '')}>{A[i]}</div>)}</div>
+      <div className="alfa-label">Testo cifrato (chiave {k})</div>
+      <div className="alfa">{idx.map(i => <div key={i} className={'c cif' + (sel && sel.includes(i) ? ' sel' : '')}>{cif(i)}</div>)}</div>
+    </div>
+  );
+}
+function AlfabetiAffiancati({ k, sel }) {
+  return (
+    <div>
+      <div className="alfa-d"><RigheAlfabeto k={k} da={0} a={26} sel={sel} /></div>
+      <div className="alfa-m"><RigheAlfabeto k={k} da={0} a={13} sel={sel} /><RigheAlfabeto k={k} da={13} a={26} sel={sel} /></div>
+    </div>
+  );
+}
+
+// Simulatore inline: cifra e decifra con un cursore per la chiave.
+function CesareSim() {
+  const [testo, setTesto] = useState('Ci vediamo domani alle otto');
+  const [k, setK] = useState(3);
+  const [modo, setModo] = useState('cifra');
+  const [gruppi, setGruppi] = useState(false);
+  const out = modo === 'cifra' ? C.cesare(testo, k) : C.cesareDecifra(testo, k);
+  const mostrato = gruppi ? (C.normalizza(out).match(/.{1,5}/g) || []).join(' ') : out;
+  const usate = useMemo(() => [...new Set(C.normalizza(testo).split('').map(c => c.charCodeAt(0) - 65))], [testo]);
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · cifrario di Cesare</div>
+      <Grid cols={2}>
+        <div className="stack">
+          <Field label="Testo" htmlFor="sim-testo"><textarea id="sim-testo" className="input" rows={2} value={testo} onChange={e => setTesto(e.target.value)} /></Field>
+          <Field label={'Chiave: ' + k}><input type="range" min="0" max="25" value={k} onChange={e => setK(+e.target.value)} aria-label="Chiave" /></Field>
+          <div className="row">
+            <Btn variant={modo === 'cifra' ? 'primary' : ''} onClick={() => setModo('cifra')} aria-pressed={modo === 'cifra'}>Cifra</Btn>
+            <Btn variant={modo === 'decifra' ? 'primary' : ''} onClick={() => setModo('decifra')} aria-pressed={modo === 'decifra'}>Decifra</Btn>
+            <label className="row small dim" style={{ gap: '.4rem', minHeight: 44 }}><input type="checkbox" checked={gruppi} onChange={e => setGruppi(e.target.checked)} style={{ width: 22, height: 22 }} />Gruppi di 5</label>
+          </div>
+        </div>
+        <div className="stack">
+          <div className="label xs muted">{modo === 'cifra' ? 'Testo cifrato' : 'Testo in chiaro'}</div>
+          <div className="out big" aria-live="polite">{mostrato || ' '}</div>
+          <AlfabetiAffiancati k={modo === 'cifra' ? k : (26 - k) % 26} sel={usate} />
+        </div>
+      </Grid>
+    </div>
+  );
+}
+
+// Traccia di una lettera attraverso le operazioni del codice PHP.
+function TracciaLettera() {
+  const [c, setC] = useState('X');
+  const [k, setK] = useState(3);
+  const ch = (c || ' ')[0];
+  const maius = ch >= 'A' && ch <= 'Z', minus = ch >= 'a' && ch <= 'z';
+  let corpo;
+  if (!maius && !minus) {
+    corpo = <p className="small dim">«{ch}» non è una lettera dell'alfabeto: il codice la copia così com'è.</p>;
+  } else {
+    const base = maius ? 65 : 97, o = ch.charCodeAt(0), n = o - base, s = n + k, m = s % 26, ris = String.fromCharCode(m + base);
+    const righe = [
+      ['ord(\'' + ch + '\')', o],
+      ['− ' + base + ' (posizione nell\'alfabeto)', n],
+      ['+ k  →  ' + n + ' + ' + k, s],
+      ['% 26  →  ' + s + ' % 26', m],
+      ['+ ' + base + '  →  ' + m + ' + ' + base, m + base],
+      ['chr(' + (m + base) + ')', '\'' + ris + '\''],
+    ];
+    corpo = (
+      <table className="table mono"><tbody>
+        {righe.map((r, i) => <tr key={i}><td>{r[0]}</td><td className="hl">{r[1]}</td></tr>)}
+      </tbody></table>
+    );
+  }
+  return (
+    <div className="sim">
+      <div className="sim-title">Una lettera, passo per passo</div>
+      <div className="row">
+        <Field label="Lettera"><input className="input mono" style={{ width: '4.5em' }} maxLength={1} value={c} onChange={e => setC(e.target.value.slice(-1))} aria-label="Lettera" /></Field>
+        <Field label={'Chiave k = ' + k} className="grow"><input type="range" min="0" max="25" value={k} onChange={e => setK(+e.target.value)} aria-label="Chiave" /></Field>
+      </div>
+      {corpo}
+    </div>
+  );
+}
+
+// Forza bruta: tutte le 25 chiavi su un testo cifrato.
+function ForzaBruta() {
+  const iniziale = useMemo(() => C.cesare('Domani verifica di reti', 11), []);
+  const [cifrato, setCifrato] = useState(iniziale);
+  const [suggerisci, setSuggerisci] = useState(false);
+  const { lista, ms } = useMemo(() => {
+    const t0 = performance.now(); const l = C.forzaBruta(cifrato); return { lista: l, ms: performance.now() - t0 };
+  }, [cifrato]);
+  const migliore = useMemo(() => lista.reduce((m, x) => (x.punteggio < m.punteggio ? x : m), lista[0]), [lista]);
+  return (
+    <div className="sim">
+      <div className="row-between">
+        <div className="sim-title">Forza bruta · le 25 chiavi</div>
+        <span className="mono xs muted">25 chiavi provate in {ms.toFixed(2)} ms</span>
+      </div>
+      <Field label="Testo cifrato" htmlFor="bf-in"><input id="bf-in" className="input mono" value={cifrato} onChange={e => setCifrato(e.target.value)} /></Field>
+      <Grid cols={3} gap=".1rem .8rem">
+        {lista.map(x => (
+          <div key={x.chiave} className={'bf-cell' + (suggerisci && x.chiave === migliore.chiave ? ' best' : '')}>
+            <b>k={x.chiave}</b><span>{x.testo}</span>
+          </div>
+        ))}
+      </Grid>
+      <div className="row">
+        <Btn small onClick={() => setSuggerisci(v => !v)} aria-pressed={suggerisci}>{suggerisci ? 'Nascondi il suggerimento' : 'Suggerisci con le statistiche'}</Btn>
+        <Btn small variant="ghost" onClick={() => { setCifrato(iniziale); setSuggerisci(false); }}>Ripristina</Btn>
+        <span className="xs muted">Su testi molto corti la statistica può sbagliare: l'occhio umano no.</span>
+      </div>
+    </div>
+  );
+}
+
+// Analisi delle frequenze: italiano atteso contro il messaggio cifrato, con spostamento manuale.
+const CAMPIONE = 'La crittografia è l\'arte di nascondere il significato di un messaggio. Chi scrive trasforma le parole con una regola e una chiave, chi legge usa la stessa chiave per tornare al testo originale. Nei secoli questa idea è stata usata per proteggere lettere, ordini militari e segreti di stato, ma anche per giocare con gli amici.';
+function GraficoBarre({ valori, max, cls }) {
+  return (
+    <div>
+      <div className={'freq ' + (cls || '')} role="img" aria-label="Istogramma delle frequenze delle lettere">
+        {valori.map((v, i) => <div key={i} className="b"><i style={{ height: (100 * v / max) + '%' }} /></div>)}
+      </div>
+      <div className="freq-let" aria-hidden="true">{valori.map((v, i) => <span key={i}>{A[i]}</span>)}</div>
+    </div>
+  );
+}
+function AnalisiFrequenze() {
+  const cifrato = useMemo(() => C.cesare(CAMPIONE, 7), []);
+  const oss = useMemo(() => C.frequenze(cifrato).percentuali, [cifrato]);
+  const att = useMemo(() => A.split('').map(l => C.FREQ_IT[l]), []);
+  const [off, setOff] = useState(0);
+  const rif = att.map((_, i) => att[(i - off + 26) % 26]);        // grafico italiano ruotato di `off` posti
+  const diff = oss.reduce((s, v, i) => s + Math.abs(v - rif[i]), 0);
+  const max = 13;
+  return (
+    <div className="sim">
+      <div className="sim-title">Frequenze delle lettere</div>
+      <div className="xs muted">Italiano atteso, spostato di {off} {off === 1 ? 'posto' : 'posti'}</div>
+      <GraficoBarre valori={rif} max={max} />
+      <div className="xs muted">Lettere nel messaggio cifrato ({cifrato.replace(/[^A-Za-z]/g, '').length} lettere)</div>
+      <GraficoBarre valori={oss} max={max} cls="cif" />
+      <div className="row">
+        <Field label="Sposta il grafico italiano" className="grow"><input type="range" min="0" max="25" value={off} onChange={e => setOff(+e.target.value)} aria-label="Spostamento del grafico italiano" /></Field>
+        <span className="mono small hl">differenza: {diff.toFixed(0)}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- dati calcolati con crypto.js ---------- */
+
+const TRACCIA = C.cesareTraccia('ATTACCO', 3);
+const CIFRATO_ES = C.cesare('ATTACCO', 3);
+
+const passiEsempio = TRACCIA.map((t, i) => ({
+  title: 'Lettera ' + (i + 1) + ': ' + t.chiaro,
+  content: (
+    <div className="stack">
+      <p><span className="mono hl">{t.chiaro}</span> è la lettera numero <span className="mono hl">{t.indiceChiaro}</span> (A è la 0).</p>
+      <p>Spostiamo di 3: <span className="mono">{t.indiceChiaro} + 3 = {t.indiceChiaro + 3}</span>{t.indiceChiaro + 3 > 25 ? <> → siamo oltre la Z, si riparte da A: <span className="mono">{t.indiceChiaro + 3} − 26 = {t.indiceCifrato}</span></> : null}.</p>
+      <p>La lettera numero <span className="mono hl">{t.indiceCifrato}</span> è <span className="mono hl">{t.cifrato}</span>. Finora: <span className="mono hl">{TRACCIA.slice(0, i + 1).map(x => x.cifrato).join('')}</span></p>
+    </div>
+  ),
+}));
+
+const CODICE_LETTERA = `<?php
+function cesareLettera(string $c, int $k): string {
+    $n = ord($c) - ord('A');      // posizione: A=0, B=1, ... Z=25
+    $n = ($n + $k) % 26;          // sposta di k posti, riparte da A
+    return chr($n + ord('A'));    // da posizione a carattere
+}
+
+echo cesareLettera('X', 3);`;
+const SPIEGA_LETTERA = [
+  'Il tag di apertura: da qui in poi è codice PHP.',
+  'Una funzione che riceve una lettera ($c) e la chiave ($k) e restituisce la lettera cifrata.',
+  'ord() trasforma il carattere nel suo codice numerico. Sottraendo il codice di \'A\' la A diventa 0.',
+  'Si somma la chiave. L\'operatore % (resto della divisione) fa ripartire da 0 dopo la Z: è l\'aritmetica modulo 26.',
+  'chr() fa il percorso inverso: da numero a carattere. Si somma di nuovo il codice di \'A\'.',
+  'Chiude la funzione.',
+  '',
+  'Chiamata di prova: cifrare la X con chiave 3.',
+];
+
+const CODICE_TESTO = `<?php
+function cesare(string $testo, int $k): string {
+    $k = (($k % 26) + 26) % 26;        // chiave sempre tra 0 e 25
+    $risultato = '';
+    for ($i = 0; $i < strlen($testo); $i++) {
+        $c = $testo[$i];
+        if ($c >= 'A' && $c <= 'Z') {
+            $risultato .= chr((ord($c) - 65 + $k) % 26 + 65);
+        } elseif ($c >= 'a' && $c <= 'z') {
+            $risultato .= chr((ord($c) - 97 + $k) % 26 + 97);
+        } else {
+            $risultato .= $c;           // spazi, cifre, punteggiatura
+        }
+    }
+    return $risultato;
+}`;
+const SPIEGA_TESTO = [
+  '', 'La funzione lavora su un intero testo, non su una lettera sola.',
+  'Normalizza la chiave: anche con k negativo o maggiore di 25 si torna a un valore tra 0 e 25 (vedi la slide sul resto).',
+  'Il risultato parte vuoto e si costruisce lettera per lettera.',
+  'Un ciclo che visita ogni carattere del testo, dal primo all\'ultimo.',
+  '$testo[$i] è il carattere in posizione $i.',
+  'Maiuscola? I codici di A..Z vanno da 65 a 90.',
+  'Stessa formula di prima, con 65 scritto direttamente. Il punto (.=) accoda al risultato.',
+  'Minuscola? I codici di a..z partono da 97: la formula è identica, cambia solo la base.',
+  'Stessa formula con la base delle minuscole: maiuscole e minuscole restano tali.',
+  'Tutto il resto (spazi, numeri, punteggiatura, lettere accentate) non si cifra.',
+  'Si copia il carattere così com\'è.',
+  'Fine dei casi.', 'Fine del ciclo.', 'Il testo cifrato viene restituito.', '',
+];
+const CODICE_EVID = `<?php
+function cesare(string $testo, int $k): string {
+    $k = (($k % 26) + 26) % 26;
+    $risultato = '';
+    for ($i = 0; $i < strlen($testo); $i++) {
+        $c = $testo[$i];
+        if ($c >= 'A' && $c <= 'Z') {
+            $risultato .= chr((ord($c) - 65 + $k) % 26 + 65);
+        }
+        // ... minuscole e altri caratteri
+    }
+    return $risultato;
+}`;
+
+/* ---------- le slide ---------- */
+
+const slides = [
+  { copertina: true, sezione: 'Apertura', titolo: 'Il cifrario di Cesare',
+    sottotitolo: 'Il più antico dei cifrari a sostituzione: come funziona, come si programma e perché si rompe in pochi minuti.',
+    note: ['Apertura del modulo. Il cifrario di Cesare è il punto di partenza di tutto il percorso: poche regole, ma contiene già le idee che tornano in DES e RSA (algoritmo, chiave, attacco).', 'Tasti utili: frecce per scorrere, N per queste note, I per l\'elenco delle slide, F per lo schermo intero.'] },
+
+  { sezione: 'Idea e storia', titolo: 'Nascondere un messaggio',
+    contenuto: () => (
+      <div className="stack-lg">
+        <p className="lead">Un messaggio può essere intercettato. La crittografia lo rende illeggibile a chi non conosce il segreto.</p>
+        <Flow steps={[
+          { icon: '📜', label: 'Testo in chiaro', sub: 'ATTACCO' },
+          { icon: '⚙️', label: 'Cifratura', sub: 'algoritmo + chiave', color: 'var(--info)' },
+          { icon: '🔒', label: 'Testo cifrato', sub: CIFRATO_ES, color: 'var(--danger)' },
+          { icon: '⚙️', label: 'Decifratura', sub: 'algoritmo + chiave', color: 'var(--info)' },
+          { icon: '📜', label: 'Testo in chiaro', sub: 'ATTACCO' },
+        ]} />
+        <Grid cols={2}>
+          <Box type="info" title="Algoritmo">La regola con cui si trasforma il testo. Può essere pubblica.</Box>
+          <Box type="warn" title="Chiave">Il dato segreto che fa funzionare la regola. Cambia la chiave e cambia il risultato.</Box>
+        </Grid>
+      </div>
+    ),
+    note: 'Fissate i quattro termini: testo in chiaro, testo cifrato, algoritmo, chiave. Il cifrato dello schema è calcolato con lo stesso codice che useremo nel simulatore. Chiedete: se un nemico vede il testo cifrato, cosa gli manca per leggerlo? La risposta guida tutto il modulo.' },
+
+  { sezione: 'Idea e storia', titolo: 'Giulio Cesare e il suo cifrario',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Glow><p>Lo storico romano Svetonio racconta che Giulio Cesare, nelle lettere riservate, <span className="hl">sostituiva ogni lettera con quella tre posti più avanti</span> nell'alfabeto.</p></Glow>
+        <Grid cols={2}>
+          <Card tone="accent"><h3>La regola</h3><p>A diventa D, B diventa E, C diventa F… e dopo la Z si riparte dalla A.</p></Card>
+          <Card tone="info"><h3>La chiave</h3><p>Per Cesare era 3. Svetonio attribuisce ad Augusto una versione con spostamento di un solo posto.</p></Card>
+        </Grid>
+        <p className="small muted">Cifrario a sostituzione monoalfabetica: ogni lettera ha sempre la stessa sostituta.</p>
+      </div>
+    ),
+    note: 'Contesto storico breve, un minuto. La fonte è Svetonio (Vite dei Cesari): non serve citare i passi, basta dire che la regola ci è nota da testimonianze antiche. Il termine «monoalfabetico» tornerà quando parleremo di Vigenère: qui basta sottolineare che la stessa lettera in chiaro dà sempre la stessa lettera cifrata.' },
+
+  { sezione: 'Come funziona', titolo: 'Due alfabeti affiancati',
+    contenuto: () => (
+      <div className="stack-lg">
+        <p>Si scrive l'alfabeto due volte: il secondo è <span className="hl">scorrevole</span>, spostato della chiave.</p>
+        <AlfabetiAffiancati k={3} />
+        <Box type="tip" title="Per cifrare">Cerca la lettera nella riga sopra e scrivi quella che sta sotto di lei.</Box>
+        <p className="small muted">Con chiave 3 il cifrato di ATTACCO è <span className="mono hl">{CIFRATO_ES}</span>.</p>
+      </div>
+    ),
+    note: 'Fate trovare agli studenti la lettera sotto la A, la X, la Z. Sulla X e sulla Z l\'alfabeto «torna indietro»: è già l\'idea del modulo aritmetico, che formalizziamo tra poche slide. Il cifrato dell\'esempio è prodotto dal motore crypto.js, non scritto a mano.' },
+
+  { sezione: 'Come funziona', titolo: 'Esempio svolto: ATTACCO con chiave 3',
+    contenuto: () => (
+      <div className="stack">
+        <Steps steps={passiEsempio} />
+        <p className="small muted">Risultato finale: <span className="mono hl">ATTACCO → {CIFRATO_ES}</span></p>
+      </div>
+    ),
+    note: 'Si procede lettera per lettera con Avanti (o con la freccia destra). Soffermatevi sul passo in cui compare «oltre la Z»: è il caso che manda in crisi gli studenti nel codice. Le due T e le due C danno la stessa lettera cifrata: ne riparleremo parlando di frequenze.' },
+
+  { sezione: 'Come funziona', titolo: 'Decifrare: il percorso inverso',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2}>
+          <Card tone="accent"><h3>Cifrare</h3><p>Sposta ogni lettera <span className="hl">avanti</span> di k posti.</p><p className="mono small dim">D = A + 3</p></Card>
+          <Card tone="info"><h3>Decifrare</h3><p>Sposta ogni lettera <span className="hl">indietro</span> di k posti.</p><p className="mono small dim">A = D − 3</p></Card>
+        </Grid>
+        <Box type="warn" title="Quante chiavi ci sono?">
+          Le chiavi utili sono <span className="hl">25</span>. Con chiave 0 il testo non cambia, con chiave 26 si fa un giro completo e si torna alla chiave 0.
+        </Box>
+        <p className="small muted">Chiave 13 su «{C.cesare('Ciao', 13)}»: applicata di nuovo restituisce «{C.cesare(C.cesare('Ciao', 13), 13)}».</p>
+      </div>
+    ),
+    note: 'Cifrare e decifrare usano lo stesso algoritmo con segno opposto. Il caso k = 13 è una curiosità (ROT13): applicato due volte restituisce l\'originale, perché 13 + 13 = 26. Lo spazio delle chiavi, 25, è il numero da ricordare per la slide sull\'attacco.' },
+
+  { sezione: 'Simulatore', titolo: 'Prova tu: cifra e decifra',
+    contenuto: () => (
+      <div className="stack">
+        <CesareSim />
+        <div className="row">
+          <ActivityBadge href="simulazione-ruota.html" label="Apri la ruota di Cesare (anche da smartphone)" icon="🎡" />
+        </div>
+      </div>
+    ),
+    note: 'Lasciate che gli studenti scrivano una frase e provino chiavi diverse. Fate notare che le lettere usate nel testo sono evidenziate sugli alfabeti. «Gruppi di 5» mostra il testo come lo scrivevano i telegrafisti: senza spazi, che sono un indizio per chi attacca. La ruota è una versione da smartphone con il disco di cifratura.' },
+
+  { sezione: 'Aritmetica', titolo: 'Le lettere diventano numeri',
+    contenuto: () => (
+      <div className="stack">
+        <Table mono center head={A.slice(0, 13).split('')} rows={[A.slice(0, 13).split('').map((_, i) => i)]} />
+        <Table mono center head={A.slice(13).split('')} rows={[A.slice(13).split('').map((_, i) => i + 13)]} />
+        <Glow><p className="center">Cifrare: <span className="mono hl">E(x) = (x + k) mod 26</span></p><p className="center">Decifrare: <span className="mono hl">D(y) = (y − k) mod 26</span></p></Glow>
+        <p className="small muted">«mod 26» significa: il resto della divisione per 26. È come un orologio con 26 ore.</p>
+      </div>
+    ),
+    note: 'Passaggio chiave: dal gioco con le lettere all\'aritmetica. La A vale 0 (non 1): così il resto della divisione funziona senza correzioni. L\'orologio con 26 ore aiuta chi non ha familiarità con il modulo; nel modulo 7 lo riprendiamo in modo sistematico per RSA.' },
+
+  { sezione: 'Aritmetica', titolo: 'Il resto della divisione',
+    contenuto: () => (
+      <div className="stack">
+        <Table mono head={['Lettera', 'x', 'k', 'x + k', '(x + k) mod 26', 'Cifrata']}
+          rows={['C', 'W', 'X', 'Z'].map(l => { const x = l.charCodeAt(0) - 65; return [l, x, 3, x + 3, (x + 3) % 26, A[(x + 3) % 26]]; })} />
+        <Box type="danger" title="Attenzione ai numeri negativi">
+          Decifrare «C» con k = 5: <span className="mono">2 − 5 = {2 - 5}</span>. In PHP, come in JavaScript, <span className="mono">{2 - 5} % 26</span> dà <span className="mono hl">{(2 - 5) % 26}</span>, non 23! Per ottenere il valore giusto: <span className="mono hl">(({2 - 5} % 26) + 26) % 26 = {(((2 - 5) % 26) + 26) % 26}</span>.
+        </Box>
+      </div>
+    ),
+    note: 'Qui nasce l\'errore più comune nel laboratorio: in PHP il segno del resto segue il dividendo, quindi un numero negativo dà un resto negativo. La correzione («+26, poi % 26 di nuovo») va ricordata: la ritroveremo nel codice. I numeri della tabella sono calcolati, non scritti a mano.' },
+
+  { sezione: 'Attività', titolo: 'Il gioco dei bigliettini',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2} stretch>
+          <Card tone="accent">
+            <h3>Su carta</h3>
+            <ol>
+              <li>Ogni coppia riceve un bigliettino.</li>
+              <li>Quelli con la chiave si decifrano; gli altri vanno «rotti».</li>
+              <li>Poi si scrive una risposta e la si cifra per un'altra coppia.</li>
+            </ol>
+            <ActivityBadge href="../schede/bigliettini-cesare.html" label="Bigliettini da stampare" />
+          </Card>
+          <Card tone="info">
+            <h3>Sul telefono</h3>
+            <p>Arriva un messaggio con una chiave casuale: trova la chiave e leggi la frase.</p>
+            <ActivityBadge href="gioco-rompi-cesare.html" label="Gioco: rompi il messaggio" icon="📱" />
+          </Card>
+        </Grid>
+        <Box type="tip" title="Regola d'oro">Prima di toccare il telefono prova a ragionare: la parola più corta del messaggio che cosa può essere?</Box>
+      </div>
+    ),
+    note: 'Attività da 10-15 minuti. Distribuite i bigliettini stampati (ce n\'è un foglio da ritagliare) oppure fate aprire il gioco da telefono: l\'indirizzo si può proiettare o trasformare in QR. Nel gioco il messaggio e la chiave sono casuali a ogni partita. Passate tra i banchi: osservate chi prova a mano e chi usa la forza bruta.' },
+
+  { sezione: 'Codice PHP', titolo: 'Dal ragionamento al codice',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { label: 'Carattere', sub: '\'X\'' },
+          { label: 'ord()', sub: 'codice: ' + 'X'.charCodeAt(0), color: 'var(--info)' },
+          { label: '− 65', sub: 'posizione: ' + ('X'.charCodeAt(0) - 65), color: 'var(--info)' },
+          { label: '+ k', sub: 'con k = 3: ' + ('X'.charCodeAt(0) - 65 + 3), color: 'var(--accent)' },
+          { label: '% 26', sub: 'resto: ' + ((('X'.charCodeAt(0) - 65) + 3) % 26), color: 'var(--accent)' },
+          { label: 'chr(+ 65)', sub: '\'' + C.cesare('X', 3) + '\'', color: 'var(--success)' },
+        ]} />
+        <Grid cols={2}>
+          <Card><h3><code>ord()</code></h3><p>Da carattere a numero (il codice ASCII).</p></Card>
+          <Card><h3><code>chr()</code></h3><p>Da numero a carattere. È l'inversa di <code>ord()</code>.</p></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Schema da proiettare prima di scrivere codice: ogni blocco corrisponde a una riga della funzione. In ASCII la A vale 65 e la a vale 97: la distanza tra maiuscole e minuscole spiega perché servono due rami nel codice. I valori dello schema sono calcolati per la lettera X.' },
+
+  { sezione: 'Codice PHP', titolo: 'Cifrare una lettera',
+    contenuto: () => (
+      <div className="stack">
+        <Code title="cesare-lettera.php" code={CODICE_LETTERA} reveal explain={SPIEGA_LETTERA} />
+        <p className="small muted">Con la freccia destra si rivela una riga alla volta. Atteso: <span className="mono hl">{C.cesare('X', 3)}</span></p>
+      </div>
+    ),
+    note: 'Rivelate le righe una alla volta e fate prevedere a voce che cosa farà la riga successiva. La spiegazione sotto il codice accompagna ogni riga. La funzione gestisce solo maiuscole e chiavi tra 0 e 25: i limiti vengono rimossi nella slide successiva.' },
+
+  { sezione: 'Codice PHP', titolo: 'Tutto il testo: maiuscole, minuscole, altri simboli',
+    contenuto: () => (
+      <Code title="cesare.php" code={CODICE_TESTO} reveal explain={SPIEGA_TESTO} />
+    ),
+    note: 'È la funzione che gli studenti completeranno nel laboratorio: il testo qui sopra è la versione di riferimento di cui si parla in classe, la scheda ne contiene uno scheletro con dei vuoti. Insistete su tre scelte: normalizzare la chiave, trattare maiuscole e minuscole con basi diverse, lasciare intatto tutto il resto. Le lettere accentate in UTF-8 occupano più byte e finiscono nel ramo else: restano invariate.' },
+
+  { sezione: 'Codice PHP', titolo: 'Il codice a confronto con i numeri',
+    contenuto: () => (
+      <Grid cols={2} className="split-code">
+        <Code title="cesare.php (estratto)" code={CODICE_EVID} highlight={[8]} />
+        <TracciaLettera />
+      </Grid>
+    ),
+    note: 'Cambiate lettera e chiave nel pannello di destra e verificate a voce i numeri. Provate: una minuscola, una cifra, una Z con chiave 3, una chiave 0. Le righe evidenziate a sinistra sono quelle che producono la tabella di destra.' },
+
+  { sezione: 'Attacco', titolo: 'Forza bruta: provare tutte le chiavi',
+    contenuto: () => (
+      <div className="stack">
+        <p>Le chiavi sono solo 25: un attaccante le prova <span className="hl">tutte</span> e legge quale risultato ha senso.</p>
+        <ForzaBruta />
+      </div>
+    ),
+    note: 'Nessuna sfida da risolvere qui: è una dimostrazione. Fate cercare la riga in cui compare una frase italiana, poi premete «Suggerisci» e discutete come il computer sceglie (confronta le frequenze delle lettere con quelle dell\'italiano). Il tempo mostrato è quello misurato in questo browser. Sul telefono il gioco usa la stessa idea.' },
+
+  { sezione: 'Attacco', titolo: 'Analisi delle frequenze',
+    contenuto: () => (
+      <div className="stack">
+        <p>In italiano alcune lettere sono molto più comuni (E, A, I, O). Cesare le sposta tutte della stessa quantità: <span className="hl">il profilo resta uguale, ma traslato</span>.</p>
+        <AnalisiFrequenze />
+      </div>
+    ),
+    note: 'Fate muovere il cursore finché i due grafici hanno le stesse «montagne»: lo spostamento trovato è la chiave. Il numero «differenza» scende quando i profili coincidono. Questo attacco non prova le 25 chiavi: guarda la statistica del testo, ed è la base per attaccare cifrari molto più forti (Vigenère, sostituzione generica). Funziona bene con testi lunghi; con testi corti i profili sono rumorosi.' },
+
+  { sezione: 'Debolezze', titolo: 'Perché Cesare non è sicuro',
+    contenuto: () => (
+      <div className="stack-lg">
+        <CompareTwo
+          left={{ icon: '✅', title: 'Cosa funziona', color: 'var(--success)', points: ['Semplice da spiegare e da programmare', 'Ottimo per capire chiave, algoritmo e attacco', 'Ha ispirato cifrari più robusti'] }}
+          right={{ icon: '❌', title: 'Cosa lo rompe', color: 'var(--danger)', points: ['Solo 25 chiavi: la forza bruta è immediata', 'Ogni lettera ha sempre la stessa sostituta', 'Le frequenze delle lettere restano visibili'] }} />
+        <Box type="tip" title="Principio di Kerckhoffs">
+          La sicurezza non deve dipendere dalla segretezza dell'algoritmo, ma solo da quella della chiave. Qui il problema è che le chiavi possibili sono troppo poche.
+        </Box>
+      </div>
+    ),
+    note: 'Sintesi delle due strade di attacco viste: forza bruta (poche chiavi) e frequenze (struttura del linguaggio che sopravvive). Il principio di Kerckhoffs (1883) è un riferimento ricorrente: lo ritroverete con DES, dove l\'algoritmo è pubblico e la sicurezza sta nella chiave, e con RSA. I moduli successivi mostrano come rimediare alle due debolezze.' },
+
+  { sezione: 'Riepilogo', titolo: 'Riepilogo e prossimi passi',
+    contenuto: () => (
+      <div className="stack-lg">
+        <ul>
+          <li>Cesare sposta ogni lettera di <span className="hl">k posti</span>: <span className="mono">E(x) = (x + k) mod 26</span>.</li>
+          <li>In PHP: <code>ord()</code>, <code>chr()</code>, <code>%</code>, con la correzione per i numeri negativi.</li>
+          <li>Si rompe con la <span className="hl">forza bruta</span> (25 chiavi) o con le <span className="hl">frequenze</span>.</li>
+        </ul>
+        <Grid cols={3} stretch>
+          <Card tone="accent"><h3>Laboratorio</h3><p className="small">Scrivi in PHP cifratura, decifratura e attacco.</p><ActivityBadge href="../lab-php/01-cesare/scheda.html" label="Scheda del lab" icon="🧪" /></Card>
+          <Card tone="info"><h3>Quiz</h3><p className="small">Verifica che i concetti siano chiari.</p><ActivityBadge href="../quiz/quiz.html" label="Vai al quiz" icon="✅" /></Card>
+          <Card tone="success"><h3>Avanti</h3><p className="small">Più chiavi, stessa idea: cifrario affine.</p><ActivityBadge href="../modulo-2-cesare-generalizzato/slide.html" stesso label="Modulo 2" icon="➡️" /></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Chiusura: tre messaggi da ricordare (formula, codice, due attacchi). Indicate il laboratorio PHP come naturale proseguimento: ci sono tre livelli, dal completamento di una funzione alla scrittura dell\'attacco. Il modulo 2 mostra come allargare lo spazio delle chiavi, ma non risolve da solo il problema delle frequenze.' },
+];
+
+Deck.mount(slides, { modulo: 1, nome: 'Il cifrario di Cesare', indice: '../index.html' });
+</script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La ruota di Cesare — simulazione</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  .ruota-box { max-width: 26rem; margin: 0 auto; }
+  .ruota { width: 100%; height: auto; display: block; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+  .ruota:active { cursor: grabbing; }
+  .ruota .anello-est { fill: var(--bg-light); stroke: var(--border); stroke-width: 2; }
+  .ruota .anello-int { fill: color-mix(in srgb, var(--accent) 14%, var(--bg-card)); stroke: var(--accent); stroke-width: 2; }
+  .ruota .centro { fill: var(--bg); stroke: var(--border); stroke-width: 2; }
+  .ruota text { font-family: var(--f-mono); font-weight: 600; text-anchor: middle; dominant-baseline: central; }
+  .ruota .l-est { fill: var(--text); font-size: 15px; }
+  .ruota .l-int { fill: var(--accent-alt); font-size: 14px; }
+  .ruota .k-num { fill: var(--accent-alt); font-size: 40px; font-family: var(--f-title); font-weight: 700; }
+  .ruota .k-lab { fill: var(--text-muted); font-size: 10px; letter-spacing: 1px; }
+  .ruota .evid { fill: none; stroke: var(--info-t); stroke-width: 3; }
+  .ruota .gruppo-int { transition: transform .25s ease; transform-origin: 180px 180px; }
+  @media (prefers-reduced-motion: reduce) { .ruota .gruppo-int { transition: none; } }
+  .k-ctrl { display: flex; align-items: center; justify-content: center; gap: .6rem; flex-wrap: wrap; }
+  .k-ctrl .btn { min-width: 52px; font-size: 1.2rem; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef } = React;
+const { Btn, Field, Box, PaginaGioco } = UI;
+const C = window.Cripto, A = C.ALFABETO, PASSO = 360 / 26, CX = 180, CY = 180;
+
+const pos = (i, r) => { const t = i * PASSO * Math.PI / 180; return [CX + r * Math.sin(t), CY - r * Math.cos(t)]; };
+const mod26 = (n) => ((n % 26) + 26) % 26;
+
+function Ruota({ giri, setGiri, evidenzia }) {
+  const k = mod26(giri), svgRef = useRef(null), drag = useRef(null);
+  const angolo = (e) => {
+    const r = svgRef.current.getBoundingClientRect();
+    return Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2))) * 180 / Math.PI;
+  };
+  const giu = (e) => { svgRef.current.setPointerCapture && svgRef.current.setPointerCapture(e.pointerId); drag.current = { a0: angolo(e), g0: giri }; };
+  const muovi = (e) => {
+    if (!drag.current) return;
+    let d = angolo(e) - drag.current.a0;
+    if (d > 180) d -= 360; if (d < -180) d += 360;
+    setGiri(drag.current.g0 - Math.round(d / PASSO));
+  };
+  const su = () => { drag.current = null; };
+  const lett = A.split('');
+  return (
+    <svg ref={svgRef} className="ruota" viewBox="0 0 360 360" role="img"
+         aria-label={'Ruota di Cesare con chiave ' + k + ': la A del cerchio esterno corrisponde alla ' + A[k] + ' del cerchio interno'}
+         onPointerDown={giu} onPointerMove={muovi} onPointerUp={su} onPointerCancel={su}>
+      <circle className="anello-est" cx={CX} cy={CY} r="172" />
+      <circle className="anello-int" cx={CX} cy={CY} r="128" />
+      <circle className="centro" cx={CX} cy={CY} r="88" />
+      {lett.map((l, i) => { const [x, y] = pos(i, 150); return <text key={'e' + i} className="l-est" x={x} y={y} transform={`rotate(${i * PASSO} ${x} ${y})`}>{l}</text>; })}
+      <g className="gruppo-int" style={{ transform: `rotate(${-giri * PASSO}deg)` }}>
+        {lett.map((l, i) => { const [x, y] = pos(i, 108); return <text key={'i' + i} className="l-int" x={x} y={y} transform={`rotate(${i * PASSO} ${x} ${y})`}>{l}</text>; })}
+        {evidenzia != null ? (() => { const [x, y] = pos(evidenzia.int, 108); return <circle className="evid" cx={x} cy={y} r="13" />; })() : null}
+      </g>
+      {evidenzia != null ? (() => { const [x, y] = pos(evidenzia.est, 150); return <circle className="evid" cx={x} cy={y} r="13" />; })() : null}
+      <text className="k-lab" x={CX} y={CY - 30}>CHIAVE</text>
+      <text className="k-num" x={CX} y={CY + 2}>{k}</text>
+      <text className="k-lab" x={CX} y={CY + 34}>A → {A[k]}</text>
+    </svg>
+  );
+}
+
+function App() {
+  const [giri, setGiri] = useState(() => UI.carica('ruota-k', 3));
+  const [testo, setTesto] = useState('Ciao a tutti');
+  const [modo, setModo] = useState('cifra');
+  const [lettera, setLettera] = useState('');
+  const k = mod26(giri);
+  const vai = (n) => { setGiri(n); UI.salva('ruota-k', mod26(n)); };
+  const impostaK = (v) => { const target = mod26(parseInt(v, 10) || 0); vai(giri + (((target - k + 13) % 26 + 26) % 26 - 13)); };
+  const out = modo === 'cifra' ? C.cesare(testo, k) : C.cesareDecifra(testo, k);
+  const L = (lettera || '').toUpperCase()[0];
+  const idx = L && L >= 'A' && L <= 'Z' ? L.charCodeAt(0) - 65 : null;
+  const evid = idx == null ? null : (modo === 'cifra' ? { est: idx, int: mod26(idx + k) } : { est: mod26(idx - k), int: idx });
+  return (
+    <PaginaGioco titolo="La ruota di Cesare" indietro="slide.html#7" indietroEtichetta="Modulo 1">
+      <p>Il cerchio interno ruota. La lettera sotto a una del cerchio esterno è la sua versione cifrata. Trascina la ruota, oppure usa i pulsanti.</p>
+      <div className="ruota-box">
+        <Ruota giri={giri} setGiri={(g) => { setGiri(g); UI.salva('ruota-k', mod26(g)); }} evidenzia={evid} />
+        <div className="k-ctrl mt">
+          <Btn onClick={() => vai(giri - 1)} aria-label="Chiave più piccola di uno">−</Btn>
+          <Field label="Chiave"><select className="input" value={k} onChange={e => impostaK(e.target.value)} aria-label="Chiave">
+            {Array.from({ length: 26 }, (_, i) => <option key={i} value={i}>{i}</option>)}
+          </select></Field>
+          <Btn onClick={() => vai(giri + 1)} aria-label="Chiave più grande di uno">+</Btn>
+        </div>
+      </div>
+
+      <div className="sim">
+        <div className="sim-title">Testo</div>
+        <div className="row">
+          <Btn variant={modo === 'cifra' ? 'primary' : ''} onClick={() => setModo('cifra')} aria-pressed={modo === 'cifra'}>Cifra</Btn>
+          <Btn variant={modo === 'decifra' ? 'primary' : ''} onClick={() => setModo('decifra')} aria-pressed={modo === 'decifra'}>Decifra</Btn>
+        </div>
+        <Field label="Scrivi qui" htmlFor="testo"><textarea id="testo" className="input" rows={2} value={testo} onChange={e => setTesto(e.target.value)} /></Field>
+        <div className="xs muted" style={{ textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600 }}>{modo === 'cifra' ? 'Testo cifrato' : 'Testo in chiaro'}</div>
+        <div className="out big" aria-live="polite">{out || ' '}</div>
+        <Field label="Segui una lettera sulla ruota" htmlFor="lett">
+          <input id="lett" className="input mono" maxLength={1} style={{ width: '5em' }} value={lettera} onChange={e => setLettera(e.target.value.slice(-1))} placeholder="es. M" />
+        </Field>
+        {idx != null ? <p className="small">{modo === 'cifra'
+          ? <>La <b className="hl">{A[idx]}</b> del cerchio esterno diventa la <b className="hl">{A[mod26(idx + k)]}</b> del cerchio interno.</>
+          : <>La <b className="hl">{A[idx]}</b> del cerchio interno torna alla <b className="hl">{A[mod26(idx - k)]}</b> del cerchio esterno.</>}</p> : null}
+      </div>
+
+      <Box type="tip" title="Per decifrare a mano">
+        Metti la lettera cifrata sul cerchio <em>interno</em> e leggi quella sopra, sul cerchio esterno.
+      </Box>
+      <p className="small muted mt">Vuoi mettere alla prova quello che hai capito? <a className="text-link" href="gioco-rompi-cesare.html">Gioco: rompi il messaggio</a></p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>
