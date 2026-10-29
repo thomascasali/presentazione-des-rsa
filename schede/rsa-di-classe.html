@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RSA di classe — scheda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/print.css">
+<style>
+  .scrollx { overflow-x: auto; max-width: 100%; }
+  .grande td { height: 9mm; }
+  .grande.alta td { height: 12mm; }
+  .passi td { height: 8mm; }
+  .sp { height: 22mm; border-bottom: 1px solid var(--p-line); }
+  .ex { break-inside: avoid; margin-bottom: 4mm; }
+  .ex .num { font-family: var(--f-mono); font-weight: 700; margin-right: 6pt; }
+  .sol { font-family: var(--f-mono); }
+</style>
+</head>
+<body>
+<div class="toolbar no-stampa"><a href="../index.html">← Indice</a><button onclick="window.print()">Stampa</button></div>
+<section class="sheet">
+  <div class="meta">Attività di classe · RSA</div>
+  <h1>RSA di classe</h1>
+  <p>Ognuno genera la propria coppia di chiavi, pubblica quella pubblica, riceve messaggi cifrati che solo lui può leggere e prova a rompere una chiave piccola. Si può usare il telefono (<span class="mono">modulo-8-rsa/gioco-rsa-di-classe.html</span> o il simulatore) oppure solo carta e calcolatrice.</p>
+  <h2>Come si procede</h2>
+  <ol>
+    <li><b>Genera la tua coppia.</b> Scegli due primi <i>p</i> e <i>q</i> (tra 11 e 97), calcola <i>n</i> = <i>p</i>·<i>q</i>, φ = (<i>p</i>−1)(<i>q</i>−1), un <i>e</i> coprimo con φ e <i>d</i> (inverso di <i>e</i> modulo φ).</li>
+    <li><b>Pubblica</b> nella tabella della classe solo <i>n</i> ed <i>e</i> accanto al tuo nome. <i>p</i>, <i>q</i>, φ e <i>d</i> restano segreti.</li>
+    <li><b>Scrivi a un compagno.</b> Scegli una chiave pubblica dalla tabella, trasforma il messaggio in numeri minori del suo <i>n</i> e cifralo con <i>c</i> = <i>m</i><sup><i>e</i></sup> mod <i>n</i>. Annota il cifrato nella tabella dei messaggi.</li>
+    <li><b>Leggi i tuoi messaggi.</b> Decifra i cifrati a te destinati con <i>m</i> = <i>c</i><sup><i>d</i></sup> mod <i>n</i>.</li>
+    <li><b>Attaccante.</b> Prova a rompere la chiave di un compagno dalla tabella: fattorizza <i>n</i>, trova <i>d</i> e decifra un messaggio intercettato.</li>
+  </ol>
+  <div class="nota"><b>Codifica delle lettere</b> (due cifre per lettera, blocchi con valore minore di <i>n</i>):
+    <div class="scrollx"><table class="grande"><tr><td class="mono">A=01</td><td class="mono">B=02</td><td class="mono">C=03</td><td class="mono">D=04</td><td class="mono">E=05</td><td class="mono">F=06</td><td class="mono">G=07</td><td class="mono">H=08</td><td class="mono">I=09</td><td class="mono">J=10</td><td class="mono">K=11</td><td class="mono">L=12</td><td class="mono">M=13</td></tr><tr><td class="mono">N=14</td><td class="mono">O=15</td><td class="mono">P=16</td><td class="mono">Q=17</td><td class="mono">R=18</td><td class="mono">S=19</td><td class="mono">T=20</td><td class="mono">U=21</td><td class="mono">V=22</td><td class="mono">W=23</td><td class="mono">X=24</td><td class="mono">Y=25</td><td class="mono">Z=26</td><td></td></tr></table></div>
+    Con <i>n</i> minore di 2626 si cifra una lettera per volta (come un cifrario di sostituzione); con <i>n</i> da 2627 in su si possono unire due lettere (esempio: CIAO → 0309 0115).</div>
+
+  <h2>1 · Le mie chiavi (la tua riga resta privata)</h2>
+  <div class="scrollx"><table class="grande alta">
+    <tr><th>p</th><th>q</th><th>n = p·q</th><th>φ = (p−1)(q−1)</th><th>e</th><th>d</th></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  </table></div>
+  <p class="small">Verifica: <i>e</i> · <i>d</i> = <span class="vuoto" style="min-width:5em"></span> = <span class="vuoto" style="min-width:3em"></span> · φ + 1 &nbsp; (il resto deve essere 1).</p>
+
+  <h2>2 · Chiavi pubbliche della classe</h2>
+  <div class="scrollx"><table class="grande">
+    <tr><th style="width:38%">Nome</th><th>n</th><th>e</th></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td></tr>
+  </table></div>
+</section>
+<section class="sheet">
+  <h2>3 · Messaggi cifrati</h2>
+  <div class="scrollx"><table class="grande alta">
+    <tr><th>Da</th><th>A</th><th>Messaggio in chiaro (numeri o lettere)</th><th>Cifrato <i>c</i></th></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+  </table></div>
+  <h2>4 · Messaggi che ho ricevuto e decifrato</h2>
+  <div class="scrollx"><table class="grande alta">
+    <tr><th>Da</th><th>Cifrato <i>c</i></th><th>Calcolo <i>c<sup>d</sup></i> mod <i>n</i></th><th>Messaggio</th></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td></tr>
+  </table></div>
+  <h2>5 · Attacco a una chiave piccola</h2>
+  <div class="scrollx"><table class="grande alta">
+    <tr><th>Chiave di</th><th>n</th><th>e</th><th>p · q</th><th>φ</th><th>d</th></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  </table></div>
+  <p>Messaggio intercettato <i>c</i> = <span class="vuoto" style="min-width:5em"></span> &nbsp; decifrato <i>m</i> = <span class="vuoto" style="min-width:5em"></span> &nbsp; lettere: <span class="vuoto" style="min-width:6em"></span></p>
+  <div class="nota"><b>Per discutere.</b> Quanto tempo hai impiegato per fattorizzare un <i>n</i> di 4 cifre? E se <i>n</i> avesse 617 cifre (RSA-2048)? Perché cifrare con la chiave pubblica di un compagno non permette agli altri di leggere?</div>
+</section>
+</body>
+</html>

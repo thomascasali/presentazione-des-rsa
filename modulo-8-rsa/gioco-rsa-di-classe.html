@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RSA di classe — gioco</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<script src="../modulo-7-matematica-rsa/mat-ui.js"></script>
+<script src="rsa-ui.js"></script>
+<style>
+  .tabs { display: flex; gap: .4rem; margin: .5rem 0 .8rem; }
+  .tabs .btn { flex: 1; padding-left: .2rem; padding-right: .2rem; font-size: .95rem; }
+  .due { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+  .eq { font-family: var(--f-mono); overflow-wrap: anywhere; font-size: .95rem; }
+  .lavagna { font-family: var(--f-mono); font-size: 1.6rem; font-weight: 600; color: var(--accent-alt); text-align: center; background: #0e0c0a; border: 2px dashed var(--accent); border-radius: 12px; padding: .8rem; line-height: 1.3; overflow-wrap: anywhere; }
+  .lavagna small { display: block; font-size: .85rem; color: var(--text-muted); font-weight: 500; }
+  .segreta { font-family: var(--f-mono); font-size: 1.1rem; color: var(--danger-t); background: var(--bg-card); border: 2px solid var(--danger); border-radius: 10px; padding: .6rem .8rem; overflow-wrap: anywhere; }
+  .statistiche { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; text-align: center; }
+  .statistiche div { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: .4rem; }
+  .statistiche b { display: block; font-family: var(--f-mono); font-size: 1.3rem; color: var(--accent-alt); }
+  .statistiche span { font-size: .8rem; color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Btn, Box, Field, Chip, PaginaGioco } = UI;
+const { num, fmt, CampoNum } = MatUI;
+const R = window.RsaUI, C = window.Cripto;
+
+/* Chiave salvata solo su questo telefono: stringhe decimali (JSON non conosce BigInt). */
+const daSalvata = (s) => s ? { p: BigInt(s.p), q: BigInt(s.q), e: BigInt(s.e), d: BigInt(s.d), n: BigInt(s.n) } : null;
+const inSalvata = (k) => ({ p: String(k.p), q: String(k.q), e: String(k.e), d: String(k.d), n: String(k.n) });
+
+function MiaChiave({ chiave, setChiave }) {
+  const [mostra, setMostra] = useState(false);
+  const genera = () => { const k = R.coppiaCasuale(); setChiave(k); UI.salva('rsa-classe-chiave', inSalvata(k)); setMostra(false); };
+  return (
+    <div className="stack">
+      <p>Genera la tua coppia di chiavi (primi piccoli, scelti a caso). Poi <b>scrivi alla lavagna o sulla scheda la chiave pubblica</b> con il tuo nome. La chiave privata resta solo su questo telefono.</p>
+      <Btn variant="primary" onClick={genera}>{chiave ? 'Genera una nuova coppia' : 'Genera la mia coppia'}</Btn>
+      {chiave ? (<>
+        <div className="lavagna"><small>Chiave pubblica da scrivere alla lavagna</small>n = {String(chiave.n)}<br />e = {String(chiave.e)}</div>
+        <Btn onClick={() => setMostra(v => !v)} aria-pressed={mostra}>{mostra ? 'Nascondi la chiave privata' : 'Mostra la chiave privata'}</Btn>
+        {mostra ? <div className="segreta">d = {String(chiave.d)}<br /><span className="small">p = {String(chiave.p)}, q = {String(chiave.q)}, φ(n) = {String(chiave.phi || (chiave.p - 1n) * (chiave.q - 1n))}<br />Non mostrarla a nessuno!</span></div> : null}
+        <p className="small muted">Con una nuova coppia i messaggi cifrati per la vecchia chiave non si leggono più.</p>
+      </>) : null}
+    </div>
+  );
+}
+
+function Scrivo() {
+  const [n, setN] = useState(''), [e, setE] = useState(''), [modo, setModo] = useState('numero');
+  const [m, setM] = useState(''), [t, setT] = useState('');
+  const N = num(n), E = num(e);
+  const chiaveOk = N !== null && E !== null && N > 26n && E > 1n && E < N;
+  let blocchi = null, err = null, L = 0;
+  if (chiaveOk) {
+    if (modo === 'numero') { const x = num(m); if (x === null || x < 0n) err = m ? 'Scrivi un numero intero non negativo.' : null; else if (x >= N) err = 'Il numero deve essere minore di n = ' + fmt(N) + '.'; else blocchi = [x]; }
+    else { const cd = R.codificaTesto(t, N); if (!cd) err = 'n è troppo piccolo.'; else if (cd.blocchi.length) { blocchi = cd.blocchi; L = cd.L; } }
+  }
+  const cif = blocchi ? blocchi.map(x => C.potenzaModulare(x, E, N)) : null;
+  return (
+    <div className="stack">
+      <p>Copia dalla lavagna la <b>chiave pubblica di un compagno</b> e cifra per lui un numero o una parola.</p>
+      <div className="due">
+        <CampoNum label="n del compagno" value={n} onChange={setN} max={10} />
+        <CampoNum label="e del compagno" value={e} onChange={setE} max={10} />
+      </div>
+      {!chiaveOk && (n || e) ? <p className="small t-warn">Servono due numeri: n maggiore di 26 ed e tra 2 e n.</p> : null}
+      <div className="tabs" role="group" aria-label="Tipo di messaggio">
+        <Btn variant={modo === 'numero' ? 'primary' : ''} aria-pressed={modo === 'numero'} onClick={() => setModo('numero')}>Un numero</Btn>
+        <Btn variant={modo === 'testo' ? 'primary' : ''} aria-pressed={modo === 'testo'} onClick={() => setModo('testo')}>Una parola</Btn>
+      </div>
+      {modo === 'numero' ? <CampoNum label="Numero da cifrare" value={m} onChange={setM} max={10} />
+        : <Field label="Parola (solo lettere)" htmlFor="g-t"><input id="g-t" className="input mono" value={t} onChange={x => setT(x.target.value.slice(0, 20))} /></Field>}
+      {err ? <div className="feedback ko" role="status">{err}</div> : null}
+      {cif ? (<>
+        <p className="eq">{blocchi.map((x, i) => <span key={i}>{fmt(x)}^{fmt(E)} mod {fmt(N)} = <b className="hl">{fmt(cif[i])}</b><br /></span>)}</p>
+        <div className="lavagna"><small>Cifrato: scrivilo alla lavagna per il compagno</small>{cif.map(String).join(' ')}</div>
+        {modo === 'testo' ? <p className="small muted">Blocchi di {L} {L === 1 ? 'lettera' : 'lettere'} (A=01 … Z=26).</p> : null}
+      </>) : null}
+    </div>
+  );
+}
+
+function Leggo({ chiave }) {
+  const [s, setS] = useState('');
+  if (!chiave) return <Box type="warn" title="Serve la tua chiave">Vai alla scheda «La mia chiave» e genera la tua coppia.</Box>;
+  const lista = R.listaNumeri(s);
+  const dec = lista ? lista.map(c => C.potenzaModulare(c, chiave.d, chiave.n)) : null;
+  const L = R.lettereBlocco(chiave.n);
+  return (
+    <div className="stack">
+      <p>Copia dalla lavagna il numero (o i numeri) cifrato per te e decifralo con la tua chiave <b>privata</b>.</p>
+      <Field label="Numeri cifrati (separati da spazi)" htmlFor="g-c"><input id="g-c" className="input mono" inputMode="numeric" value={s} onChange={x => setS(x.target.value)} /></Field>
+      {s && !lista ? <p className="small t-warn">Scrivi solo numeri separati da spazi.</p> : null}
+      {dec ? (<>
+        <p className="eq">{lista.map((c, i) => <span key={i}>{fmt(c)}^d mod {fmt(chiave.n)} = <b className="hl">{fmt(dec[i])}</b><br /></span>)}</p>
+        <div className="out">{dec.map(String).join(' ')}</div>
+        {L ? <p>Se era una parola: <span className="mono hl">{R.decodificaBlocchi(dec, L)}</span></p> : null}
+        <p className="small muted">Un numero maggiore o uguale a n ({String(chiave.n)}) non può essere un messaggio valido per la tua chiave.</p>
+      </>) : null}
+    </div>
+  );
+}
+
+/* Modalità attaccante: n piccolo, cifrato intercettato; prima p e q, poi d, poi il messaggio. */
+function nuovaSfida() {
+  const k = R.coppiaCasuale();
+  const parola = Math.random() < 0.5;
+  let m, cif, L = 0, chiaro = null;
+  if (parola && R.lettereBlocco(k.n)) {
+    const lista = ['SI', 'NO', 'SOLE', 'RETE', 'CODICE', 'RSA', 'PRIMO', 'CHIAVE'];
+    chiaro = lista[R.casuale(0, lista.length - 1)];
+    const cd = R.codificaTesto(chiaro, k.n); L = cd.L; m = cd.blocchi;
+  } else { m = [BigInt(R.casuale(2, Number(k.n) - 1))]; }
+  cif = m.map(x => C.rsa.cifra(x, k.pub));
+  return { k, m, cif, L, chiaro };
+}
+function Attacco() {
+  const [s, setS] = useState(() => nuovaSfida());
+  const [pq, setPq] = useState(['', '']), [dv, setDv] = useState(''), [mv, setMv] = useState('');
+  const [prova, setProva] = useState('');
+  const [esito, setEsito] = useState(null);
+  const [risolti, setRisolti] = useState(() => UI.carica('rsa-attacchi', 0));
+  const reset = () => { setS(nuovaSfida()); setPq(['', '']); setDv(''); setMv(''); setProva(''); setEsito(null); };
+  const P = num(pq[0]), Q = num(pq[1]), D = num(dv);
+  const fattoriOk = P !== null && Q !== null && P > 1n && Q > 1n && P * Q === s.k.n;
+  const dOk = D !== null && D === s.k.d;
+  const controlla = () => {
+    const stringaM = mv.trim();
+    const ok = R.listaNumeri(stringaM) && R.listaNumeri(stringaM).every((x, i) => x === s.m[i]) && R.listaNumeri(stringaM).length === s.m.length;
+    const okParola = s.chiaro && stringaM.toUpperCase().replace(/[^A-Z]/g, '') === s.chiaro;
+    if (ok || okParola) { const n = risolti + 1; setRisolti(n); UI.salva('rsa-attacchi', n); setEsito('ok'); } else setEsito('ko');
+  };
+  const t = num(prova);
+  return (
+    <div className="stack">
+      <p>Sei l'<b>attaccante</b>: conosci solo la chiave pubblica e un messaggio intercettato. Trova la chiave privata.</p>
+      <div className="lavagna"><small>Chiave pubblica</small>n = {String(s.k.n)}, e = {String(s.k.e)}<small style={{ marginTop: '.5rem' }}>Messaggio intercettato</small>{s.cif.map(String).join(' ')}</div>
+      <ol className="small">
+        <li>Fattorizza n: trova i due primi p e q.</li>
+        <li>Calcola φ(n) = (p−1)(q−1) e poi d, inverso di e modulo φ(n) (Euclide esteso).</li>
+        <li>Decifra con <span className="mono">c^d mod n</span>{s.chiaro ? ' (è una parola: A=01 … Z=26)' : ''}.</li>
+      </ol>
+      <div className="sim">
+        <div className="sim-title">Prova una divisione</div>
+        <div className="row">
+          <Field label="n diviso per…" className="grow"><input className="input mono" inputMode="numeric" value={prova} onChange={x => setProva(x.target.value.replace(/\D/g, '').slice(0, 6))} aria-label="Divisore da provare" /></Field>
+        </div>
+        {t && t > 1n ? <p className="eq">{String(s.k.n)} ÷ {String(t)} → resto <b className={s.k.n % t === 0n ? 't-success' : 'hl'}>{String(s.k.n % t)}</b>{s.k.n % t === 0n ? ' → divisore trovato! quoziente ' + String(s.k.n / t) : ''}</p> : null}
+      </div>
+      <div className="due">
+        <CampoNum label="p trovato" value={pq[0]} onChange={v => setPq([v, pq[1]])} max={6} />
+        <CampoNum label="q trovato" value={pq[1]} onChange={v => setPq([pq[0], v])} max={6} />
+      </div>
+      {(pq[0] || pq[1]) ? <p className="small">{fattoriOk ? <b className="t-success">p · q = n: ottimo!</b> : <span className="t-warn">p · q non dà n.</span>}</p> : null}
+      <CampoNum label="d trovato" value={dv} onChange={setDv} max={10} />
+      {dv ? <p className="small">{dOk ? <b className="t-success">d corretto: e · d ≡ 1 (mod φ).</b> : <span className="t-warn">d non è ancora quello giusto.</span>}</p> : null}
+      <Field label="Messaggio decifrato (numero/i o parola)" htmlFor="g-m"><input id="g-m" className="input mono" value={mv} onChange={x => setMv(x.target.value)} /></Field>
+      <div className="row">
+        <Btn variant="primary" onClick={controlla} disabled={!mv.trim()}>Controlla</Btn>
+        <Btn variant="ghost" onClick={() => setEsito('resa')}>Mi arrendo</Btn>
+        <Btn variant="ghost" onClick={reset}>Nuova sfida</Btn>
+      </div>
+      {esito === 'ok' ? <div className="feedback ok" role="status"><b>Chiave rotta!</b> Hai fattorizzato n e letto il messaggio. Con 2048 bit questo non è possibile.</div> : null}
+      {esito === 'ko' ? <div className="feedback ko" role="status">Non è il messaggio giusto. Controlla p, q e d.</div> : null}
+      {esito === 'resa' ? <div className="feedback" role="status">n = {String(s.k.p)} · {String(s.k.q)}; d = {String(s.k.d)}; messaggio: {s.chiaro ? s.chiaro + ' (' + s.m.map(String).join(' ') + ')' : s.m.map(String).join(' ')}.</div> : null}
+      <p className="small muted">Sfide risolte su questo telefono: <b className="hl">{risolti}</b></p>
+    </div>
+  );
+}
+
+function App() {
+  const [scheda, setScheda] = useState(UI.carica('rsa-classe-scheda', 'chiave'));
+  const [chiave, setChiaveS] = useState(() => { try { return daSalvata(UI.carica('rsa-classe-chiave', null)); } catch (x) { return null; } });
+  const setChiave = (k) => setChiaveS(k);
+  const vai = (s) => { setScheda(s); UI.salva('rsa-classe-scheda', s); };
+  const sch = [['chiave', 'La mia chiave'], ['scrivo', 'Scrivo'], ['leggo', 'Leggo'], ['attacco', 'Attacco']];
+  return (
+    <PaginaGioco titolo="RSA di classe" indietro="slide.html#15" indietroEtichetta="Modulo 8">
+      <div className="tabs" role="group" aria-label="Sezioni">
+        {sch.map(([k, t]) => <Btn key={k} variant={scheda === k ? 'primary' : ''} aria-pressed={scheda === k} onClick={() => vai(k)}>{t}</Btn>)}
+      </div>
+      {scheda === 'chiave' ? <MiaChiave chiave={chiave} setChiave={setChiave} /> : null}
+      {scheda === 'scrivo' ? <Scrivo /> : null}
+      {scheda === 'leggo' ? <Leggo chiave={chiave} /> : null}
+      {scheda === 'attacco' ? <Attacco /> : null}
+      <p className="small muted mt-lg">La chiave privata e i punteggi restano solo su questo telefono. Nessun dato viene raccolto. Per capire i passaggi: <a className="text-link" href="simulazione-rsa.html">simulatore RSA</a>.</p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>

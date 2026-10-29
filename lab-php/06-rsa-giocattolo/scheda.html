@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab PHP 06 — RSA giocattolo (scheda)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/print.css">
+</head>
+<body>
+<div class="toolbar no-stampa">
+  <a href="../../index.html">← Indice</a>
+  <button onclick="window.print()">Stampa la scheda</button>
+</div>
+
+<section class="sheet">
+  <div class="meta">Laboratorio PHP 06 · Sistemi e Reti</div>
+  <h1>RSA giocattolo in PHP</h1>
+  <p>Scrivi in PHP le funzioni che generano le chiavi RSA, cifrano e decifrano, e poi rompi una chiave troppo piccola. Lavori nel file <code>esercizio.php</code>; il file <code>test.php</code> controlla il tuo codice con dei casi noti.</p>
+
+  <h2>Prima di iniziare</h2>
+  <p><b>Gli ingredienti.</b> Li trovi nelle slide del modulo 7 (matematica) e del modulo 8 (RSA). Con l'esempio <i>p</i> = 61, <i>q</i> = 53, <i>e</i> = 17:</p>
+  <table>
+    <tr><th>Passo</th><th>Formula</th><th>Esempio</th></tr>
+    <tr><td>modulo</td><td class="mono">n = p · q</td><td class="mono">3233</td></tr>
+    <tr><td>phi</td><td class="mono">φ = (p − 1)(q − 1)</td><td class="mono">3120</td></tr>
+    <tr><td>chiave privata</td><td class="mono">d = e⁻¹ mod φ</td><td class="mono">2753</td></tr>
+    <tr><td>cifra</td><td class="mono">c = m^e mod n</td><td class="mono">65 → 2790</td></tr>
+    <tr><td>decifra</td><td class="mono">m = c^d mod n</td><td class="mono">2790 → 65</td></tr>
+  </table>
+  <table>
+    <tr><th>In PHP</th><th>Cosa fa</th><th>Esempio</th></tr>
+    <tr><td class="mono">$a % $b</td><td>resto della divisione</td><td class="mono">3120 % 17 vale 9</td></tr>
+    <tr><td class="mono">intdiv($a, $b)</td><td>quoziente intero</td><td class="mono">intdiv(3120, 17) vale 183</td></tr>
+    <tr><td class="mono">$e &amp; 1</td><td>bit meno significativo</td><td class="mono">17 &amp; 1 vale 1</td></tr>
+    <tr><td class="mono">$e &gt;&gt;= 1</td><td>scorre l'esponente a destra di un bit</td><td class="mono">17 diventa 8</td></tr>
+    <tr><td class="mono">[$a, $b] = [$b, $a % $b]</td><td>assegna due variabili insieme</td><td>scambio per Euclide</td></tr>
+  </table>
+  <div class="nota attenzione"><b>Limite degli interi.</b> In PHP un <code>int</code> ha 64 bit (massimo circa 9,2 · 10<sup>18</sup>). Nelle moltiplicazioni modulari il prodotto di due numeri minori di <i>n</i> deve stare in un int: l'esercizio funziona per <i>n</i> fino a circa 3 miliardi. Le chiavi vere (2048 bit) richiedono numeri molto più grandi: in PHP si usano le estensioni <b>GMP</b> (<code>gmp_powm</code>, <code>gmp_invert</code>) o <b>bcmath</b> (<code>bcpowmod</code>), oppure <code>openssl</code>.</div>
+
+  <h2><span class="livello">Livello 1</span> Completa le funzioni</h2>
+  <p>In <code>esercizio.php</code> sostituisci i <code>TODO 1</code> e <code>TODO 2</code>:</p>
+  <ul>
+    <li><code>mcd(int $a, int $b): int</code>: algoritmo di Euclide con un ciclo <code>while</code>.</li>
+    <li><code>potenzaModulare(int $base, int $esp, int $mod): int</code>: <i>square-and-multiply</i>. Non calcolare mai <code>$base ** $esp</code>: sarebbe un numero enorme.</li>
+  </ul>
+  <p><b>Prima di scrivere, rispondi a mano:</b> in binario 17 si scrive <span class="vuoto" style="min-width:6em"></span>. Quanti quadrati e quante moltiplicazioni servono per 65<sup>17</sup> mod 3233?</p>
+  <p class="righe"></p><p class="righe"></p>
+  <p><b>Controllo:</b> da terminale <code>php test.php</code>. Il livello è finito quando tutti i test «Livello 1» sono OK.</p>
+</section>
+
+<section class="sheet">
+  <h2><span class="livello">Livello 2</span> Scrivi le funzioni di RSA</h2>
+  <p>Scrivi il corpo di queste funzioni (nomi e firme sono fissati nel file):</p>
+  <ol>
+    <li><code>euclideEsteso(int $a, int $b): array</code> restituisce <code>[g, x, y]</code> con <code>$a*x + $b*y = g</code>.</li>
+    <li><code>inversoModulare(int $a, int $m): ?int</code> usa <code>euclideEsteso()</code>; restituisce <code>null</code> se <code>mcd</code> è diverso da 1. Attenzione ai numeri negativi!</li>
+    <li><code>generaChiavi(int $p, int $q, int $e): ?array</code> restituisce <code>['n', 'phi', 'e', 'd']</code>, oppure <code>null</code> se <i>e</i> non è coprimo con φ.</li>
+    <li><code>cifra()</code> e <code>decifra()</code>: usano <code>potenzaModulare()</code>.</li>
+  </ol>
+  <p><b>Prova a mano:</b> con <i>p</i> = 17, <i>q</i> = 11, <i>e</i> = 7 calcola <i>n</i> = <span class="vuoto" style="min-width:4em"></span>, φ = <span class="vuoto" style="min-width:4em"></span>, e verifica che <i>d</i> = 23 sia l'inverso di 7 modulo φ: 7 · 23 = <span class="vuoto" style="min-width:4em"></span> = <span class="vuoto" style="min-width:3em"></span> · φ + 1.</p>
+  <div class="nota">Firmare e verificare non richiedono funzioni nuove: la firma è <code>decifra($m, $d, $n)</code> e la verifica è <code>cifra($firma, $e, $n)</code>. Il test lo controlla.</div>
+
+  <h2><span class="livello">Livello 3</span> Scrivi l'attacco</h2>
+  <p>Un attaccante conosce solo la chiave pubblica <code>(n, e)</code>. Scrivi:</p>
+  <ol>
+    <li><code>fattorizza(int $n): array</code> restituisce <code>[p, q]</code> provando i divisori fino a √<i>n</i> (oppure <code>[]</code> se <i>n</i> è primo).</li>
+    <li><code>attaccoRSA(int $n, int $e): ?int</code> restituisce la chiave privata <i>d</i> a partire da <i>n</i> ed <i>e</i>.</li>
+  </ol>
+  <p><b>Per riflettere:</b> quante divisioni al massimo fa <code>fattorizza()</code> con <i>n</i> = 3233? E con un <i>n</i> di 13 cifre? Che cosa succederebbe con un <i>n</i> di 617 cifre (RSA-2048)?</p>
+  <p class="righe"></p><p class="righe"></p>
+
+  <h2>Come eseguire i test</h2>
+  <table>
+    <tr><th>Da terminale</th><td class="mono">cd lab-php/06-rsa-giocattolo<br>php test.php</td></tr>
+    <tr><th>Con XAMPP</th><td>copia la cartella in <span class="mono">htdocs</span> e apri <span class="mono">http://localhost/…/06-rsa-giocattolo/test.php</span></td></tr>
+  </table>
+  <p>Ogni riga è <b>OK</b> oppure <b>ERRORE</b>, con il valore atteso e quello ottenuto. In fondo c'è un riepilogo per livello.</p>
+
+  <h2>Consegna</h2>
+  <p>Il file <code>esercizio.php</code> con i tre livelli completati e il riepilogo di <code>test.php</code>.</p>
+  <p>Nome e cognome: <span class="vuoto" style="min-width:14em"></span> &nbsp; Classe: <span class="vuoto" style="min-width:5em"></span> &nbsp; Test superati: <span class="vuoto" style="min-width:4em"></span> / 40</p>
+</section>
+</body>
+</html>

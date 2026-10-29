@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulatore RSA — giocattolo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<script src="../modulo-7-matematica-rsa/mat-ui.js"></script>
+<script src="rsa-ui.js"></script>
+<style>
+  .due { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+  .tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin: .3rem 0; }
+  .tabs .btn { flex: 1 1 6rem; }
+  .eq { font-family: var(--f-mono); overflow-wrap: anywhere; font-size: .95rem; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .chiave { border-radius: 10px; padding: .5rem .8rem; border: 2px solid var(--border); background: var(--bg-card); font-family: var(--f-mono); overflow-wrap: anywhere; }
+  .chiave.pub { border-color: var(--info); } .chiave.priv { border-color: var(--danger); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+const { Btn, Box, Chip, Field, PaginaGioco } = UI;
+const { num, fmt, CampoNum, TabInverso } = MatUI;
+const R = window.RsaUI, C = window.Cripto;
+
+function Chiavi({ onKeys }) {
+  const [p, setP] = useState(UI.carica('rsa-p', '61'));
+  const [q, setQ] = useState(UI.carica('rsa-q', '53'));
+  const [e, setE] = useState(UI.carica('rsa-e', '17'));
+  const P = num(p), Q = num(q), E = num(e);
+  const pOk = P !== null && C.isPrimo(P), qOk = Q !== null && C.isPrimo(Q);
+  let K = null, err = null;
+  try { if (!pOk || !qOk) throw new RangeError('p e q devono essere due numeri primi.'); if (E === null) throw new RangeError('Scrivi e.'); K = C.rsa.genera(P, Q, E); } catch (x) { err = x.message; }
+  const salva = (k, v, set) => { set(v); UI.salva(k, v); };
+  const validi = (pOk && qOk && P !== Q) ? R.esponentiValidi((P - 1n) * (Q - 1n)).filter(x => x > 2).slice(0, 8) : [];
+  React.useEffect(() => { onKeys(K); }, [p, q, e]);
+  return (
+    <div className="sim">
+      <div className="sim-title">1 · Scegli p, q ed e</div>
+      <div className="due">
+        <CampoNum label="p (primo)" value={p} onChange={v => salva('rsa-p', v, setP)} max={8} />
+        <CampoNum label="q (primo)" value={q} onChange={v => salva('rsa-q', v, setQ)} max={8} />
+      </div>
+      <div className="chip-row">
+        <Chip color={pOk ? 'success' : 'danger'}>p {pOk ? 'è primo' : 'non è primo'}</Chip>
+        <Chip color={qOk ? 'success' : 'danger'}>q {qOk ? 'è primo' : 'non è primo'}</Chip>
+        {pOk && qOk && P === Q ? <Chip color="danger">p e q devono essere diversi</Chip> : null}
+      </div>
+      <div className="row">
+        <Btn small onClick={() => { salva('rsa-p', '61', setP); salva('rsa-q', '53', setQ); salva('rsa-e', '17', setE); }}>Esempio 61, 53, 17</Btn>
+        <Btn small onClick={() => { const a = R.primoCasuale(11, 97), b = R.primoCasuale(11, 97, a); salva('rsa-p', String(a), setP); salva('rsa-q', String(b), setQ); const es = R.esponentiValidi((a - 1) * (b - 1)).filter(x => x > 2 && x < 40); salva('rsa-e', String(es[0]), setE); }}>Primi a caso</Btn>
+      </div>
+      <CampoNum label="e (esponente pubblico)" value={e} onChange={v => salva('rsa-e', v, setE)} max={8} />
+      {validi.length ? <p className="small muted">Valori possibili di e (coprimi con φ): {validi.join(', ')}…</p> : null}
+      {err ? <div className="feedback ko" role="status">{err}</div> : (
+        <div className="stack">
+          <p className="eq">n = {fmt(P)} · {fmt(Q)} = <b className="hl">{fmt(K.n)}</b><br />φ(n) = {fmt(P - 1n)} · {fmt(Q - 1n)} = <b className="hl">{fmt(K.phi)}</b><br />MCD({fmt(K.e)}, {fmt(K.phi)}) = <b className="t-success">1</b></p>
+          <div className="sim-title" style={{ marginTop: '.4rem' }}>2 · Calcola d (Euclide esteso)</div>
+          <TabInverso a={K.e} m={K.phi} />
+          <div className="chiave pub"><b>Chiave pubblica</b> (e, n) = ({fmt(K.e)}, {fmt(K.n)})</div>
+          <div className="chiave priv"><b>Chiave privata</b> (d, n) = ({fmt(K.d)}, {fmt(K.n)})</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Operazioni({ K }) {
+  const [modo, setModo] = useState('numero');
+  const [op, setOp] = useState('cifra');
+  const [m, setM] = useState('65');
+  const [testo, setTesto] = useState('CIAO');
+  const [lista, setLista] = useState('2790');
+  const [fir, setFir] = useState('588');
+  if (!K) return <div className="sim"><div className="sim-title">3 · Messaggi</div><p className="small muted">Prima scegli chiavi valide.</p></div>;
+  const tm = num(m);
+  let voci = null, errM = null, L = 0;
+  if (modo === 'numero') { if (tm === null || tm < 0n) errM = 'Scrivi un numero intero non negativo.'; else if (tm >= K.n) errM = 'Il numero deve essere minore di n = ' + fmt(K.n) + '.'; else voci = [tm]; }
+  else { const cd = R.codificaTesto(testo, K.n); if (!cd) errM = 'n è troppo piccolo per codificare le lettere.'; else if (!cd.blocchi.length) errM = 'Scrivi almeno una lettera.'; else { voci = cd.blocchi; L = cd.L; } }
+  const sorgente = (modo === 'testo' && voci) ? <p className="small muted">Codifica A=01…Z=26, blocchi di {L} {L === 1 ? 'lettera' : 'lettere'}: <span className="mono">{R.codificaTesto(testo, K.n).cifre.join(' ')}</span></p> : null;
+  let ris = null;
+  if (op === 'cifra' && voci) {
+    const c = voci.map(x => C.rsa.cifra(x, K.pub));
+    ris = <div className="stack"><p className="eq">c = m^e mod n</p>{voci.map((x, i) => <p key={i} className="eq">{fmt(x)}^{fmt(K.e)} mod {fmt(K.n)} = <b className="hl">{fmt(c[i])}</b></p>)}<div className="out">{c.map(String).join(' ')}</div></div>;
+  } else if (op === 'firma' && voci) {
+    const s = voci.map(x => C.rsa.firma(x, K.priv));
+    ris = <div className="stack"><p className="eq">s = m^d mod n</p>{voci.map((x, i) => <p key={i} className="eq">{fmt(x)}^{fmt(K.d)} mod {fmt(K.n)} = <b className="hl">{fmt(s[i])}</b></p>)}<div className="out">{s.map(String).join(' ')}</div></div>;
+  }
+  const lc = R.listaNumeri(lista), lf = R.listaNumeri(fir);
+  let dec = null;
+  if (op === 'decifra') {
+    if (!lc) dec = <p className="small muted">Scrivi uno o più numeri separati da spazi.</p>;
+    else {
+      const d = lc.map(c => C.rsa.decifra(c, K.priv));
+      dec = <div className="stack"><p className="eq">m = c^d mod n</p>{lc.map((c, i) => <p key={i} className="eq">{fmt(c)}^{fmt(K.d)} mod {fmt(K.n)} = <b className="hl">{fmt(d[i])}</b></p>)}
+        <div className="out">{d.map(String).join(' ')}</div>
+        {R.lettereBlocco(K.n) ? <p className="small">Se era una parola: <span className="mono hl">{R.decodificaBlocchi(d, R.lettereBlocco(K.n))}</span></p> : null}</div>;
+    }
+  }
+  let ver = null;
+  if (op === 'verifica') {
+    if (!lf || !voci) ver = <p className="small muted">{errM || 'Scrivi le firme (numeri separati da spazi).'}</p>;
+    else if (lf.length !== voci.length) ver = <p className="small t-warn">Servono {voci.length} firme, una per blocco del messaggio.</p>;
+    else {
+      const ok = lf.map((s, i) => C.rsa.verifica(s, voci[i], K.pub)), tutte = ok.every(Boolean);
+      ver = <div className="stack">{lf.map((s, i) => <p key={i} className="eq">{fmt(s)}^{fmt(K.e)} mod {fmt(K.n)} = <b className="hl">{fmt(C.potenzaModulare(s, K.e, K.n))}</b> {ok[i] ? '= ' : '≠ '}{fmt(voci[i])}</p>)}
+        <div className={'feedback ' + (tutte ? 'ok' : 'ko')} role="status">{tutte ? 'Firma valida: il messaggio è autentico.' : 'Firma NON valida.'}</div></div>;
+    }
+  }
+  return (
+    <div className="sim">
+      <div className="sim-title">3 · Cifra, decifra, firma, verifica</div>
+      <div className="tabs" role="group" aria-label="Operazione">
+        {[['cifra', 'Cifra'], ['decifra', 'Decifra'], ['firma', 'Firma'], ['verifica', 'Verifica']].map(([k, t]) =>
+          <Btn key={k} small variant={op === k ? 'primary' : ''} aria-pressed={op === k} onClick={() => setOp(k)}>{t}</Btn>)}
+      </div>
+      {op !== 'decifra' ? (<>
+        <div className="tabs" role="group" aria-label="Tipo di messaggio">
+          <Btn small variant={modo === 'numero' ? 'primary' : ''} aria-pressed={modo === 'numero'} onClick={() => setModo('numero')}>Numero</Btn>
+          <Btn small variant={modo === 'testo' ? 'primary' : ''} aria-pressed={modo === 'testo'} onClick={() => setModo('testo')}>Parola</Btn>
+        </div>
+        {modo === 'numero' ? <CampoNum label={'Messaggio (minore di ' + fmt(K.n) + ')'} value={m} onChange={setM} max={20} />
+          : <Field label="Parola (solo lettere)" htmlFor="sr-testo"><input id="sr-testo" className="input mono" value={testo} onChange={e => setTesto(e.target.value.slice(0, 40))} /></Field>}
+        {sorgente}
+      </>) : null}
+      {op === 'decifra' ? <Field label="Numeri cifrati (separati da spazi)" htmlFor="sr-c"><input id="sr-c" className="input mono" inputMode="numeric" value={lista} onChange={e => setLista(e.target.value)} /></Field> : null}
+      {op === 'verifica' ? <Field label="Firme da controllare (separate da spazi)" htmlFor="sr-f"><input id="sr-f" className="input mono" inputMode="numeric" value={fir} onChange={e => setFir(e.target.value)} /></Field> : null}
+      {errM && op !== 'decifra' ? <div className="feedback ko" role="status">{errM}</div> : (op === 'decifra' ? dec : op === 'verifica' ? ver : ris)}
+    </div>
+  );
+}
+
+function App() {
+  const [K, setK] = useState(null);
+  return (
+    <PaginaGioco titolo="Simulatore RSA" indietro="slide.html#10" indietroEtichetta="Modulo 8">
+      <p>RSA con numeri piccoli: scegli i primi, guarda come si ricava la chiave privata e prova a cifrare, decifrare, firmare e verificare.</p>
+      <Chiavi onKeys={setK} />
+      <Operazioni K={K} />
+      <Box type="warn" title="Solo per imparare">Con numeri così piccoli la chiave si rompe in un istante. Prova nel <a className="text-link" href="gioco-rsa-di-classe.html">gioco di classe</a>.</Box>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>

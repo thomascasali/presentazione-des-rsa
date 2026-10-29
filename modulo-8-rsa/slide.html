@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modulo 8 — RSA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<script src="../modulo-7-matematica-rsa/mat-ui.js"></script>
+<script src="rsa-ui.js"></script>
+<style>
+  .due { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+  .tre { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .6rem; }
+  .tabs { display: flex; gap: .4rem; flex-wrap: wrap; }
+  .lista-x { display: flex; flex-wrap: wrap; gap: .25rem .5rem; font-family: var(--f-mono); font-size: var(--fs-xs); }
+  .lista-x span { padding: .05em .45em; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); }
+  .lista-x span.si { border-color: var(--success); background: color-mix(in srgb, var(--success) 22%, var(--bg)); color: var(--text); font-weight: 700; }
+  .chiave { border-radius: 10px; padding: .5rem .8rem; border: 2px solid var(--border); background: var(--bg-card); }
+  .chiave.pub { border-color: var(--info); }
+  .chiave.priv { border-color: var(--danger); }
+  .chiave b { font-family: var(--f-mono); color: var(--accent-alt); }
+  .tempo { display: flex; align-items: stretch; gap: .6rem; flex-wrap: wrap; }
+  .tempo .ev { flex: 1 1 9rem; background: var(--bg-card); border: 1px solid var(--border); border-top: 4px solid var(--accent); border-radius: 10px; padding: .5rem .7rem; min-width: 0; }
+  .tempo .ev .anno { font-family: var(--f-mono); color: var(--accent-alt); font-weight: 700; font-size: var(--fs-lead); }
+  .tempo .ev p { font-size: var(--fs-sm) !important; }
+  .eq { font-family: var(--f-mono); overflow-wrap: anywhere; }
+  .cm { width: 100%; }
+  @media (max-width: 900px) { .due, .tre { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useEffect } = React;
+const { Box, Glow, Chip, Grid, Card, Btn, Field, Table, Flow, CompareTwo, ActivityBadge, Steps, Code } = UI;
+const { num, modB, fmt, CampoNum, TabInverso, TabPotenza } = MatUI;
+const R = window.RsaUI;
+const C = window.Cripto;
+
+/* ---------- dati dell'esempio, tutti da crypto.js ---------- */
+const K = C.rsa.genera(61, 53, 17);                                   // n=3233, phi=3120, e=17, d=2753
+const M0 = 65n;
+const C0 = C.rsa.cifra(M0, K.pub);                                    // 2790
+const S0 = C.rsa.firma(M0, K.priv);                                   // 588
+const ED = K.e * K.d;                                                 // 46801
+const KED = (ED - 1n) / K.phi;                                        // 15
+const PAROLA = 'CIAO';
+const COD = R.codificaTesto(PAROLA, K.n);                             // blocchi di 2 lettere
+const COD_CIF = COD.blocchi.map(b => C.rsa.cifra(b, K.pub));
+const COD_DEC = COD_CIF.map(c => C.rsa.decifra(c, K.priv));
+const CIFRE_2048 = (BigInt(1) << 2048n).toString().length;            // cifre decimali di 2^2048
+const CIFRE_RADICE = (BigInt(1) << 1023n).toString().length;          // ~ sqrt(2^2048) / 2
+
+/* ---------- componenti ---------- */
+
+function PersoneChiavi() {
+  const [n, setN] = useState(30);
+  return (
+    <div className="sim">
+      <div className="sim-title">Quante chiavi servono?</div>
+      <Grid cols={2}>
+        <div className="stack">
+          <Field label={'Persone: ' + n}><input type="range" min="2" max="200" value={n} onChange={e => setN(+e.target.value)} aria-label="Persone" /></Field>
+          <p>Con la crittografia simmetrica ogni coppia ha una chiave segreta: <span className="mono hl">n(n−1)/2 = {fmt(n * (n - 1) / 2)}</span> chiavi.</p>
+        </div>
+        <div className="stack">
+          <p>Con RSA ogni persona ha <b className="hl">una</b> coppia di chiavi: <span className="mono hl">{n}</span> coppie in tutto. E la chiave pubblica non è segreta.</p>
+        </div>
+      </Grid>
+    </div>
+  );
+}
+
+function RsaLab() {
+  const [p, setP] = useState('61'), [q, setQ] = useState('53'), [e, setE] = useState('17');
+  const [tab, setTab] = useState('cifra');
+  const [modo, setModo] = useState('numero');
+  const [msg, setMsg] = useState('65');
+  const [testo, setTesto] = useState('CIAO');
+  const P = num(p), Q = num(q), E = num(e);
+  let K1 = null, err = null;
+  try { if (P === null || Q === null || E === null) throw new RangeError('Scrivi p, q ed e (numeri interi).'); K1 = C.rsa.genera(P, Q, E); }
+  catch (x) { err = x.message; }
+  let voci = null, errMsg = null, L = 0;
+  if (K1) {
+    if (modo === 'numero') { const m = num(msg); if (m === null || m < 0n) errMsg = 'Scrivi un numero intero non negativo.'; else if (m >= K1.n) errMsg = 'Il messaggio deve essere minore di n = ' + fmt(K1.n) + '.'; else voci = [m]; }
+    else { const cd = R.codificaTesto(testo, K1.n); if (!cd) errMsg = 'n è troppo piccolo per codificare le lettere: scegli primi più grandi.'; else if (!cd.blocchi.length) errMsg = 'Scrivi almeno una lettera.'; else { voci = cd.blocchi; L = cd.L; } }
+  }
+  const conv = (v) => modo === 'testo' ? R.decodificaBlocchi([v], L) : '';
+  let corpo = null;
+  if (K1 && voci) {
+    if (tab === 'cifra') {
+      const cif = voci.map(m => C.rsa.cifra(m, K1.pub)), dec = cif.map(c => C.rsa.decifra(c, K1.priv));
+      corpo = (
+        <div className="stack">
+          <p className="eq">Cifratura: c = m^e mod n → {voci.map((m, i) => <span key={i}>{i ? ' · ' : ''}{fmt(m)}^{fmt(K1.e)} mod {fmt(K1.n)} = <b className="hl">{fmt(cif[i])}</b></span>)}</p>
+          <p className="eq">Decifratura: m = c^d mod n → {cif.map((c, i) => <span key={i}>{i ? ' · ' : ''}{fmt(c)}^{fmt(K1.d)} mod {fmt(K1.n)} = <b className="t-success">{fmt(dec[i])}</b></span>)}</p>
+          {modo === 'testo' ? <p className="small">Cifrato da trasmettere: <span className="mono hl">{cif.map(fmt).join(' ')}</span> · Testo recuperato: <span className="mono hl">{R.decodificaBlocchi(dec, L)}</span></p> : null}
+        </div>
+      );
+    } else {
+      const fir = voci.map(m => C.rsa.firma(m, K1.priv)), ok = fir.map((s, i) => C.rsa.verifica(s, voci[i], K1.pub));
+      corpo = (
+        <div className="stack">
+          <p className="eq">Firma con d: s = m^d mod n → {voci.map((m, i) => <span key={i}>{i ? ' · ' : ''}{fmt(m)}^{fmt(K1.d)} mod {fmt(K1.n)} = <b className="hl">{fmt(fir[i])}</b></span>)}</p>
+          <p className="eq">Verifica con e: s^e mod n → {fir.map((s, i) => <span key={i}>{i ? ' · ' : ''}{fmt(s)}^{fmt(K1.e)} mod {fmt(K1.n)} = <b className="t-success">{fmt(C.potenzaModulare(s, K1.e, K1.n))}</b> {ok[i] ? '✓' : '✗'}</span>)}</p>
+        </div>
+      );
+    }
+  }
+  return (
+    <div className="sim">
+      <div className="sim-title">Calcolatore RSA giocattolo</div>
+      <div className="tre">
+        <CampoNum label="p (primo)" value={p} onChange={setP} max={7} />
+        <CampoNum label="q (primo)" value={q} onChange={setQ} max={7} />
+        <CampoNum label="e (coprimo con φ)" value={e} onChange={setE} max={7} />
+      </div>
+      {err ? <div className="feedback ko" role="status">{err}</div> : (
+        <p className="eq small">n = <b className="hl">{fmt(K1.n)}</b> · φ(n) = <b className="hl">{fmt(K1.phi)}</b> · d = <b className="hl">{fmt(K1.d)}</b> → pubblica ({fmt(K1.e)}, {fmt(K1.n)}) · privata ({fmt(K1.d)}, {fmt(K1.n)})</p>
+      )}
+      {K1 ? (<>
+        <div className="row">
+          <div className="tabs" role="group" aria-label="Operazione">
+            <Btn small variant={tab === 'cifra' ? 'primary' : ''} aria-pressed={tab === 'cifra'} onClick={() => setTab('cifra')}>Cifra e decifra</Btn>
+            <Btn small variant={tab === 'firma' ? 'primary' : ''} aria-pressed={tab === 'firma'} onClick={() => setTab('firma')}>Firma e verifica</Btn>
+          </div>
+          <div className="tabs" role="group" aria-label="Tipo di messaggio">
+            <Btn small variant={modo === 'numero' ? 'primary' : ''} aria-pressed={modo === 'numero'} onClick={() => setModo('numero')}>Numero</Btn>
+            <Btn small variant={modo === 'testo' ? 'primary' : ''} aria-pressed={modo === 'testo'} onClick={() => setModo('testo')}>Parola</Btn>
+          </div>
+        </div>
+        {modo === 'numero'
+          ? <CampoNum label="Messaggio m (minore di n)" value={msg} onChange={setMsg} max={20} />
+          : <Field label="Parola (solo lettere)" htmlFor="rl-testo"><input id="rl-testo" className="input mono" value={testo} onChange={e2 => setTesto(e2.target.value.slice(0, 30))} /></Field>}
+        {errMsg ? <div className="feedback ko" role="status">{errMsg}</div> : corpo}
+      </>) : null}
+    </div>
+  );
+}
+
+function Hash() {
+  const [t, setT] = useState('Verifica di Sistemi e Reti: voto 8');
+  const [h, setH] = useState('');
+  const [nonDisp, setNonDisp] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    try {
+      if (!window.crypto || !window.crypto.subtle) { setNonDisp(true); return; }
+      window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)).then(buf => {
+        if (vivo) setH(Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join(''));
+      }).catch(() => setNonDisp(true));
+    } catch (x) { setNonDisp(true); }
+    return () => { vivo = false; };
+  }, [t]);
+  return (
+    <div className="sim">
+      <div className="sim-title">Impronta SHA-256 del documento</div>
+      <Field label="Documento" htmlFor="hash-in"><textarea id="hash-in" className="input" rows={2} value={t} onChange={e => setT(e.target.value)} /></Field>
+      {nonDisp ? <p className="small t-warn">Il browser non permette il calcolo di SHA-256 da questa pagina (serve un contesto sicuro).</p> :
+        <div className="out mono" style={{ fontSize: 'var(--fs-xs)', overflowWrap: 'anywhere' }} aria-live="polite">{h || ' '}</div>}
+      <p className="small muted">Cambia una sola lettera: l'impronta cambia completamente. Sono 256 bit, qualunque sia la lunghezza del documento.</p>
+    </div>
+  );
+}
+
+function CalcAttacco() {
+  const [n, setN] = useState('3233');
+  const [e, setE] = useState('17');
+  const [c, setC] = useState('2790');
+  const [ris, setRis] = useState(null);
+  const N = num(n), E = num(e), Cc = num(c);
+  const ok = N !== null && E !== null && Cc !== null && N > 3n && N < 100000000000000n;
+  const attacca = () => {
+    const t0 = performance.now();
+    const f = C.fattorizza(N);
+    const ms = performance.now() - t0;
+    if (f.fattori.length !== 2) { setRis({ errore: 'n non è il prodotto di due primi (fattori trovati: ' + f.fattori.map(String).join(' · ') + ').', ...f, ms }); return; }
+    const phi = (f.fattori[0] - 1n) * (f.fattori[1] - 1n), d = C.inversoModulare(E, phi);
+    if (d === null) { setRis({ errore: 'e non è coprimo con φ(n): non è una chiave RSA valida.', ...f, ms }); return; }
+    setRis({ ...f, ms, phi, d, m: C.potenzaModulare(Cc, d, N) });
+  };
+  const pre = (a, b, cc) => () => { setN(String(a)); setE(String(b)); setC(String(cc)); setRis(null); };
+  return (
+    <div className="sim">
+      <div className="sim-title">Attacco: rompere una chiave piccola</div>
+      <div className="tre">
+        <CampoNum label="n (pubblico)" value={n} onChange={v => { setN(v); setRis(null); }} max={14} />
+        <CampoNum label="e (pubblico)" value={e} onChange={v => { setE(v); setRis(null); }} max={14} />
+        <CampoNum label="c (intercettato)" value={c} onChange={v => { setC(v); setRis(null); }} max={14} />
+      </div>
+      <div className="row">
+        <Btn small onClick={pre(3233, 17, 2790)}>3233</Btn>
+        <Btn small onClick={() => { const p = R.prossimoPrimo(10007), q = R.prossimoPrimo(10501), k = C.rsa.genera(p, q, 65537); setN(String(k.n)); setE('65537'); setC(String(C.rsa.cifra(123456, k.pub))); setRis(null); }}>n di 9 cifre</Btn>
+        <Btn small onClick={() => { const p = R.prossimoPrimo(1000003), q = R.prossimoPrimo(1000100), k = C.rsa.genera(p, q, 65537); setN(String(k.n)); setE('65537'); setC(String(C.rsa.cifra(123456, k.pub))); setRis(null); }}>n di 13 cifre</Btn>
+        <Btn variant="primary" onClick={attacca} disabled={!ok}>Fattorizza n</Btn>
+      </div>
+      {!ok ? <p className="small muted">Servono tre interi; n tra 4 e 99 999 999 999 999 (oltre sarebbe troppo lento da provare qui).</p> : null}
+      {ris && ris.errore ? <div className="feedback ko" role="status">{ris.errore}</div> : null}
+      {ris && !ris.errore ? (
+        <div className="stack">
+          <p className="eq">n = <b className="hl">{fmt(ris.fattori[0])} · {fmt(ris.fattori[1])}</b> <span className="muted">({fmt(ris.tentativi)} divisioni, {ris.ms.toFixed(1)} ms)</span></p>
+          <p className="eq">φ(n) = {fmt(ris.fattori[0] - 1n)} · {fmt(ris.fattori[1] - 1n)} = {fmt(ris.phi)} → d = inverso di {fmt(E)} = <b className="hl">{fmt(ris.d)}</b></p>
+          <p className="eq">m = c^d mod n = <b className="t-success">{fmt(ris.m)}</b> <span className="muted">(messaggio decifrato senza la chiave privata)</span></p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DaLibro() {
+  const [t, setT] = useState('SI');
+  const s = C.normalizza(t).replace(/[^A-Z]/g, '').slice(0, 12);
+  const dizionario = useMemo(() => Array.from({ length: 26 }, (_, i) => ({ l: String.fromCharCode(65 + i), c: C.rsa.cifra(i + 1, K.pub) })), []);
+  const cif = s.split('').map(ch => C.rsa.cifra(ch.charCodeAt(0) - 64, K.pub));
+  const inv = Object.fromEntries(dizionario.map(x => [String(x.c), x.l]));
+  return (
+    <div className="sim">
+      <div className="sim-title">RSA «da libro» lettera per lettera (n = 3233, e = 17)</div>
+      <Field label="Messaggio" htmlFor="dl-in"><input id="dl-in" className="input mono" value={t} onChange={e => setT(e.target.value.slice(0, 12))} /></Field>
+      <p className="eq">Cifrato: <b className="hl">{cif.map(fmt).join(' ')}</b></p>
+      <p className="eq">L'attaccante cifra tutte le 26 lettere con la chiave <i>pubblica</i> e confronta: <b className="t-danger">{cif.map(c => inv[String(c)] || '?').join('')}</b></p>
+      <div className="lista-x" aria-label="Dizionario di tutte le lettere cifrate">
+        {dizionario.map(x => <span key={x.l} className={s.includes(x.l) ? 'si' : ''}>{x.l}→{x.c}</span>)}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- codice PHP ---------- */
+const mk = (righe) => ({ code: righe.map(r => r[0]).join('\n'), explain: righe.map(r => r[1] || '') });
+
+const PHP_CHIAVI = mk([
+  ['<?php', 'Apertura PHP. Il programma usa solo interi: valido per numeri piccoli.'],
+  ['function mcd(int $a, int $b): int {', 'Algoritmo di Euclide: serve a verificare che e sia coprimo con φ(n).'],
+  ['    while ($b !== 0) { [$a, $b] = [$b, $a % $b]; }', 'Si scala: il divisore diventa dividendo, il resto diventa divisore. Si ferma a resto 0.'],
+  ['    return $a;', 'L\'ultimo valore non nullo è il MCD.'],
+  ['}', ''],
+  ['', ''],
+  ['function inverso(int $e, int $phi): int {', 'Inverso di e modulo φ, con Euclide esteso.'],
+  ['    [$r0, $r1] = [$phi, $e];', 'r tiene i resti: si parte da φ e da e.'],
+  ['    [$t0, $t1] = [0, 1];', 't tiene il coefficiente di e: r = φ·s + e·t (di s non ci serve nulla).'],
+  ['    while ($r1 !== 0) {', 'Finché il resto non è zero.'],
+  ['        $q = intdiv($r0, $r1);', 'Quoziente intero della divisione.'],
+  ['        [$r0, $r1] = [$r1, $r0 - $q * $r1];', 'Nuovo resto: r0 − q·r1.'],
+  ['        [$t0, $t1] = [$t1, $t0 - $q * $t1];', 'Lo stesso passo sui coefficienti t.'],
+  ['    }', 'Alla fine r0 vale il MCD (1 se e e φ sono coprimi).'],
+  ['    return (($t0 % $phi) + $phi) % $phi;', 't può essere negativo: la doppia % lo riporta tra 0 e φ−1. Questo è d.'],
+  ['}', ''],
+  ['', ''],
+  ['function generaChiavi(int $p, int $q, int $e): array {', 'Dati due primi e un esponente pubblico, costruisce le chiavi.'],
+  ['    $n = $p * $q;', 'Modulo: 61 · 53 = 3233.'],
+  ['    $phi = ($p - 1) * ($q - 1);', 'φ(n) = 60 · 52 = 3120.'],
+  ['    if (mcd($e, $phi) !== 1) { throw new InvalidArgumentException(\'e non è coprimo con phi\'); }', 'Se e non è coprimo con φ non esiste l\'inverso: errore.'],
+  ['    $d = inverso($e, $phi);', 'Esponente privato: 2753.'],
+  ['    return [\'pub\' => [$e, $n], \'priv\' => [$d, $n]];', 'Le due chiavi: la pubblica si diffonde, la privata resta al proprietario.'],
+  ['}', ''],
+]);
+
+const PHP_CIFRA = mk([
+  ['<?php', 'Si riusa potenzaModulare() del modulo 7 (square-and-multiply).'],
+  ['function cifra(int $m, array $pub): int {', 'Chi cifra conosce solo la chiave pubblica [e, n].'],
+  ['    return potenzaModulare($m, $pub[0], $pub[1]);', 'c = m^e mod n. Con m = 65 si ottiene 2790.'],
+  ['}', ''],
+  ['', ''],
+  ['function decifra(int $c, array $priv): int {', 'Chi decifra usa la chiave privata [d, n].'],
+  ['    return potenzaModulare($c, $priv[0], $priv[1]);', 'm = c^d mod n. Con c = 2790 si torna a 65. La firma è la stessa operazione sul messaggio.'],
+  ['}', ''],
+  ['', ''],
+  ['function attacco(int $n, int $e): int {', 'L\'attaccante conosce n ed e (pubblici) e vuole d.'],
+  ['    for ($p = 2; $p * $p <= $n; $p++) {', 'Prova i divisori fino a √n: è la fattorizzazione ingenua.'],
+  ['        if ($n % $p === 0) {', 'Trovato un fattore.'],
+  ['            $q = intdiv($n, $p);', 'L\'altro fattore.'],
+  ['            return inverso($e, ($p - 1) * ($q - 1));', 'Con p e q calcola φ(n) e poi d, come farebbe il proprietario.'],
+  ['        }', ''],
+  ['    }', ''],
+  ['    throw new InvalidArgumentException(\'n è primo: non è una chiave RSA\');', 'Nessun divisore: n è primo.'],
+  ['}', ''],
+]);
+
+/* ---------- le slide ---------- */
+
+const slides = [
+  { copertina: true, sezione: 'Apertura', titolo: 'RSA',
+    sottotitolo: 'Il cifrario a chiave pubblica: chiavi, cifratura, firma digitale e perché non si rompe.',
+    note: ['Modulo centrale sulla crittografia asimmetrica. Si presume di aver visto il modulo 7 (modulo, MCD, Euclide esteso, potenza modulare); dove serve si rimanda alle sue slide.', 'Esempio guida: p = 61, q = 53, e = 17, messaggio 65. Ogni numero mostrato è calcolato dal motore del progetto.'] },
+
+  { sezione: 'Il problema', titolo: 'Il problema della chiave condivisa',
+    contenuto: () => (
+      <div className="stack">
+        <p className="lead">Con un cifrario simmetrico mittente e destinatario hanno <span className="hl">la stessa chiave</span>. Ma come se la scambiano, se il canale non è sicuro?</p>
+        <PersoneChiavi />
+        <Box type="warn" title="Due problemi">Distribuire la chiave in modo sicuro. Gestire un numero di chiavi che cresce con il quadrato delle persone.</Box>
+      </div>
+    ),
+    note: 'Riprendete DES: tutta la sicurezza sta nella chiave, che però va comunicata. Il cursore mostra la crescita quadratica del numero di chiavi simmetriche. La soluzione di RSA: due chiavi diverse, una pubblica e una privata.' },
+
+  { sezione: 'Storia', titolo: 'Come nasce la chiave pubblica',
+    contenuto: () => (
+      <div className="stack-lg">
+        <div className="tempo">
+          <div className="ev"><div className="anno">1973</div><p>Clifford Cocks, al GCHQ britannico, ideò un sistema equivalente a RSA. Rimase segreto fino al 1997.</p></div>
+          <div className="ev"><div className="anno">1976</div><p>Diffie e Hellman (con Merkle) pubblicano «New Directions in Cryptography»: scambio di chiavi su canale pubblico.</p></div>
+          <div className="ev"><div className="anno">1977</div><p>Rivest, Shamir e Adleman, al MIT, inventano RSA. Descrizione formale nel 1978.</p></div>
+          <div className="ev"><div className="anno">2000</div><p>Scade il brevetto statunitense di RSA: l'algoritmo diventa libero.</p></div>
+        </div>
+        <Box type="info" title="Il nome">RSA sono le iniziali dei tre autori: Rivest, Shamir, Adleman.</Box>
+      </div>
+    ),
+    note: 'Storia in due minuti. Diffie e Hellman propongono l\'idea e un metodo per accordarsi su una chiave; RSA è il primo cifrario a chiave pubblica pubblicato che serve anche per cifrare e firmare. Cocks e i colleghi del GCHQ (Ellis, Williamson) arrivarono prima ma non potevano parlarne: la desecretazione è del dicembre 1997. Il brevetto è scaduto nel settembre 2000.' },
+
+  { sezione: 'Idea', titolo: 'Due chiavi: una pubblica, una privata',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { icon: '🧑', label: 'Bob', sub: 'genera le due chiavi', color: 'var(--info)' },
+          { icon: '📢', label: 'Pubblica la chiave pubblica', sub: 'la vedono tutti', color: 'var(--accent)' },
+          { icon: '🧑‍💻', label: 'Alice', sub: 'cifra con la pubblica di Bob', color: 'var(--accent)' },
+          { icon: '🔒', label: 'Messaggio cifrato', sub: 'circola in chiaro sulla rete', color: 'var(--danger)' },
+          { icon: '🔑', label: 'Bob decifra', sub: 'con la sua privata', color: 'var(--success)' },
+        ]} />
+        <Grid cols={2}>
+          <Box type="info" title="Il lucchetto aperto">La chiave pubblica è un lucchetto aperto: chiunque può chiuderlo, solo Bob ha la chiave per riaprirlo.</Box>
+          <Box type="warn" title="Condizione">Dalla chiave pubblica non deve essere possibile ricavare quella privata (se non con un lavoro impraticabile).</Box>
+        </Grid>
+      </div>
+    ),
+    note: 'Analogia del lucchetto: Bob spedisce in giro molti lucchetti aperti. Chi vuole scrivergli ne chiude uno su una scatola. Nessuno dovrà mai comunicare un segreto in anticipo. Ricordate agli studenti che il «lucchetto» è un calcolo matematico: nel resto del modulo si vede quale.' },
+
+  { sezione: 'Chiavi', titolo: 'Generare le chiavi in 5 passi',
+    contenuto: () => (
+      <div className="stack">
+        <Steps steps={[
+          { title: '1. Scegli due primi', content: <p className="eq">p = <b className="hl">61</b>, q = <b className="hl">53</b> <Chip color="success">primi: {String(C.isPrimo(61))}/{String(C.isPrimo(53))}</Chip><br /><span className="small muted">Devono essere segreti e diversi. Nella realtà sono numeri da 1024 bit ciascuno.</span></p> },
+          { title: '2. Calcola n = p · q', content: <p className="eq">n = 61 · 53 = <b className="hl">{String(K.n)}</b> <span className="small muted">(è il «modulo», pubblico)</span></p> },
+          { title: '3. Calcola φ(n)', content: <p className="eq">φ(n) = (p − 1)(q − 1) = 60 · 52 = <b className="hl">{String(K.phi)}</b> <span className="small muted">(segreto: serve p e q per calcolarlo)</span></p> },
+          { title: '4. Scegli e coprimo con φ(n)', content: <p className="eq">e = <b className="hl">17</b>: MCD(17, {String(K.phi)}) = <b className="t-success">{String(C.mcd(17n, K.phi))}</b> <span className="small muted">(1 &lt; e &lt; φ; nella pratica spesso 65537)</span></p> },
+          { title: '5. Calcola d, inverso di e', content: <p className="eq">d = inverso di 17 modulo {String(K.phi)} = <b className="hl">{String(K.d)}</b><br />Verifica: 17 · {String(K.d)} = {String(ED)} = {String(KED)} · {String(K.phi)} + {String(ED % K.phi)}</p> },
+        ]} />
+        <div className="due">
+          <div className="chiave pub"><b>Chiave pubblica</b><br /><span className="mono">(e, n) = ({String(K.e)}, {String(K.n)})</span></div>
+          <div className="chiave priv"><b>Chiave privata</b><br /><span className="mono">(d, n) = ({String(K.d)}, {String(K.n)})</span></div>
+        </div>
+      </div>
+    ),
+    note: 'Cinque passi da ripetere con le frecce. Dopo il passo 5 si buttano p, q e φ(n): la privata contiene solo d e n. Sottolineate che n ed e sono pubblici: la sicurezza sta nell\'impossibilità di ricavare φ(n) senza conoscere p e q. I primi reali sono lunghi circa 1024 bit ciascuno.' },
+
+  { sezione: 'Chiavi', titolo: 'Come si trova d: Euclide esteso',
+    contenuto: () => (
+      <div className="stack">
+        <p>d è l'inverso di e modulo φ(n): serve <span className="mono hl">e · d ≡ 1 (mod 3120)</span>.</p>
+        <TabInverso a={17} m={3120} />
+      </div>
+    ),
+    note: 'Richiamo del modulo 7 con i numeri dell\'esempio. La tabella è generata dal motore. Il coefficiente t è negativo (−367) e si riporta in 0..3119 sommando 3120: 2753. La verifica in fondo è l\'unica cosa che conta: e·d lascia resto 1 nella divisione per φ(n).' },
+
+  { sezione: 'Cifrare', titolo: 'Cifrare un numero: m = 65',
+    contenuto: () => (
+      <div className="stack">
+        <Glow><p className="center">Cifratura: <span className="mono hl">c = m^e mod n = 65^17 mod 3233 = {String(C0)}</span></p></Glow>
+        <TabPotenza base={65} esp={17} mod={3233} />
+        <p className="small muted">Il messaggio deve essere un numero minore di n. Si usa solo la chiave pubblica (17, 3233).</p>
+      </div>
+    ),
+    note: 'La potenza è calcolata con square-and-multiply (modulo 7): cinque passi, mai numeri oltre 3233. Fate notare che nessun segreto viene usato: chiunque può cifrare 65 e ottenere 2790. Il vincolo m &lt; n è importante; per messaggi più lunghi vedi la slide sulle parole.' },
+
+  { sezione: 'Decifrare', titolo: 'Decifrare: da 2790 torna 65',
+    contenuto: () => (
+      <div className="stack">
+        <Glow><p className="center">Decifratura: <span className="mono hl">m = c^d mod n = 2790^2753 mod 3233 = {String(C.rsa.decifra(C0, K.priv))}</span></p></Glow>
+        <TabPotenza base={2790} esp={2753} mod={3233} />
+        <p className="small muted">L'esponente 2753 ha 12 bit: bastano 12 quadrati e poche moltiplicazioni.</p>
+      </div>
+    ),
+    note: 'Stessa funzione di prima, con esponente d. Il risultato è 65: il messaggio originale. Chiedete: perché funziona? Spiegazione alla slide «Perché funziona». Chi non conosce d non può fare questo calcolo e deve prima trovare d.' },
+
+  { sezione: 'Messaggi', titolo: 'Dalle parole ai numeri',
+    contenuto: () => (
+      <div className="stack">
+        <p>RSA cifra <span className="hl">numeri</span> minori di n. Per le parole serve una codifica e dei blocchi.</p>
+        <Table mono center head={['C', 'I', 'A', 'O']} rows={[['03', '09', '01', '15']]} />
+        <Grid cols={2} stretch>
+          <Card tone="accent"><h3>Blocchi minori di n</h3><p className="small">Con n = 3233 si possono unire due lettere: il blocco massimo è 2626 &lt; 3233. «{PAROLA}» → blocchi <span className="mono hl">{COD.cifre.join(' ')}</span> → numeri <span className="mono hl">{COD.blocchi.map(String).join(', ')}</span>.</p></Card>
+          <Card tone="info"><h3>Cifrati</h3><p className="small mono">{COD.blocchi.map((b, i) => `${b}^17 mod 3233 = ${COD_CIF[i]}`).join('\n').split('\n').map((r, i) => <span key={i}>{r}<br /></span>)}</p><p className="small">Decifrati: <span className="mono hl">{R.decodificaBlocchi(COD_DEC, COD.L)}</span></p></Card>
+        </Grid>
+        <Box type="warn" title="Se n è piccolo">Con n ≤ 2626 si può usare un blocco di una sola lettera: è una semplice sostituzione monoalfabetica, rompibile con le frequenze (modulo 1).</Box>
+      </div>
+    ),
+    note: 'Codifica scolastica A = 01 … Z = 26: due cifre per lettera, così i blocchi si decodificano senza ambiguità. In RSA vero si cifrano byte, con padding. I valori dello schema (309, 115 → 2851, 1230) sono prodotti dal motore. Il riquadro avverte che un n troppo piccolo rende RSA equivalente a Cesare: la sicurezza sta nella dimensione.' },
+
+  { sezione: 'Messaggi', titolo: 'Prova: cifra, decifra, firma',
+    contenuto: () => (
+      <div className="stack">
+        <RsaLab />
+        <div className="row">
+          <ActivityBadge href="simulazione-rsa.html" label="Simulatore RSA per smartphone" icon="📱" />
+          <ActivityBadge href="gioco-rsa-di-classe.html" label="RSA di classe (gioco)" icon="🎲" />
+        </div>
+      </div>
+    ),
+    note: 'Calcolatore completo: cambiate p, q, e (devono essere primi e e deve essere coprimo con φ). Provate prima il numero 65, poi la parola CIAO. Passate a «Firma e verifica». Se p e q sono troppo piccoli la parola non si può codificare: è voluto. Il simulatore per smartphone aggiunge i passi del calcolo di d.' },
+
+  { sezione: 'Perché funziona', titolo: 'Perché funziona: l\'intuizione di Eulero',
+    contenuto: () => (
+      <div className="stack">
+        <Box type="info" title="Dal modulo 7">Se m è coprimo con n: <span className="mono hl">m^φ(n) ≡ 1 (mod n)</span>.</Box>
+        <p className="eq">e · d = 17 · {String(K.d)} = {String(ED)} = <b className="hl">1 + {String(KED)} · {String(K.phi)}</b></p>
+        <Glow>
+          <p className="center eq">(m^e)^d = m^(e·d) = m^(1 + {String(KED)}·φ) = m · (m^φ)^{String(KED)} ≡ m · 1^{String(KED)} = <span className="hl">m</span></p>
+        </Glow>
+        <p className="small muted">Per questo d si sceglie come inverso di e modulo φ(n): la decifratura annulla la cifratura. Il caso (rarissimo) di m non coprimo con n funziona comunque: la dimostrazione completa usa il teorema cinese del resto.</p>
+      </div>
+    ),
+    note: 'Non serve una dimostrazione formale: la catena di uguaglianze è il cuore. Dalla scelta di d segue che e·d = 1 + k·φ(n); la proprietà di Eulero fa sparire la parte con φ. Per i numeri dell\'esempio k vale 15. Studenti curiosi: il caso m multiplo di p o q si dimostra con il teorema cinese del resto, fuori programma.' },
+
+  { sezione: 'Firma', titolo: 'La firma digitale: stesse chiavi, ruoli invertiti',
+    contenuto: () => (
+      <div className="stack">
+        <Flow steps={[
+          { icon: '✍️', label: 'Firma', sub: 's = m^d mod n con la PRIVATA', color: 'var(--danger)' },
+          { icon: '📨', label: 'Invio', sub: '(messaggio m, firma s)', color: 'var(--accent)' },
+          { icon: '🔍', label: 'Verifica', sub: 's^e mod n con la PUBBLICA', color: 'var(--info)' },
+          { icon: '✅', label: 'Uguale a m?', sub: 'sì: autentico', color: 'var(--success)' },
+        ]} />
+        <Glow><p className="center eq">Firma di {String(M0)}: {String(M0)}^{String(K.d)} mod {String(K.n)} = <b className="hl">{String(S0)}</b> · Verifica: {String(S0)}^{String(K.e)} mod {String(K.n)} = <b className="t-success">{String(C.potenzaModulare(S0, K.e, K.n))}</b></p></Glow>
+        <p className="small muted">Solo chi possiede d può produrre una firma che la chiave pubblica verifica: prova di autore e di integrità.</p>
+      </div>
+    ),
+    note: 'Firmare è «decifrare» con la privata; verificare è «cifrare» con la pubblica. Funziona perché le due operazioni commutano: (m^d)^e = (m^e)^d. La firma non nasconde il messaggio: serve a provare chi l\'ha scritto e che non è stato modificato.' },
+
+  { sezione: 'Firma', titolo: 'Si firma l\'impronta, non il documento',
+    contenuto: () => (
+      <div className="stack">
+        <Hash />
+        <Grid cols={2}>
+          <Box type="info" title="Perché l'hash">Firmare direttamente un documento lungo richiederebbe molti blocchi RSA, lenti. Si firma una sua impronta di lunghezza fissa.</Box>
+          <Box type="tip" title="Verifica">Chi riceve ricalcola l'impronta, applica la chiave pubblica alla firma e confronta i due risultati.</Box>
+        </Grid>
+      </div>
+    ),
+    note: 'Cenno all\'hash: SHA-256 produce 256 bit per qualsiasi input, ed è praticamente impossibile trovare due documenti con la stessa impronta. L\'impronta qui sopra è calcolata davvero dal browser mentre scrivete. Nei sistemi reali la firma applica uno schema con padding (PSS), non l\'esponenziazione semplice. Gli hash sono approfonditi nel laboratorio OpenSSL.' },
+
+  { sezione: 'Chi fa cosa', titolo: 'Chi può fare cosa',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Table head={['Obiettivo', 'Chi opera', 'Chiave usata', 'Chi controlla', 'Chiave usata']} rows={[
+          ['Riservatezza (cifrare)', 'Mittente', 'Pubblica del destinatario', 'Destinatario (decifra)', 'Privata del destinatario'],
+          ['Autenticità (firmare)', 'Autore', 'Privata dell\'autore', 'Chiunque (verifica)', 'Pubblica dell\'autore'],
+        ]} />
+        <Grid cols={2}>
+          <Box type="success" title="Tutti possono">Cifrare per Bob e verificare le firme di Bob: serve solo la sua chiave pubblica.</Box>
+          <Box type="danger" title="Solo Bob può">Decifrare i messaggi per Bob e firmare a nome di Bob: serve la sua chiave privata.</Box>
+        </Grid>
+        <p className="small muted">Cifrare e firmare si possono combinare: firma con la propria privata e cifra con la pubblica del destinatario.</p>
+      </div>
+    ),
+    note: 'Tabella da far ricostruire agli studenti: partite da «chi ha il segreto?». Per cifrare il segreto è del destinatario; per firmare è del firmatario. Errore frequente: «si firma con la chiave pubblica». Esercizio rapido: Alice vuole spedire a Bob un messaggio riservato e firmato: quali chiavi usa, in che ordine?' },
+
+  { sezione: 'Sicurezza', titolo: 'Attacco: fattorizzare n piccolo',
+    contenuto: () => (
+      <div className="stack">
+        <p>L'attaccante vede <span className="mono">n</span> ed <span className="mono">e</span>. Se fattorizza <span className="mono">n</span> ricava φ(n), poi d, e legge tutto.</p>
+        <CalcAttacco />
+        <div className="row"><ActivityBadge href="gioco-rsa-di-classe.html" label="Gioco: modalità attaccante" icon="🕵️" /></div>
+      </div>
+    ),
+    note: 'Premete «Fattorizza n» con 3233: 27 divisioni, istantaneo. Poi n di 9 cifre e di 13 cifre: il numero di divisioni cresce con la radice di n. Il risultato mostra tutta la catena: p, q, φ(n), d e messaggio. Con 2048 bit nessuna di queste operazioni è fattibile. Il pulsante per la gara «rompi la chiave del compagno» è nel gioco di classe.' },
+
+  { sezione: 'Sicurezza', titolo: 'Con 2048 bit: un altro mondo',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Table mono head={['', 'Esempio', 'RSA-2048']} rows={[
+          ['Cifre di n', '4', String(CIFRE_2048)],
+          ['Divisioni per tentativi (circa √n/2)', String(C.fattorizza(3233).tentativi), 'circa 10^' + (CIFRE_RADICE - 1)],
+        ]} />
+        <Box type="danger" title="Un confronto">Anche a un miliardo di miliardi (10^18) di divisioni al secondo servirebbero circa 10^{CIFRE_RADICE - 19} secondi. L'età dell'universo è circa 4·10^17 secondi.</Box>
+        <p className="small muted">Esistono algoritmi molto più rapidi della divisione per tentativi, ma restano impraticabili a questa dimensione: vedi i record di fattorizzazione.</p>
+      </div>
+    ),
+    note: 'Numeri calcolati con interi grandi: 2^2048 ha 617 cifre decimali; la radice quadrata è circa 2^1024, che ha 309 cifre; la divisione per tentativi salta i numeri pari e prova circa metà dei candidati. È un confronto illustrativo con un computer ipotetico da 10^18 operazioni al secondo, ben oltre ciò che esiste. Gli algoritmi reali (crivello dei campi di numeri) sono sub-esponenziali ma non cambiano la conclusione.' },
+
+  { sezione: 'Sicurezza', titolo: 'I record di fattorizzazione',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Table head={['Numero', 'Cifre', 'Bit', 'Fattorizzato']} rows={[
+          ['RSA-129', '129', '426', '1994'],
+          ['RSA-768', '232', '768', '2009'],
+          ['RSA-240', '240', '795', '2019'],
+          ['RSA-250', '250', '829', '2020'],
+          ['RSA-2048', '617', '2048', 'non fattorizzato'],
+        ]} />
+        <Box type="info" title="Per dare l'idea">La fattorizzazione di RSA-250 (2020) è costata circa 2700 anni-core di calcolo su tanti computer. Un RSA-2048 è molto più grande: la difficoltà cresce in modo rapidissimo con i bit.</Box>
+        <p className="small muted">Fonti: sfide RSA Laboratories; annunci dei team di ricerca (CADO-NFS, INRIA) per RSA-240 e RSA-250.</p>
+      </div>
+    ),
+    note: 'I dati sono quelli delle sfide pubbliche RSA: RSA-129 (1994, con la sfida lanciata da Martin Gardner nel 1977), RSA-768 (2009), RSA-240 (novembre 2019), RSA-250 (febbraio 2020, circa 2700 anni-core su processori Xeon Gold 6130 a 2,1 GHz). Non sono record assoluti per tutti i tipi di numeri, ma sono i traguardi usati come riferimento. Usate la tabella per mostrare che un salto di 80 bit richiede un lavoro enorme.' },
+
+  { sezione: 'Sicurezza', titolo: 'Dimensioni consigliate',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Table head={['Modulo RSA', 'Sicurezza equivalente', 'Giudizio']} rows={[
+          ['1024 bit', '80 bit', 'Non più accettabile'],
+          ['2048 bit', '112 bit', 'Minimo attuale'],
+          ['3072 bit', '128 bit', 'Consigliato per i nuovi sistemi'],
+          ['7680 bit', '192 bit', 'Alta sicurezza'],
+          ['15360 bit', '256 bit', 'Massima sicurezza (poco pratico)'],
+        ]} />
+        <p className="small muted">Valori della raccomandazione NIST SP 800-57. «Sicurezza equivalente»: lavoro paragonabile alla forza bruta su una chiave simmetrica di quella lunghezza.</p>
+        <Box type="tip" title="Notare">Per avere la stessa sicurezza di AES a 128 bit serve una chiave RSA di 3072 bit. Un motivo in più per usare RSA solo dove serve (slide sul confronto con DES).</Box>
+      </div>
+    ),
+    note: 'Tabella NIST SP 800-57 Parte 1 (tabella dei livelli di sicurezza). Le raccomandazioni evolvono: controllate sempre le fonti aggiornate (NIST, ENISA, BSI). L\'e usato nella pratica è quasi sempre 65537. I numeri 80/112/128/192/256 sono bit di sicurezza, non lunghezza della chiave RSA.' },
+
+  { sezione: 'Debolezze', titolo: 'RSA «da libro» è insicuro',
+    contenuto: () => (
+      <div className="stack">
+        <p>Se a ogni messaggio corrisponde sempre lo stesso cifrato (RSA <span className="hl">deterministico</span>), l'attaccante può provare tutti i messaggi possibili con la chiave pubblica.</p>
+        <DaLibro />
+      </div>
+    ),
+    note: 'Dimostrazione del limite: con n = 3233 si cifra ogni lettera A-Z e l\'attaccante costruisce un dizionario di 26 voci con la sola chiave pubblica. Se i messaggi possibili sono pochi («SI/NO», un voto, un PIN) vale la stessa idea anche con 2048 bit. Notate anche che «A» (1) si cifra sempre in 1: i valori piccoli sono pericolosi. La soluzione è il padding casuale, slide seguente.' },
+
+  { sezione: 'Debolezze', titolo: 'Il padding e gli usi veri',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2} stretch>
+          <Card tone="danger"><h3>Problemi dell'RSA «da libro»</h3><ul className="small"><li>Deterministico: stessa m, stesso c.</li><li>Messaggi corti: se m^e &lt; n basta una radice e-esima, senza modulo.</li><li>Malleabile: dai cifrati si costruiscono altri cifrati validi.</li></ul></Card>
+          <Card tone="success"><h3>Rimedio: il padding</h3><ul className="small"><li><b>OAEP</b> per cifrare: aggiunge casualità e struttura.</li><li><b>PSS</b> per firmare.</li><li>Si usa sempre una libreria collaudata (OpenSSL), mai codice scritto a mano.</li></ul></Card>
+        </Grid>
+        <Box type="warn" title="Il nostro RSA giocattolo">È ottimo per capire, ma non va mai usato per proteggere dati reali: numeri piccoli, nessun padding.</Box>
+      </div>
+    ),
+    note: 'Punto formativo: capire la matematica non basta per scrivere crittografia sicura. Standard citati: PKCS #1 (OAEP e PSS). Il laboratorio con OpenSSL usa questi schemi. Non entrate nei dettagli di OAEP: basta il principio (casualità + struttura che si può verificare in decifratura).' },
+
+  { sezione: 'Futuro', titolo: 'Il computer quantistico e l\'algoritmo di Shor',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2} stretch>
+          <Card tone="info"><h3>L'algoritmo</h3><p className="small">Nel 1994 Peter Shor mostrò che un computer quantistico abbastanza grande potrebbe fattorizzare n in tempo polinomiale: RSA non reggerebbe.</p></Card>
+          <Card tone="accent"><h3>La situazione</h3><p className="small">I computer quantistici attuali sono lontanissimi dalle dimensioni richieste: le stime parlano di un numero enorme di qubit fisici corretti dagli errori. Nessuno rompe oggi RSA-2048.</p></Card>
+        </Grid>
+        <Box type="tip" title="Cosa si fa">Il NIST ha standardizzato nel 2024 i primi algoritmi di crittografia post-quantistica (FIPS 203, 204, 205) e promuove la transizione graduale. Chi deve proteggere dati per molti anni inizia a pianificarla.</Box>
+      </div>
+    ),
+    note: 'Tono misurato: la minaccia è reale in prospettiva ma non attuale. Shor (1994) riguarda fattorizzazione e logaritmo discreto: colpisce RSA, Diffie-Hellman e curve ellittiche. I cifrari simmetrici come AES sono toccati in modo molto più lieve. Standard NIST dell\'agosto 2024: ML-KEM (FIPS 203), ML-DSA (FIPS 204), SLH-DSA (FIPS 205). Evitate previsioni su date precise.' },
+
+  { sezione: 'Confronto', titolo: 'RSA e DES a confronto',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Table head={['', 'DES / AES (simmetrico)', 'RSA (asimmetrico)']} rows={[
+          ['Chiavi', 'Una sola, segreta, condivisa', 'Due: pubblica e privata'],
+          ['Problema principale', 'Scambiare la chiave', 'Lentezza e dimensione dei numeri'],
+          ['Velocità', 'Molto alta', 'Molto più bassa (ordini di grandezza)'],
+          ['Messaggi', 'Lunghi quanto serve', 'Brevi: minori di n'],
+          ['Usi tipici', 'Cifrare i dati', 'Scambiare chiavi, firmare'],
+          ['Sicurezza', 'Forza bruta sulla chiave', 'Fattorizzazione di n'],
+        ]} />
+        <Box type="tip" title="Idea">I due sistemi si completano: RSA risolve lo scambio della chiave, il cifrario simmetrico fa il lavoro pesante.</Box>
+      </div>
+    ),
+    note: 'Confronto con il modulo 6. La lentezza dipende da due fattori: operazioni su numeri da centinaia di cifre e il fatto che un blocco RSA cifra al massimo qualche centinaio di byte. I rapporti precisi dipendono da implementazione e hardware: dite «ordini di grandezza» senza dare numeri esatti. Questo prepara la crittografia ibrida.' },
+
+  { sezione: 'Verso la pratica', titolo: 'Ponte: la crittografia ibrida',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { icon: '🎲', label: 'Chiave di sessione', sub: 'casuale, simmetrica', color: 'var(--accent)' },
+          { icon: '🔐', label: 'RSA cifra la chiave', sub: 'con la pubblica del destinatario', color: 'var(--info)' },
+          { icon: '📦', label: 'Cifrario simmetrico', sub: 'cifra i dati con la sessione', color: 'var(--success)' },
+          { icon: '📨', label: 'Invio', sub: 'chiave cifrata + dati cifrati', color: 'var(--accent)' },
+        ]} />
+        <p className="lead">Così funzionano TLS (https) e SSH: asimmetrico per il segreto iniziale, simmetrico per il traffico.</p>
+        <div className="row"><ActivityBadge href="../modulo-9-ibrida/slide.html" stesso label="Modulo 9: crittografia ibrida" icon="➡️" /></div>
+      </div>
+    ),
+    note: 'Anticipa il modulo 9. La chiave di sessione è breve (pochi byte): ci sta in un blocco RSA e il resto dei dati passa con un cifrario veloce. Nei protocolli moderni si preferisce uno scambio con curve ellittiche (ECDHE), ma l\'idea ibrida non cambia.' },
+
+  { sezione: 'Codice PHP', titolo: 'RSA giocattolo in PHP: le chiavi',
+    contenuto: () => (
+      <Code title="rsa-chiavi.php" code={PHP_CHIAVI.code} reveal explain={PHP_CHIAVI.explain} />
+    ),
+    note: 'Si rivela una riga per volta. Le tre funzioni sono quelle richieste nel laboratorio 06, in versione completa. Limiti: gli interi a 64 bit bastano solo per n piccoli, perché il prodotto di due numeri minori di n deve restare sotto 9,2·10^18, cioè n sotto circa 3 miliardi. Per chiavi vere: GMP (gmp_powm, gmp_invert) o bcmath, oppure OpenSSL.' },
+
+  { sezione: 'Codice PHP', titolo: 'RSA giocattolo in PHP: cifra, decifra, attacca',
+    contenuto: () => (
+      <div className="stack">
+        <Code title="rsa-uso.php" code={PHP_CIFRA.code} reveal explain={PHP_CIFRA.explain} />
+        <p className="small muted">Provate: cifra(65, [17, 3233]) deve dare <span className="mono hl">{String(C0)}</span>; decifra({String(C0)}, [{String(K.d)}, 3233]) deve restituire <span className="mono hl">65</span>.</p>
+      </div>
+    ),
+    note: 'Cifratura e decifratura sono la stessa funzione con esponenti diversi: per questo la firma è semplice da implementare. La funzione attacco() è l\'obiettivo del livello 3 del laboratorio: mostra che con n piccolo tutto crolla in pochi passi. Per n a 1024 bit il ciclo non terminerebbe mai.' },
+
+  { sezione: 'Riepilogo', titolo: 'Riepilogo e prossimi passi',
+    contenuto: () => (
+      <div className="stack-lg">
+        <ul>
+          <li><span className="hl">Chiavi</span>: n = p·q, φ = (p−1)(q−1), e coprimo con φ, d = e⁻¹ mod φ.</li>
+          <li><span className="hl">Cifra</span> <span className="mono">c = m^e mod n</span>; <span className="hl">decifra</span> <span className="mono">m = c^d mod n</span>. Firma e verifica: ruoli invertiti.</li>
+          <li>La sicurezza sta nella <span className="hl">difficoltà di fattorizzare n</span>; servono almeno 2048 bit e il padding.</li>
+        </ul>
+        <Grid cols={3} stretch>
+          <Card tone="accent"><h3>Laboratorio</h3><p className="small">Scrivi in PHP l'RSA giocattolo e l'attacco.</p><ActivityBadge href="../lab-php/06-rsa-giocattolo/scheda.html" label="Scheda del lab" icon="🧪" /></Card>
+          <Card tone="info"><h3>Attività</h3><p className="small">RSA di classe: scambio di chiavi e messaggi.</p><ActivityBadge href="../schede/rsa-di-classe.html" label="Scheda stampabile" icon="🖨️" /></Card>
+          <Card tone="success"><h3>Avanti</h3><p className="small">Come si usa RSA insieme a un cifrario simmetrico.</p><ActivityBadge href="../modulo-9-ibrida/slide.html" stesso label="Modulo 9" icon="➡️" /></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Chiusura: tre messaggi. Rimandate alle attività: il gioco di classe è il modo migliore per interiorizzare chi conosce che cosa. Il quiz finale raccoglie le domande sui moduli 7 e 8.' },
+];
+
+Deck.mount(slides, { modulo: 8, nome: 'RSA', indice: '../index.html' });
+</script>
+</body>
+</html>

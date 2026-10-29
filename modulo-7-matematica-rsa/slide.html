@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modulo 7 — La matematica di RSA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<script src="mat-ui.js"></script>
+<style>
+  .mult { display: grid; gap: 2px; font-family: var(--f-mono); font-size: var(--fs-xs); }
+  .mult .c { text-align: center; padding: .12em 0; border-radius: 4px; background: var(--bg); border: 1px solid var(--border); color: var(--text-dim); min-width: 0; }
+  .mult .c.h { background: var(--bg-light); color: var(--accent-alt); font-weight: 700; }
+  .mult .c.uno { background: color-mix(in srgb, var(--success) 26%, var(--bg)); border-color: var(--success); color: var(--text); font-weight: 700; }
+  .mult .c.nr { background: color-mix(in srgb, var(--danger) 16%, var(--bg)); }
+  .due { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+  .tre { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .6rem; }
+  .big-n { font-family: var(--f-title); font-weight: 700; color: var(--accent-alt); }
+  .lista-x { display: flex; flex-wrap: wrap; gap: .25rem .5rem; font-family: var(--f-mono); font-size: var(--fs-xs); }
+  .lista-x span { padding: .05em .45em; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); }
+  .lista-x span.si { border-color: var(--success); background: color-mix(in srgb, var(--success) 22%, var(--bg)); color: var(--text); font-weight: 700; }
+  .bot { display: grid; grid-template-columns: 1fr auto 1fr; gap: .8rem; align-items: stretch; }
+  .bot .freccia { align-self: center; font-size: 1.6rem; color: var(--text-muted); text-align: center; }
+  @media (max-width: 900px) { .due, .tre { grid-template-columns: 1fr; } .bot { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Box, Glow, Chip, Grid, Card, Btn, Field, Table, Flow, ActivityBadge, Steps, Code, BitRow } = UI;
+const { num, modB, fmt, CampoNum, Orologio, TabEuclide, TabEsteso, TabInverso, TabPotenza, conteggioMoltiplicazioni, cifre } = MatUI;
+const C = window.Cripto;
+
+/* ---------- calcolatori inline ---------- */
+
+function SimOrologio() {
+  const [n, setN] = useState(12);
+  const [a, setA] = useState('29');
+  const A = num(a);
+  const r = A === null ? null : Number(modB(A, BigInt(n)));
+  return (
+    <div className="sim">
+      <div className="sim-title">Orologio con n ore</div>
+      <Grid cols={2}>
+        <div className="stack">
+          <Field label={'Ore sul quadrante: ' + n}><input type="range" min="2" max="24" value={n} onChange={e => setN(+e.target.value)} aria-label="Numero di ore" /></Field>
+          <CampoNum label="Numero a (anche negativo)" value={a} onChange={setA} max={9} />
+          {r !== null ? (
+            <p>La lancetta, dopo <span className="mono hl">{fmt(A)}</span> passi da 0, si ferma su <span className="mono hl">{r}</span>.<br />
+              <span className="mono">{fmt(A)} mod {n} = {r}</span></p>
+          ) : <p className="muted small">Scrivi un numero intero.</p>}
+        </div>
+        <div className="center"><Orologio n={n} v={r} size={190} /></div>
+      </Grid>
+    </div>
+  );
+}
+
+function CalcMod() {
+  const [a, setA] = useState('-17');
+  const [n, setN] = useState('5');
+  const A = num(a), N = num(n);
+  const ok = A !== null && N !== null && N > 1n;
+  const r = ok ? modB(A, N) : null;
+  const q = ok ? (A - r) / N : null;
+  return (
+    <div className="sim">
+      <div className="sim-title">Calcola a mod n</div>
+      <div className="due">
+        <CampoNum label="a" value={a} onChange={setA} max={18} />
+        <CampoNum label="n (modulo)" value={n} onChange={setN} max={18} />
+      </div>
+      {ok ? (
+        <>
+          <p className="mono">{fmt(A)} = {fmt(N)} · ({fmt(q)}) + {fmt(r)}  →  <span className="hl">{fmt(A)} mod {fmt(N)} = {fmt(r)}</span></p>
+          <div className="lista-x" aria-label="Numeri congruenti">
+            {[-2, -1, 0, 1, 2].map(k => <span key={k} className={k === 0 ? 'si' : ''}>{fmt(r + N * BigInt(k))}</span>)}<span>…</span>
+          </div>
+          <p className="small muted">I numeri nella lista sono tutti <i>congruenti</i> a {fmt(r)} modulo {fmt(N)}: sullo stesso punto dell'orologio.
+            {A < 0n ? <> In PHP <span className="mono">{fmt(A)} % {fmt(N)}</span> darebbe <span className="mono">{fmt(A % N)}</span>: serve la correzione <span className="mono">((a % n) + n) % n</span>.</> : null}</p>
+        </>
+      ) : <p className="small muted">Servono due interi, con n maggiore di 1.</p>}
+    </div>
+  );
+}
+
+function CalcOperazioni() {
+  const [a, setA] = useState('47');
+  const [b, setB] = useState('38');
+  const [n, setN] = useState('7');
+  const A = num(a), B = num(b), N = num(n);
+  const ok = A !== null && B !== null && N !== null && N > 1n;
+  return (
+    <div className="sim">
+      <div className="sim-title">Somma e prodotto in modulo</div>
+      <div className="tre">
+        <CampoNum label="a" value={a} onChange={setA} max={12} />
+        <CampoNum label="b" value={b} onChange={setB} max={12} />
+        <CampoNum label="n" value={n} onChange={setN} max={12} />
+      </div>
+      {ok ? (() => {
+        const ra = modB(A, N), rb = modB(B, N);
+        return (
+          <Table mono head={['', 'Metodo lungo', 'Metodo corto (riduci prima)']} rows={[
+            ['Somma', fmt(A) + ' + ' + fmt(B) + ' = ' + fmt(A + B) + ' → ' + fmt(modB(A + B, N)), '(' + fmt(ra) + ' + ' + fmt(rb) + ') mod ' + fmt(N) + ' = ' + fmt(modB(ra + rb, N))],
+            ['Prodotto', fmt(A) + ' · ' + fmt(B) + ' = ' + fmt(A * B) + ' → ' + fmt(modB(A * B, N)), '(' + fmt(ra) + ' · ' + fmt(rb) + ') mod ' + fmt(N) + ' = ' + fmt(modB(ra * rb, N))],
+          ]} />
+        );
+      })() : <p className="small muted">Servono tre interi, con n maggiore di 1.</p>}
+    </div>
+  );
+}
+
+function TavolaMoltiplicazione() {
+  const [n, setN] = useState(7);
+  const celle = [];
+  const inv = [];
+  for (let a = 1; a < n; a++) { inv[a] = null; for (let x = 1; x < n; x++) if ((a * x) % n === 1) inv[a] = x; }
+  celle.push(<div key="h" className="c h">×</div>);
+  for (let x = 1; x < n; x++) celle.push(<div key={'h' + x} className="c h">{x}</div>);
+  for (let a = 1; a < n; a++) {
+    celle.push(<div key={'r' + a} className={'c h' + (inv[a] === null ? ' nr' : '')}>{a}</div>);
+    for (let x = 1; x < n; x++) {
+      const v = (a * x) % n;
+      celle.push(<div key={a + '-' + x} className={'c' + (v === 1 ? ' uno' : '') + (inv[a] === null ? ' nr' : '')}>{v}</div>);
+    }
+  }
+  const senza = []; for (let a = 1; a < n; a++) if (inv[a] === null) senza.push(a);
+  return (
+    <div className="sim">
+      <div className="sim-title">Tabella del prodotto modulo n</div>
+      <div className="row">
+        <Field label={'Modulo n = ' + n} className="grow"><input type="range" min="3" max="13" value={n} onChange={e => setN(+e.target.value)} aria-label="Modulo" /></Field>
+        <Chip color={senza.length ? 'warn' : 'success'}>{n} {C.isPrimo(n) ? 'è primo' : 'non è primo'}</Chip>
+      </div>
+      <div className="mult" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }} role="img" aria-label={'Tabella del prodotto modulo ' + n}>{celle}</div>
+      <p className="small">{senza.length === 0
+        ? <>Ogni riga contiene un <b className="t-success">1</b>: ogni numero ha un inverso.</>
+        : <>Le righe <b className="t-danger">{senza.join(', ')}</b> non contengono nessun 1: quei numeri non hanno inverso (hanno un fattore in comune con {n}).</>}</p>
+    </div>
+  );
+}
+
+function CalcPrimi() {
+  const [n, setN] = useState('3233');
+  const [m, setM] = useState('3120');
+  const N = num(n), M = num(m);
+  const okN = N !== null && N > 0n && N < 1000000000000000n;
+  const f = okN && N > 1n ? C.fattorizza(N).fattori : [];
+  const okM = N !== null && M !== null && N > 0n && M > 0n;
+  const g = okM ? C.mcd(N, M) : null;
+  return (
+    <div className="sim">
+      <div className="sim-title">Primo? Coprimi?</div>
+      <div className="due">
+        <CampoNum label="Numero n" value={n} onChange={setN} max={15} />
+        <CampoNum label="Un altro numero m" value={m} onChange={setM} max={15} />
+      </div>
+      {okN ? <p>{N < 2n ? <>{fmt(N)} non è né primo né composto.</> : C.isPrimo(N) ? <><span className="mono hl">{fmt(N)}</span> è <b className="t-success">primo</b>.</> :
+        <><span className="mono hl">{fmt(N)}</span> è <b className="t-warn">composto</b>: <span className="mono">{fmt(N)} = {f.map(x => fmt(x)).join(' · ')}</span></>}</p> : <p className="small muted">Numero intero positivo (massimo 15 cifre).</p>}
+      {okM ? <p><span className="mono">MCD({fmt(N)}, {fmt(M)}) = {fmt(g)}</span> → {g === 1n ? <b className="t-success">coprimi</b> : <b className="t-warn">non coprimi</b>}</p> : null}
+    </div>
+  );
+}
+
+function CalcMcd() {
+  const [a, setA] = useState('1071');
+  const [b, setB] = useState('462');
+  const A = num(a), B = num(b);
+  const ok = A !== null && B !== null && A > 0n && B > 0n;
+  return (
+    <div className="sim">
+      <div className="sim-title">Calcolatore MCD</div>
+      <div className="due">
+        <CampoNum label="Primo numero" value={a} onChange={setA} max={30} />
+        <CampoNum label="Secondo numero" value={b} onChange={setB} max={30} />
+      </div>
+      {ok ? <TabEuclide a={A} b={B} /> : <p className="small muted">Scrivi due interi positivi.</p>}
+    </div>
+  );
+}
+
+function CercaInverso() {
+  const [a, setA] = useState('7');
+  const [m, setM] = useState('15');
+  const A = num(a), M = num(m);
+  const ok = A !== null && M !== null && M > 1n && M <= 40n;
+  const lista = [];
+  let trovati = [];
+  if (ok) for (let x = 0n; x < M; x++) { const v = modB(A * x, M); lista.push({ x, v }); if (v === 1n) trovati.push(x); }
+  return (
+    <div className="sim">
+      <div className="sim-title">Cerca l'inverso a tentativi</div>
+      <div className="due">
+        <CampoNum label="a" value={a} onChange={setA} max={4} />
+        <CampoNum label="Modulo m (al massimo 40)" value={m} onChange={setM} max={2} />
+      </div>
+      {ok ? (<>
+        <div className="lista-x" aria-label="Prodotti">
+          {lista.map(o => <span key={String(o.x)} className={o.v === 1n ? 'si' : ''}>{String(o.x)}→{String(o.v)}</span>)}
+        </div>
+        <p className="small">Ogni voce è <span className="mono">x → a·x mod m</span>. {trovati.length ? <>L'inverso di {fmt(A)} modulo {fmt(M)} è <b className="mono hl">{fmt(trovati[0])}</b>.</> : <>Non compare mai 1: <b className="t-danger">nessun inverso</b> (MCD = {fmt(C.mcd(modB(A, M), M))}).</>}</p>
+      </>) : <p className="small muted">Servono a intero e modulo tra 2 e 40.</p>}
+    </div>
+  );
+}
+
+function CalcInverso() {
+  const [a, setA] = useState('17');
+  const [m, setM] = useState('3120');
+  const A = num(a), M = num(m);
+  const ok = A !== null && M !== null && M > 1n;
+  return (
+    <div className="sim">
+      <div className="sim-title">Inverso con Euclide esteso</div>
+      <div className="due">
+        <CampoNum label="a" value={a} onChange={setA} max={30} />
+        <CampoNum label="Modulo m" value={m} onChange={setM} max={30} />
+      </div>
+      {ok ? <TabInverso a={A} m={M} /> : <p className="small muted">Il modulo deve essere un intero maggiore di 1.</p>}
+    </div>
+  );
+}
+
+function CalcPhi() {
+  const [p, setP] = useState('61');
+  const [q, setQ] = useState('53');
+  const P = num(p), Q = num(q);
+  const ok = P !== null && Q !== null && P > 1n && Q > 1n && P < 1000000000000n && Q < 1000000000000n;
+  const ps = ok && C.isPrimo(P), qs = ok && C.isPrimo(Q);
+  return (
+    <div className="sim">
+      <div className="sim-title">φ(n) per n = p · q</div>
+      <div className="due">
+        <CampoNum label="p (primo)" value={p} onChange={setP} max={12} />
+        <CampoNum label="q (primo)" value={q} onChange={setQ} max={12} />
+      </div>
+      {ok && ps && qs && P !== Q ? (
+        <p className="mono">n = {fmt(P)} · {fmt(Q)} = <span className="hl">{fmt(P * Q)}</span><br />
+          φ(n) = ({fmt(P)} − 1) · ({fmt(Q)} − 1) = {fmt(P - 1n)} · {fmt(Q - 1n)} = <span className="hl">{fmt((P - 1n) * (Q - 1n))}</span></p>
+      ) : <p className="small t-warn">{!ok ? 'Servono due interi maggiori di 1.' : (!ps || !qs) ? 'Entrambi devono essere primi.' : 'p e q devono essere diversi.'}</p>}
+    </div>
+  );
+}
+
+function ContaCoprimi() {
+  const [n, setN] = useState(15);
+  const lista = []; for (let k = 1; k <= n; k++) if (C.mcd(k, n) === 1) lista.push(k);
+  return (
+    <div className="sim">
+      <div className="sim-title">φ(n) = quanti numeri da 1 a n sono coprimi con n</div>
+      <Field label={'n = ' + n}><input type="range" min="2" max="40" value={n} onChange={e => setN(+e.target.value)} aria-label="n" /></Field>
+      <div className="lista-x">{Array.from({ length: n }, (_, i) => i + 1).map(k => <span key={k} className={C.mcd(k, n) === 1 ? 'si' : ''}>{k}</span>)}</div>
+      <p className="small">I coprimi con {n} sono {lista.length}: <span className="mono hl">φ({n}) = {lista.length}</span>. {C.isPrimo(n) ? <>{n} è primo: φ = {n} − 1.</> : null}</p>
+    </div>
+  );
+}
+
+function CalcEulero() {
+  const [a, setA] = useState('2');
+  const [n, setN] = useState('15');
+  const A = num(a), N = num(n);
+  const ok = A !== null && N !== null && N > 1n && N < 1000000n && A > 0n;
+  let phi = 0n; if (ok) for (let k = 1n; k <= N; k++) if (C.mcd(k, N) === 1n) phi++;
+  const g = ok ? C.mcd(A, N) : null;
+  return (
+    <div className="sim">
+      <div className="sim-title">Verifica: a^φ(n) mod n</div>
+      <div className="due">
+        <CampoNum label="a" value={a} onChange={setA} max={8} />
+        <CampoNum label="n" value={n} onChange={setN} max={6} />
+      </div>
+      {ok ? (g === 1n
+        ? <p className="mono">φ({fmt(N)}) = {fmt(phi)}<br />{fmt(A)}^{fmt(phi)} mod {fmt(N)} = <span className="hl">{fmt(C.potenzaModulare(A, phi, N))}</span></p>
+        : <p className="small t-warn">MCD({fmt(A)}, {fmt(N)}) = {fmt(g)}: la proprietà vale solo per numeri coprimi con n.</p>)
+        : <p className="small muted">Servono a ≥ 1 e n tra 2 e 999 999.</p>}
+    </div>
+  );
+}
+
+function CalcPotenza() {
+  const [b, setB] = useState('65');
+  const [e, setE] = useState('17');
+  const [m, setM] = useState('3233');
+  const B = num(b), E = num(e), M = num(m);
+  const ok = B !== null && E !== null && M !== null && B >= 0n && E >= 0n && E < 1000000000000n && M > 1n;
+  const cont = ok ? conteggioMoltiplicazioni(E) : null;
+  return (
+    <div className="sim">
+      <div className="sim-title">Calcolatore · base ^ esponente mod modulo</div>
+      <div className="tre">
+        <CampoNum label="Base" value={b} onChange={setB} max={18} />
+        <CampoNum label="Esponente" value={e} onChange={setE} max={12} />
+        <CampoNum label="Modulo" value={m} onChange={setM} max={18} />
+      </div>
+      {ok ? <>
+        <TabPotenza base={B} esp={E} mod={M} />
+        <p className="small muted">Moltiplicazioni modulari: <span className="mono hl">{cont.totale}</span> (ingenuo: {fmt(E > 0n ? E - 1n : 0n)}).</p>
+      </> : <p className="small muted">Base ≥ 0, esponente fino a 999 999 999 999, modulo maggiore di 1.</p>}
+    </div>
+  );
+}
+
+function prossimoPrimo(x) { let n = BigInt(x); while (!C.isPrimo(n)) n++; return n; }
+const COPPIE = [
+  { etichetta: '2 cifre', p: 61n, q: 53n },
+  { etichetta: '4 cifre', p: prossimoPrimo(9000), q: prossimoPrimo(9500) },
+  { etichetta: '6 cifre', p: prossimoPrimo(900000), q: prossimoPrimo(950000) },
+  { etichetta: '7 cifre', p: prossimoPrimo(9000000), q: prossimoPrimo(9500000) },
+  { etichetta: '10 cifre', p: prossimoPrimo(9000000000n), q: prossimoPrimo(9500000000n) },
+];
+function FacileDifficile() {
+  const [i, setI] = useState(2);
+  const [ris, setRis] = useState(null);
+  const { p, q } = COPPIE[i], n = p * q;
+  const percorribile = n < 100000000000000n;
+  const prova = () => { const t0 = performance.now(); const r = C.fattorizza(n); setRis({ ...r, ms: performance.now() - t0 }); };
+  const stimaPassi = (() => { let s = 1n; while (s * s <= n) s *= 2n; return s / 2n; })();   // ordine di grandezza di sqrt(n)
+  return (
+    <div className="sim">
+      <div className="sim-title">Moltiplicare è facile, fattorizzare no</div>
+      <div className="row" role="group" aria-label="Dimensione dei primi">
+        {COPPIE.map((c, k) => <Btn key={k} small variant={k === i ? 'primary' : ''} aria-pressed={k === i} onClick={() => { setI(k); setRis(null); }}>{c.etichetta}</Btn>)}
+      </div>
+      <p className="mono">p · q = {fmt(p)} · {fmt(q)} = <span className="hl">{fmt(n)}</span> <span className="muted">(istantaneo: una moltiplicazione)</span></p>
+      <div className="row">
+        <Btn variant="primary" small onClick={prova} disabled={!percorribile}>Fattorizza {fmt(n)}</Btn>
+        {!percorribile ? <span className="small t-warn">Troppo grande per provarla qui: servirebbero circa 2^{stimaPassi.toString(2).length - 1}/2 divisioni.</span> : null}
+      </div>
+      {ris ? <p className="mono">Fattori: {ris.fattori.map(x => fmt(x)).join(' · ')}<br />Divisioni tentate: <span className="hl">{fmt(ris.tentativi)}</span> in {ris.ms.toFixed(1)} ms</p> : null}
+    </div>
+  );
+}
+
+/* ---------- dati calcolati con crypto.js ---------- */
+
+const POT = C.potenzaModularePassi(65, 17, 3233);
+const POT17 = (() => { let r = 1n; for (let i = 0; i < 17; i++) r = r * 65n; return r; })();   // 65^17 esatta, senza operatore **
+const CIFRE_NAIVE = POT.risultato && POT17.toString().length;
+const BIT_RSA = 2048, E_RSA = 65537;
+const CIFRE_RSA_ESP = Math.floor(BIT_RSA * E_RSA * Math.log10(2)) + 1;
+
+const stepEuclide = [
+  { title: 'Divisione 1', content: <p className="mono">3120 = 17 · <b className="hl">183</b> + <b className="hl">9</b> <span className="muted"> (17·183 = 3111)</span></p> },
+  { title: 'Divisione 2: si scala', content: <p className="mono">17 = 9 · <b className="hl">1</b> + <b className="hl">8</b> <span className="muted"> (ora si divide 17 per 9)</span></p> },
+  { title: 'Divisione 3', content: <p className="mono">9 = 8 · <b className="hl">1</b> + <b className="hl">1</b></p> },
+  { title: 'Divisione 4: resto zero', content: <p className="mono">8 = 1 · <b className="hl">8</b> + <b className="hl">0</b> → ultimo resto non nullo: <b className="hl">1</b></p> },
+  { title: 'Conclusione', content: <p><span className="mono hl">MCD(3120, 17) = 1</span>: i due numeri sono <b className="t-success">coprimi</b>. Per RSA è la condizione che permette di scegliere e = 17.</p> },
+];
+
+const CODICE_POT = `<?php
+function potenzaModulare(int $base, int $esp, int $mod): int {
+    $risultato = 1;
+    $base = $base % $mod;
+    while ($esp > 0) {
+        if ($esp & 1) {                       // bit meno significativo = 1?
+            $risultato = ($risultato * $base) % $mod;
+        }
+        $base = ($base * $base) % $mod;       // quadrato
+        $esp = $esp >> 1;                     // scarta il bit appena usato
+    }
+    return $risultato;
+}
+
+echo potenzaModulare(65, 17, 3233);`;
+const SPIEGA_POT = [
+  '', 'Base, esponente e modulo sono interi: va bene finché i numeri restano piccoli.',
+  'Il risultato parte da 1 (elemento neutro del prodotto).', 'Si riduce subito la base: i numeri restano piccoli.',
+  'Finché ci sono bit nell\'esponente, si va avanti: un giro per ogni bit.', 'Con & 1 si legge il bit meno significativo.',
+  'Bit a 1: si moltiplica il risultato per la base, sempre riducendo con %.', 'Fine del ramo.',
+  'In ogni caso si eleva al quadrato la base (e si riduce): è il «square».', 'Lo scorrimento a destra scarta il bit usato: 10001 diventa 1000.',
+  'Fine del ciclo.', 'Il risultato è base^esp mod mod, senza mai calcolare la potenza completa.', '', '', 'Prova: cifrare 65 con e = 17, n = 3233.',
+];
+
+/* ---------- le slide ---------- */
+
+const slides = [
+  { copertina: true, sezione: 'Apertura', titolo: 'La matematica di RSA',
+    sottotitolo: 'Orologi, resti, numeri primi e potenze: gli attrezzi con cui si costruisce il cifrario a chiave pubblica.',
+    note: ['Modulo di preparazione a RSA. Non serve alcuna teoria dei numeri precedente: si parte dall\'orologio e si arriva a un problema facile in un verso e difficile nell\'altro.', 'Tutti i numeri sono calcolati dal motore del progetto. Le pagine per smartphone riprendono gli stessi calcolatori con la tabella dei passi.'] },
+
+  { sezione: 'Idea', titolo: 'Cosa ci serve per RSA',
+    contenuto: () => (
+      <div className="stack-lg">
+        <p className="lead">RSA usa pochi ingredienti, ma bisogna padroneggiarli uno per uno.</p>
+        <Flow steps={[
+          { icon: '🕒', label: 'Aritmetica modulare', sub: 'i numeri «girano»', color: 'var(--info)' },
+          { icon: '🔗', label: 'MCD e coprimi', sub: 'Euclide', color: 'var(--info)' },
+          { icon: '↩️', label: 'Inverso modulare', sub: 'Euclide esteso', color: 'var(--accent)' },
+          { icon: 'φ', label: 'Funzione φ', sub: 'per n = p · q', color: 'var(--accent)' },
+          { icon: '⚡', label: 'Potenza modulare', sub: 'square-and-multiply', color: 'var(--success)' },
+          { icon: '🚪', label: 'Funzione con botola', sub: 'facile / difficile', color: 'var(--danger)' },
+        ]} />
+        <Box type="info" title="Come si usa">Ogni slide ha un calcolatore. Inserite numeri vostri: il motore mostra la tabella dei passi, non solo il risultato.</Box>
+      </div>
+    ),
+    note: 'Mappa del modulo. Gli ingredienti sono sei e ognuno ha una slide con calcolatore. Nel modulo successivo si assemblano: scelta dei primi, calcolo dell\'esponente privato con Euclide esteso, cifratura con la potenza modulare. L\'ultimo ingrediente, la botola, spiega perché RSA è sicuro.' },
+
+  { sezione: 'Aritmetica modulare', titolo: 'L\'orologio: i numeri girano',
+    contenuto: () => (
+      <div className="stack-lg">
+        <p>Sono le 9 e passano 5 ore: non sono le 14, sono le <span className="hl">2</span>. Su un orologio da 12 ore si calcola <span className="mono hl">(9 + 5) mod 12 = 2</span>.</p>
+        <SimOrologio />
+      </div>
+    ),
+    note: 'Partite da un\'esperienza nota: le ore. Poi cambiate il numero di ore con il cursore: 12 è solo un caso. Provate numeri grandi e negativi (−5 con 12 ore dà 7). Nel modulo 1 l\'alfabeto era un orologio da 26 posizioni: qui si generalizza.' },
+
+  { sezione: 'Aritmetica modulare', titolo: 'Resti e congruenze',
+    contenuto: () => (
+      <div className="stack">
+        <Grid cols={2} stretch>
+          <Card tone="accent"><h3>Il resto</h3><p><span className="mono hl">a mod n</span> è il resto della divisione di a per n, sempre tra 0 e n − 1.</p></Card>
+          <Card tone="info"><h3>Congruenza</h3><p><span className="mono hl">a ≡ b (mod n)</span> significa che a e b hanno lo stesso resto: stanno sulla stessa lancetta.</p></Card>
+        </Grid>
+        <CalcMod />
+      </div>
+    ),
+    note: 'Definizione di congruenza con il linguaggio dell\'orologio. Il calcolatore mostra anche i numeri congruenti. Con un numero negativo segnalate la trappola già incontrata con Cesare: in PHP il resto di un negativo è negativo, quindi servono le due operazioni % per riportarlo nell\'intervallo.' },
+
+  { sezione: 'Aritmetica modulare', titolo: 'Calcolare in modulo senza numeri enormi',
+    contenuto: () => (
+      <div className="stack">
+        <Glow><p className="center">Si può <span className="hl">ridurre prima</span> e calcolare dopo: <span className="mono hl">(a · b) mod n = ((a mod n) · (b mod n)) mod n</span></p></Glow>
+        <CalcOperazioni />
+        <p className="small muted">Funziona per somma, sottrazione e prodotto. La divisione no: per dividere serve l'inverso, che vediamo tra poco.</p>
+      </div>
+    ),
+    note: 'Proprietà che rende possibile RSA con numeri da 2048 bit: i risultati intermedi non crescono mai oltre n. Chiedete agli studenti di cambiare a e b con numeri molto grandi e confrontare le due colonne. La divisione è il tema della slide sull\'inverso.' },
+
+  { sezione: 'Aritmetica modulare', titolo: 'Chi ha un inverso? La tabella del prodotto',
+    contenuto: () => (
+      <div className="stack">
+        <p>L'<span className="hl">inverso</span> di a modulo n è il numero x con <span className="mono hl">a · x ≡ 1 (mod n)</span>. Cerca gli 1 nella tabella.</p>
+        <TavolaMoltiplicazione />
+      </div>
+    ),
+    note: 'Fate muovere il cursore. Con n = 7 (primo) ogni riga ha un 1; con n = 12 mancano per 2, 3, 4, 6, 8, 9, 10: sono i numeri che hanno un fattore in comune con 12. Anticipa il risultato: l\'inverso esiste se e solo se il MCD vale 1. Le righe rosse sono quelle senza inverso.' },
+
+  { sezione: 'Primi e coprimi', titolo: 'Numeri primi e numeri coprimi',
+    contenuto: () => (
+      <div className="stack">
+        <Grid cols={2} stretch>
+          <Card tone="accent"><h3>Primo</h3><p>Ha solo due divisori: 1 e se stesso. 2, 3, 5, 7, 11, … 61, 53.</p></Card>
+          <Card tone="info"><h3>Coprimi</h3><p>Due numeri sono coprimi se non hanno fattori in comune: <span className="mono hl">MCD = 1</span>. Anche 8 e 15 lo sono, pur non essendo primi.</p></Card>
+        </Grid>
+        <CalcPrimi />
+      </div>
+    ),
+    note: 'Distinguete con cura «primo» (proprietà di un numero) e «coprimi» (relazione tra due numeri). Errore classico: pensare che coprimi significhi entrambi primi. Il calcolatore scompone in fattori; per numeri di decine di cifre la scomposizione diventa lentissima, tema dell\'ultima parte del modulo.' },
+
+  { sezione: 'MCD', titolo: 'Il massimo comun divisore',
+    contenuto: () => (
+      <div className="stack-lg">
+        <p>MCD(a, b) è il <span className="hl">più grande numero che divide entrambi</span>.</p>
+        <Grid cols={2}>
+          <Card><h3>Metodo della scuola</h3><p className="mono small">36 = 2²·3² e 60 = 2²·3·5</p><p className="small">Si scompone in fattori primi e si prendono i comuni: MCD = 2² · 3 = 12.</p></Card>
+          <Card><h3>Problema</h3><p className="small">Scomporre è lento per numeri grandi. Per RSA servono numeri con centinaia di cifre: bisogna calcolare il MCD <b>senza</b> fattorizzare.</p></Card>
+        </Grid>
+        <Box type="tip" title="Idea di Euclide">MCD(a, b) = MCD(b, a mod b). Un numero che divide a e b divide anche il resto: si rimpicciolisce il problema finché il resto è zero.</Box>
+      </div>
+    ),
+    note: 'Il metodo scolastico richiede la fattorizzazione, proprio il problema difficile che sostiene RSA: sarebbe un paradosso usarlo per costruire le chiavi. Euclide (circa 300 a.C.) offre un metodo velocissimo che non scompone nulla. Verificate la scomposizione di 36 e 60 a voce.' },
+
+  { sezione: 'MCD', titolo: 'L\'algoritmo di Euclide, passo per passo',
+    contenuto: () => (
+      <div className="stack">
+        <p>MCD(3120, 17): si divide, si prende il resto, si scala di un posto.</p>
+        <Steps steps={stepEuclide} />
+        <div className="row"><ActivityBadge href="simulazione-euclide.html" label="Calcolatore Euclide per smartphone" icon="📱" /></div>
+      </div>
+    ),
+    note: 'I numeri 3120 e 17 non sono casuali: sono φ(n) ed e dell\'esempio di RSA del modulo successivo. Fate prevedere il passo seguente prima di premere Avanti. In ogni passo il «vecchio» divisore diventa il nuovo dividendo, il resto diventa il nuovo divisore.' },
+
+  { sezione: 'MCD', titolo: 'Euclide con la tabella dei passi',
+    contenuto: () => (
+      <div className="stack">
+        <p className="small muted">Prova con due numeri qualsiasi (anche molto grandi).</p>
+        <CalcMcd />
+      </div>
+    ),
+    note: 'Lasciate che gli studenti inseriscano coppie diverse: 1071 e 462 danno 21, due numeri consecutivi danno sempre 1. Notate quanto è corta la tabella anche per numeri lunghi: il numero di passi cresce con il logaritmo. Questo è il motivo per cui Euclide funziona anche con numeri da 600 cifre.' },
+
+  { sezione: 'Inverso modulare', titolo: 'L\'inverso moltiplicativo',
+    contenuto: () => (
+      <div className="stack">
+        <Grid cols={2} stretch>
+          <Card tone="accent"><h3>Definizione</h3><p>L'inverso di a modulo n è x tale che <span className="mono hl">a · x ≡ 1 (mod n)</span>.</p><p className="small mono">3 · 5 = 15 ≡ 1 (mod 7)</p></Card>
+          <Card tone="info"><h3>Quando esiste</h3><p>Se e solo se <span className="mono hl">MCD(a, n) = 1</span>.</p><p className="small">È come «dividere per a»: in RSA serve per ricavare la chiave privata.</p></Card>
+        </Grid>
+        <CercaInverso />
+      </div>
+    ),
+    note: 'La ricerca per tentativi funziona solo con moduli piccoli: per φ(n) = 3120 si proverebbero 3120 numeri, per un modulo da 2048 bit è impossibile. Serve un metodo diretto: Euclide esteso nella slide seguente. Provate 4 modulo 12 e 7 modulo 15 per vedere un caso senza e uno con inverso.' },
+
+  { sezione: 'Inverso modulare', titolo: 'Euclide esteso: i coefficienti di Bézout',
+    contenuto: () => (
+      <div className="stack">
+        <p>Oltre al MCD, l'algoritmo può fornire due interi <span className="mono hl">s</span> e <span className="mono hl">t</span> tali che <span className="mono hl">MCD = a·s + b·t</span>.</p>
+        <TabEsteso a={3120} b={17} />
+      </div>
+    ),
+    note: 'Si segue la tabella dall\'alto verso il basso: ogni riga è combinazione delle due precedenti con lo stesso quoziente q. Per costruzione ogni riga rispetta r = a·s + b·t: fate verificare a mano la riga evidenziata: 3120·2 + 17·(−367) = 6240 − 6239 = 1. La riga evidenziata ha r = 1 = MCD.' },
+
+  { sezione: 'Inverso modulare', titolo: 'Dall\'esteso all\'inverso (con verifica)',
+    contenuto: () => (
+      <div className="stack">
+        <Glow><p className="center">Da <span className="mono">1 = 3120·s + 17·t</span> modulo 3120 resta <span className="mono hl">17·t ≡ 1</span>: t è l'inverso di 17.</p></Glow>
+        <CalcInverso />
+      </div>
+    ),
+    note: 'Il passaggio chiave: modulo 3120 il termine 3120·s vale zero, quindi rimane 17·t ≡ 1. Se t è negativo si somma il modulo. Con i numeri preimpostati si ottiene 2753, l\'esponente privato dell\'esempio RSA. La riga «Verifica» conferma sempre il risultato: abituate gli studenti a controllare.' },
+
+  { sezione: 'Funzione φ di Eulero', titolo: 'La funzione φ di Eulero',
+    contenuto: () => (
+      <div className="stack">
+        <Grid cols={2} stretch>
+          <Card tone="accent"><h3>Definizione</h3><p>φ(n) = quanti numeri da 1 a n sono <span className="hl">coprimi</span> con n.</p></Card>
+          <Card tone="info"><h3>Due regole</h3><p className="mono small">φ(p) = p − 1 se p è primo<br />φ(p·q) = (p − 1)(q − 1)</p></Card>
+        </Grid>
+        <ContaCoprimi />
+        <CalcPhi />
+      </div>
+    ),
+    note: 'Prima il conteggio a mano (n piccolo), poi la scorciatoia: per n = p·q non occorre contare, basta moltiplicare (p−1)(q−1). Con n = 15 si ottengono 8 coprimi, cioè 2·4. Il fatto che φ(n) si calcoli solo conoscendo p e q è la botola di RSA: chi conosce solo n non può farlo senza fattorizzare.' },
+
+  { sezione: 'Funzione φ di Eulero', titolo: 'La proprietà magica di Eulero',
+    contenuto: () => (
+      <div className="stack">
+        <Glow><p className="center">Se MCD(a, n) = 1 allora <span className="mono hl">a^φ(n) ≡ 1 (mod n)</span></p></Glow>
+        <CalcEulero />
+        <p className="small muted">Esempio: n = 15, φ = 8; 2⁸ = 256 = 17·15 + 1. Provate con a = 3 o a = 5: perché la regola non vale?</p>
+      </div>
+    ),
+    note: 'Senza dimostrazione: si osserva e si verifica. Con a non coprimo con n la proprietà non vale (a = 3, n = 15 o a = 5, n = 15). Questa uguaglianza è il motore di RSA: nel modulo successivo la decifratura funziona proprio perché e·d è uguale a 1 più un multiplo di φ(n).' },
+
+  { sezione: 'Potenza modulare', titolo: 'Perché non si calcola prima la potenza',
+    contenuto: () => (
+      <div className="stack-lg">
+        <p>Cifrare significa calcolare <span className="mono hl">m^e mod n</span>. Vediamo la strada ingenua: prima la potenza, poi il resto.</p>
+        <Table mono head={['Caso', 'Potenza', 'Cifre del risultato']} rows={[
+          ['65^17 (esempio giocattolo)', POT17.toString(), String(CIFRE_NAIVE)],
+          ['m a 2048 bit, e = 65537', '(2^2048)^65537', 'circa ' + fmt(CIFRE_RSA_ESP)],
+        ]} />
+        <Box type="danger" title="Impraticabile">Con chiavi vere il numero intermedio avrebbe oltre <b>{fmt(CIFRE_RSA_ESP)}</b> cifre decimali, per ogni singola cifratura. Il risultato finale, invece, ha al massimo 617 cifre.</Box>
+        <p className="small muted">Soluzione: ridurre modulo n a ogni moltiplicazione, così i numeri non superano mai n.</p>
+      </div>
+    ),
+    note: 'Il numero di cifre di m^e con m di 2048 bit ed e = 65537 è calcolato come 2048 × 65537 × log10(2), arrotondato: circa 40 milioni di cifre. Non c\'è memoria che tenga per ogni messaggio. Il valore 617 cifre per n è il numero di cifre decimali di 2^2048. La soluzione sfrutta la proprietà vista sulle operazioni modulari.' },
+
+  { sezione: 'Potenza modulare', titolo: 'Square-and-multiply',
+    contenuto: () => (
+      <div className="stack">
+        <p>Si scorre l'esponente <span className="hl">in binario</span>: 17 = <span className="mono hl">10001</span>. Per ogni bit si eleva al quadrato; se il bit è 1 si moltiplica anche per la base.</p>
+        <BitRow bits={POT.esponenteBinario} group={0} label="Esponente 17 in binario" marks={{ 0: 'success', 4: 'success' }} />
+        <TabPotenza base={65} esp={17} mod={3233} />
+        <p className="small muted">Solo {conteggioMoltiplicazioni(17).totale} operazioni invece di 16 moltiplicazioni: per esponenti grandi il risparmio è enorme.</p>
+      </div>
+    ),
+    note: 'La tabella è generata dalla funzione del motore: ogni riga è un bit dell\'esponente, da sinistra a destra. Fate notare che i valori restano sempre minori di 3233. Il risultato finale 2790 sarà il cifrato del messaggio 65 nel modulo 8. Per un esponente a 17 bit servono al massimo 34 moltiplicazioni modulari, non 131 071.' },
+
+  { sezione: 'Potenza modulare', titolo: 'Calcolatore di potenza modulare',
+    contenuto: () => (
+      <div className="stack">
+        <CalcPotenza />
+        <div className="row"><ActivityBadge href="simulazione-potenza-modulare.html" label="Versione per smartphone" icon="📱" /></div>
+      </div>
+    ),
+    note: 'Proposte: 65^17 mod 3233 (cifratura), poi 2790^2753 mod 3233 (decifratura): deve tornare 65. Provate anche esponenti più grandi, ad esempio 7^1000003 mod 1000007: la tabella ha solo 20 righe. Il conteggio mostra quanto il metodo sia più efficiente di quello ingenuo.' },
+
+  { sezione: 'Codice PHP', titolo: 'Potenza modulare in PHP',
+    contenuto: () => (
+      <div className="stack">
+        <Code title="potenza-modulare.php" code={CODICE_POT} reveal explain={SPIEGA_POT} />
+        <p className="small muted">Atteso: <span className="mono hl">{String(C.potenzaModulare(65, 17, 3233))}</span>. Con interi a 64 bit funziona finché <span className="mono">mod</span> è sotto circa 3 miliardi (il prodotto deve stare in un int).</p>
+      </div>
+    ),
+    note: 'La funzione è quella richiesta nel laboratorio 06. Insistete sul limite: il prodotto di due numeri minori di mod deve stare in 64 bit, quindi mod deve essere sotto 2^31,5 (circa 3 miliardi). Per chiavi vere servono GMP o bcmath (gmp_powm), non gli int nativi.' },
+
+  { sezione: 'Facile e difficile', titolo: 'Facile in un verso, difficile nell\'altro',
+    contenuto: () => (
+      <div className="stack">
+        <p>Moltiplicare due primi è immediato. Ritrovare i due primi partendo dal prodotto richiede <span className="hl">molti tentativi</span>.</p>
+        <FacileDifficile />
+      </div>
+    ),
+    note: 'Dimostrazione dal vivo: la fattorizzazione per tentativi ha un costo che cresce con la radice quadrata di n. Salendo di due cifre per volta il lavoro si moltiplica per 10. Con primi a 7 cifre il browser ci mette comunque pochi secondi; con i numeri da 10 cifre servirebbero miliardi di divisioni. Gli algoritmi migliori sono molto più sofisticati ma restano impraticabili per 2048 bit.' },
+
+  { sezione: 'Facile e difficile', titolo: 'Funzione unidirezionale con botola',
+    contenuto: () => (
+      <div className="stack-lg">
+        <div className="bot">
+          <Card tone="success"><h3>Verso facile</h3><p className="small">Dati p e q, calcolare <span className="mono">n = p · q</span>. Data una chiave, cifrare con la potenza modulare.</p></Card>
+          <div className="freccia" aria-hidden="true">⇄</div>
+          <Card tone="danger"><h3>Verso difficile</h3><p className="small">Dato n, trovare p e q. Dato c, trovare m senza la chiave privata.</p></Card>
+        </div>
+        <Box type="warn" title="La botola">Se conosci un'informazione speciale (<span className="mono">p</span> e <span className="mono">q</span>, quindi φ(n) e <span className="mono">d</span>) il verso difficile diventa facile. È il segreto del proprietario della chiave.</Box>
+        <p className="small muted">Funzione unidirezionale: facile da calcolare, difficile da invertire. Con botola: facile da invertire per chi conosce il segreto.</p>
+      </div>
+    ),
+    note: 'Sintesi concettuale del modulo: RSA non nasconde l\'algoritmo, nasconde la botola. Analogia: un lucchetto si chiude con uno scatto (facile) ma si apre solo con la chiave. Nota: non è dimostrato che fattorizzare sia davvero difficile; è un\'ipotesi sostenuta da secoli di tentativi. Le implicazioni sulla sicurezza sono nel modulo 8.' },
+
+  { sezione: 'Riepilogo', titolo: 'Riepilogo e prossimi passi',
+    contenuto: () => (
+      <div className="stack-lg">
+        <ul>
+          <li><span className="hl">Modulo</span>: si lavora con i resti, e si può ridurre prima di calcolare.</li>
+          <li><span className="hl">MCD</span> con Euclide; <span className="hl">inverso</span> con Euclide esteso se MCD = 1.</li>
+          <li><span className="hl">φ(p·q) = (p − 1)(q − 1)</span>; <span className="hl">a^φ(n) ≡ 1</span> per a coprimo con n.</li>
+          <li><span className="hl">Square-and-multiply</span> per le potenze; fattorizzare è il verso difficile.</li>
+        </ul>
+        <Grid cols={3} stretch>
+          <Card tone="accent"><h3>Laboratorio</h3><p className="small">Scrivi in PHP mcd, inverso e potenza modulare.</p><ActivityBadge href="../lab-php/06-rsa-giocattolo/scheda.html" label="Scheda del lab" icon="🧪" /></Card>
+          <Card tone="info"><h3>Esercizi</h3><p className="small">Euclide, inverso e potenze su carta.</p><ActivityBadge href="../schede/esercizi-matematica-rsa.html" label="Scheda esercizi" icon="✏️" /></Card>
+          <Card tone="success"><h3>Avanti</h3><p className="small">Assembliamo il cifrario: RSA.</p><ActivityBadge href="../modulo-8-rsa/slide.html" stesso label="Modulo 8" icon="➡️" /></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Chiusura: quattro idee da portare nel modulo 8. Gli esercizi su carta consolidano Euclide, inverso e potenza modulare prima di toccare RSA. Il laboratorio implementa le stesse funzioni in PHP con int piccoli.' },
+];
+
+Deck.mount(slides, { modulo: 7, nome: 'La matematica di RSA', indice: '../index.html' });
+</script>
+</body>
+</html>

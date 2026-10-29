@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Euclide, MCD e inverso — simulazione</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<script src="mat-ui.js"></script>
+<style>
+  .tabs { display: flex; gap: .4rem; margin: .5rem 0 .8rem; }
+  .tabs .btn { flex: 1; padding-left: .3rem; padding-right: .3rem; }
+  .due { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+  .esempi { display: flex; flex-wrap: wrap; gap: .4rem; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+const { Btn, Box, PaginaGioco } = UI;
+const { num, CampoNum, TabEuclide, TabEsteso, TabInverso, fmt } = MatUI;
+const C = window.Cripto;
+
+function Esempi({ lista, onPick }) {
+  return (
+    <div className="esempi" aria-label="Esempi pronti">
+      {lista.map((e, i) => <Btn key={i} small onClick={() => onPick(e)}>{e.join(', ')}</Btn>)}
+    </div>
+  );
+}
+
+function SimMcd() {
+  const [a, setA] = useState(UI.carica('eu-a', '3120'));
+  const [b, setB] = useState(UI.carica('eu-b', '17'));
+  const A = num(a), B = num(b);
+  const ok = A !== null && B !== null && A > 0n && B > 0n;
+  const set = (x, y) => { setA(String(x)); setB(String(y)); UI.salva('eu-a', String(x)); UI.salva('eu-b', String(y)); };
+  return (
+    <div className="sim">
+      <div className="sim-title">MCD con Euclide · tabella dei passi</div>
+      <div className="due">
+        <CampoNum label="Primo numero" value={a} onChange={v => { setA(v); UI.salva('eu-a', v); }} />
+        <CampoNum label="Secondo numero" value={b} onChange={v => { setB(v); UI.salva('eu-b', v); }} />
+      </div>
+      <Esempi lista={[[3120, 17], [252, 105], [1071, 462], [3233, 60]]} onPick={e => set(e[0], e[1])} />
+      {ok ? <TabEuclide a={A} b={B} /> : <p className="small muted">Scrivi due numeri interi positivi.</p>}
+      {ok ? <p className="small">{C.mcd(A, B) === 1n ? <><b className="t-success">Coprimi:</b> non hanno fattori in comune.</> : <><b className="t-warn">Non coprimi:</b> hanno il fattore comune {fmt(C.mcd(A, B))}.</>}</p> : null}
+    </div>
+  );
+}
+
+function SimEsteso() {
+  const [a, setA] = useState('3120');
+  const [b, setB] = useState('17');
+  const A = num(a), B = num(b);
+  const ok = A !== null && B !== null && A > 0n && B > 0n;
+  return (
+    <div className="sim">
+      <div className="sim-title">Euclide esteso · r = a·s + b·t</div>
+      <div className="due">
+        <CampoNum label="a" value={a} onChange={setA} />
+        <CampoNum label="b" value={b} onChange={setB} />
+      </div>
+      <Esempi lista={[[3120, 17], [240, 46], [99, 78]]} onPick={e => { setA(String(e[0])); setB(String(e[1])); }} />
+      {ok ? <TabEsteso a={A} b={B} /> : <p className="small muted">Scrivi due numeri interi positivi.</p>}
+    </div>
+  );
+}
+
+function SimInverso() {
+  const [a, setA] = useState(UI.carica('inv-a', '17'));
+  const [m, setM] = useState(UI.carica('inv-m', '3120'));
+  const A = num(a), M = num(m);
+  const ok = A !== null && M !== null && M > 1n;
+  return (
+    <div className="sim">
+      <div className="sim-title">Inverso moltiplicativo · x tale che a·x ≡ 1 (mod m)</div>
+      <div className="due">
+        <CampoNum label="Numero a" value={a} onChange={v => { setA(v); UI.salva('inv-a', v); }} />
+        <CampoNum label="Modulo m" value={m} onChange={v => { setM(v); UI.salva('inv-m', v); }} />
+      </div>
+      <Esempi lista={[[17, 3120], [3, 7], [5, 12], [4, 12]]} onPick={e => { setA(String(e[0])); setM(String(e[1])); }} />
+      {ok ? <TabInverso a={A} m={M} /> : <p className="small muted">Il modulo deve essere un intero maggiore di 1.</p>}
+    </div>
+  );
+}
+
+function App() {
+  const [t, setT] = useState('mcd');
+  return (
+    <PaginaGioco titolo="Euclide, MCD e inverso" indietro="slide.html#9" indietroEtichetta="Modulo 7">
+      <p>Tre calcolatori con la tabella dei passi: così vedi come si arriva al risultato, non solo il risultato.</p>
+      <div className="tabs" role="group" aria-label="Calcolatore">
+        <Btn variant={t === 'mcd' ? 'primary' : ''} aria-pressed={t === 'mcd'} onClick={() => setT('mcd')}>MCD</Btn>
+        <Btn variant={t === 'est' ? 'primary' : ''} aria-pressed={t === 'est'} onClick={() => setT('est')}>Esteso</Btn>
+        <Btn variant={t === 'inv' ? 'primary' : ''} aria-pressed={t === 'inv'} onClick={() => setT('inv')}>Inverso</Btn>
+      </div>
+      {t === 'mcd' ? <SimMcd /> : t === 'est' ? <SimEsteso /> : <SimInverso />}
+      <Box type="tip" title="Controlla">Con 17 e 3120 trovi l'inverso che serve a RSA. Poi prova 4 modulo 12: perché non esiste?</Box>
+      <p className="small muted mt">Avanti: <a className="text-link" href="simulazione-potenza-modulare.html">potenza modulare</a></p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>

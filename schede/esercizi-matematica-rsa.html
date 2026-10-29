@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Esercizi di matematica per RSA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/print.css">
+<style>
+  .scrollx { overflow-x: auto; max-width: 100%; }
+  .grande td { height: 9mm; }
+  .grande.alta td { height: 12mm; }
+  .passi td { height: 8mm; }
+  .sp { height: 22mm; border-bottom: 1px solid var(--p-line); }
+  .ex { break-inside: avoid; margin-bottom: 4mm; }
+  .ex .num { font-family: var(--f-mono); font-weight: 700; margin-right: 6pt; }
+  .sol { font-family: var(--f-mono); }
+</style>
+</head>
+<body>
+<div class="toolbar no-stampa"><a href="../index.html">← Indice</a><button onclick="window.print()">Stampa</button></div>
+<section class="sheet">
+  <div class="meta">Moduli 7 e 8 · Sistemi e Reti</div>
+  <h1>Esercizi: la matematica di RSA</h1>
+  <p>Svolgi gli esercizi a mano, mostrando i passaggi (tabella di Euclide, bit dell'esponente, verifiche). Puoi controllare i risultati con i calcolatori dei moduli 7 e 8 solo dopo aver provato.</p>
+  <div class="nota"><b>Promemoria.</b> Euclide: <i>a</i> = <i>b</i>·<i>q</i> + <i>r</i>, poi si scala. Inverso: <i>a</i>·<i>x</i> ≡ 1 (mod <i>m</i>) esiste se MCD(<i>a</i>, <i>m</i>) = 1. Square-and-multiply: per ogni bit dell'esponente (da sinistra) si eleva al quadrato; se il bit è 1 si moltiplica per la base; sempre modulo <i>n</i>.</div>
+  <h2>A · Aritmetica modulare</h2>
+<div class="ex"><p><span class="num">A1</span>Calcola 87 mod 12.</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">A2</span>Calcola (−15) mod 7. Attenzione al segno!</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">A3</span>Calcola (47 · 38) mod 7 riducendo prima i fattori.</p><div class="sp"></div></div>
+<h2>B · MCD con Euclide (scrivi la tabella delle divisioni)</h2>
+<div class="ex"><p><span class="num">B1</span>MCD(1071, 462)</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">B2</span>MCD(2145, 1001)</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">B3</span>I numeri 91 e 120 sono coprimi?</p><div class="sp"></div></div>
+<h2>C · Inverso moltiplicativo (Euclide esteso)</h2>
+<div class="ex"><p><span class="num">C1</span>Trova l'inverso di 7 modulo 40 e verificalo.</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">C2</span>Trova l'inverso di 11 modulo 60.</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">C3</span>Esiste l'inverso di 6 modulo 21? Spiega perché.</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">C4</span>Trova l'inverso di 9 modulo 26 (serve al cifrario affine del modulo 2).</p><div class="sp"></div></div>
+<h2>D · Funzione φ di Eulero</h2>
+<div class="ex"><p><span class="num">D1</span>Elenca i numeri da 1 a 15 coprimi con 15 e scrivi φ(15).</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">D2</span>Calcola φ(35) e φ(77) con la formula (p−1)(q−1).</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">D3</span>Verifica la proprietà di Eulero: 2^φ(15) mod 15.</p><div class="sp"></div></div>
+<h2>E · Potenza modulare (square-and-multiply, scrivi i bit dell'esponente)</h2>
+<div class="ex"><p><span class="num">E1</span>Calcola 5^13 mod 23.</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">E2</span>Calcola 4^11 mod 15.</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">E3</span>Calcola 7^19 mod 33.</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">E4</span>Quante moltiplicazioni modulari servono per 65^17 mod 3233 con square-and-multiply? E con il metodo ingenuo?</p><div class="sp"></div></div>
+<h2>F · Un RSA completo a mano</h2>
+<div class="ex"><p><span class="num">F1</span>Con p = 5, q = 11, e = 7: calcola n, φ(n) e d. Poi cifra m = 9.</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">F2</span>Con la chiave del punto precedente decifra c e controlla di ottenere m = 9. Poi firma m = 9 con d e verifica la firma con e.</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">F3</span>Con p = 7, q = 11, e = 13 trova le chiavi e cifra m = 5.</p><div class="sp"></div></div>
+<div class="ex"><p><span class="num">F4</span>Un attaccante intercetta la chiave pubblica (n = 391, e = 5). Fattorizza n, trova d. Perché questa chiave non è sicura?</p><div class="sp"></div></div>
+  <p>Nome e cognome: <span class="vuoto" style="min-width:14em"></span> &nbsp; Classe: <span class="vuoto" style="min-width:5em"></span></p>
+</section>
+</body>
+</html>

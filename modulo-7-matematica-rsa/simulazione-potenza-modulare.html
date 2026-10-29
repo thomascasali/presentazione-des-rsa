@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Potenza modulare — simulazione</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<script src="mat-ui.js"></script>
+<style>
+  .tre { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .5rem; }
+  .esempi { display: flex; flex-wrap: wrap; gap: .4rem; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+const { Btn, Box, PaginaGioco } = UI;
+const { num, CampoNum, TabPotenza, fmt, conteggioMoltiplicazioni, cifre } = MatUI;
+const C = window.Cripto;
+
+function App() {
+  const [b, setB] = useState(UI.carica('pm-b', '65'));
+  const [e, setE] = useState(UI.carica('pm-e', '17'));
+  const [m, setM] = useState(UI.carica('pm-m', '3233'));
+  const B = num(b), E = num(e), M = num(m);
+  const ok = B !== null && E !== null && M !== null && B >= 0n && E >= 0n && E < 1000000000000n && M > 1n;
+  const imposta = (x, y, z) => { setB(String(x)); setE(String(y)); setM(String(z)); UI.salva('pm-b', String(x)); UI.salva('pm-e', String(y)); UI.salva('pm-m', String(z)); };
+  const cont = ok ? conteggioMoltiplicazioni(E) : null;
+  // numero di cifre di base^esp senza calcolarlo: esp * log10(base)
+  const cifreNaive = ok && B > 1n ? Math.floor(Number(E) * Math.log10(Number(B))) + 1 : null;
+  return (
+    <PaginaGioco titolo="Potenza modulare" indietro="slide.html#18" indietroEtichetta="Modulo 7">
+      <p>Calcola <b className="mono hl">base ^ esponente mod modulo</b> con square-and-multiply: un passo per ogni bit dell'esponente.</p>
+      <div className="sim">
+        <div className="sim-title">Square-and-multiply</div>
+        <div className="tre">
+          <CampoNum label="Base" value={b} onChange={v => { setB(v); UI.salva('pm-b', v); }} />
+          <CampoNum label="Esponente" value={e} onChange={v => { setE(v); UI.salva('pm-e', v); }} />
+          <CampoNum label="Modulo" value={m} onChange={v => { setM(v); UI.salva('pm-m', v); }} />
+        </div>
+        <div className="esempi">
+          <Btn small onClick={() => imposta(65, 17, 3233)}>65 ^ 17 mod 3233</Btn>
+          <Btn small onClick={() => imposta(2790, 2753, 3233)}>2790 ^ 2753 mod 3233</Btn>
+          <Btn small onClick={() => imposta(2, 10, 1000)}>2 ^ 10 mod 1000</Btn>
+        </div>
+        {ok ? <TabPotenza base={B} esp={E} mod={M} /> : <p className="small muted">Servono tre interi: base ≥ 0, esponente tra 0 e 999 999 999 999, modulo maggiore di 1.</p>}
+        {ok ? (
+          <Box type="info" title="Quante operazioni?">
+            <p>Con square-and-multiply: <b className="mono hl">{cont.quadrati}</b> quadrati e <b className="mono hl">{cont.moltiplicazioni}</b> moltiplicazioni, in tutto <b className="mono hl">{cont.totale}</b> moltiplicazioni modulari.</p>
+            <p>Con il metodo ingenuo (ripetere la moltiplicazione) ne servirebbero <b className="mono">{fmt(E > 0n ? E - 1n : 0n)}</b>.</p>
+            {cifreNaive ? <p>Inoltre il numero <span className="mono">{fmt(B)}^{fmt(E)}</span> avrebbe circa <b className="mono hl">{fmt(cifreNaive)}</b> cifre: calcolare prima la potenza e poi il resto è impraticabile.</p> : null}
+          </Box>
+        ) : null}
+      </div>
+      <Box type="tip" title="Prova">Cifra 65 con (e = 17, n = 3233) e poi decifra il risultato con l'esponente 2753: devi tornare a 65.</Box>
+      <p className="small muted mt">Prima: <a className="text-link" href="simulazione-euclide.html">Euclide, MCD e inverso</a></p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>
