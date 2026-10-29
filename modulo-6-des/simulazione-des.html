@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DES: 16 round — simulazione</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="viste.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<script src="viste.js"></script>
+<style>
+  .tabs { display: flex; gap: .4rem; margin: .5rem 0 .8rem; flex-wrap: wrap; }
+  .tabs .btn { flex: 1 1 0; }
+  .barra { height: .8em; background: var(--danger-t); border-radius: 3px; min-width: 2px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Btn, Field, Box, Card, Table, BitRow, PaginaGioco } = UI;
+const C = window.Cripto, V = window.VisteDES;
+const soloHex = (s) => s.replace(/[^0-9a-fA-F]/g, '').slice(0, 16).toUpperCase();
+const flip = (b, i) => b.split('').map((x, j) => (j === i ? (x === '1' ? '0' : '1') : x)).join('');
+const casHex = () => Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase();
+
+function App() {
+  const [chiave, setChiave] = useState(() => UI.carica('des-sim-k', '133457799BBCDFF1'));
+  const [blocco, setBlocco] = useState(() => UI.carica('des-sim-b', '0123456789ABCDEF'));
+  const [decifra, setDecifra] = useState(false);
+  const [round, setRound] = useState(1);
+  const [vista, setVista] = useState('round');
+  const [pos, setPos] = useState(0);
+  const ok = chiave.length === 16 && blocco.length === 16;
+  const t = useMemo(() => (ok ? C.des.traccia(blocco, chiave, decifra) : null), [chiave, blocco, decifra]);
+  const passi = useMemo(() => (t ? V.desRoundPassi(t.round[round - 1], { matrici: true, colonneSbox: 2 }) : []), [t, round]);
+  const modificato = ok ? flip(C.hexABit(blocco), pos) : '';
+  const t2 = useMemo(() => (ok ? C.des.traccia(C.bitAHex(modificato), chiave, decifra) : null), [ok, modificato, chiave, decifra]);
+  const cambiaK = (v) => { setChiave(v); UI.salva('des-sim-k', v); };
+  const cambiaB = (v) => { setBlocco(v); UI.salva('des-sim-b', v); };
+  const voci = [['round', 'Round'], ['chiavi', 'Sottochiavi'], ['tutti', '16 round'], ['valanga', 'Valanga']];
+  const diff = t && t2 ? t.round.map((r, i) => V.pesoUno(C.xor(r.uscita.L + r.uscita.R, t2.round[i].uscita.L + t2.round[i].uscita.R))) : [];
+  return (
+    <PaginaGioco titolo="DES: i 16 round" indietro="slide.html#21" indietroEtichetta="Modulo 6" largo>
+      <div className="sim">
+        <Field label={'Chiave (16 cifre esadecimali): ' + chiave.length + '/16'} htmlFor="k"><input id="k" className="input mono" value={chiave} onChange={e => cambiaK(soloHex(e.target.value))} /></Field>
+        <Field label={(decifra ? 'Blocco cifrato' : 'Blocco in chiaro') + ' (16 cifre esadecimali): ' + blocco.length + '/16'} htmlFor="b"><input id="b" className="input mono" value={blocco} onChange={e => cambiaB(soloHex(e.target.value))} /></Field>
+        <div className="tabs" role="group" aria-label="Modo">
+          <Btn variant={!decifra ? 'primary' : ''} aria-pressed={!decifra} onClick={() => setDecifra(false)}>Cifra</Btn>
+          <Btn variant={decifra ? 'primary' : ''} aria-pressed={decifra} onClick={() => setDecifra(true)}>Decifra</Btn>
+        </div>
+        <div className="row">
+          <Btn small onClick={() => { cambiaK('133457799BBCDFF1'); cambiaB(decifra ? '85E813540F0AB405' : '0123456789ABCDEF'); }}>Vettore ufficiale</Btn>
+          <Btn small onClick={() => { cambiaK(casHex()); cambiaB(casHex()); }}>Valori casuali</Btn>
+        </div>
+        {!ok ? <div className="feedback ko" role="status">Servono 16 cifre esadecimali (0-9, A-F) per chiave e blocco.</div>
+          : <div className="feedback ok" role="status">{decifra ? 'Decifrato' : 'Cifrato'}: <b className="mono">{t.output}</b></div>}
+      </div>
+
+      {t ? (
+        <div className="mt">
+          <div className="tabs" role="group" aria-label="Vista">
+            {voci.map(([id, et]) => <Btn key={id} variant={vista === id ? 'primary' : ''} aria-pressed={vista === id} onClick={() => setVista(id)}>{et}</Btn>)}
+          </div>
+
+          {vista === 'round' ? (
+            <div className="stack">
+              <Field label={'Round ' + round + ' di 16 · usa la sottochiave K' + (decifra ? 17 - round : round)}><input type="range" min="1" max="16" value={round} onChange={e => setRound(+e.target.value)} aria-label="Round" /></Field>
+              {round === 1 ? <div className="card light">{V.Bits('Dopo IP: L0 (azzurro) e R0 (ambra)', t.ip, { group: 8, compact: true, marks: V.segna(0, 32, 'info', V.segna(32, 64, 'warn')) })}</div> : null}
+              {passi.map((p, i) => <div key={i} className="step-card"><h3>{p.title}</h3>{p.content}</div>)}
+            </div>
+          ) : null}
+
+          {vista === 'chiavi' ? (
+            <div className="stack">
+              <p className="small">PC-1 elimina i bit di parità e dà C<sub>0</sub> e D<sub>0</sub>; per ogni round si ruota a sinistra e PC-2 sceglie i 48 bit della sottochiave.</p>
+              {V.Bits('dopo PC-1 (56 bit)', t.sottochiavi.pc1, { group: 7, compact: true, marks: V.segna(0, 28, 'info', V.segna(28, 56, 'warn')) })}
+              {V.TabellaSottochiavi(t.sottochiavi, 0, 8)}
+              {V.TabellaSottochiavi(t.sottochiavi, 8, 16)}
+              {decifra ? <Box type="info" title="Decifratura">Le stesse sottochiavi si usano in ordine inverso: nel round 1 la K16, nel round 16 la K1.</Box> : null}
+            </div>
+          ) : null}
+
+          {vista === 'tutti' ? (
+            <div className="stack">
+              <p className="small">IP: <span className="mono">{C.bitAHex(t.ip)}</span> → L<sub>0</sub> = <span className="mono hl">{C.bitAHex(t.L0)}</span>, R<sub>0</sub> = <span className="mono hl">{C.bitAHex(t.R0)}</span></p>
+              <Table mono center head={['n', 'sottochiave', 'L', 'R', 'f(R,K)']} rows={t.round.map(r => [r.n, C.bitAHex(r.K), C.bitAHex(r.uscita.L), C.bitAHex(r.uscita.R), C.bitAHex(r.f.p)])} />
+              <p className="small">Dopo il round 16 e lo scambio: <span className="mono">{C.bitAHex(t.preuscita)}</span> → IP⁻¹ → <span className="mono hl">{t.output}</span></p>
+            </div>
+          ) : null}
+
+          {vista === 'valanga' ? (
+            <div className="stack">
+              <p className="small">Tocca un bit del blocco per cambiarlo e confronta i due cifrati round per round.</p>
+              <BitRow bits={modificato} group={8} compact label="Blocco con un bit invertito (il bit selezionato è in rosso)" marks={{ [pos]: 'danger' }} onToggle={i => setPos(i)} />
+              <p className="small">Cifrato originale <span className="mono">{t.output}</span> · modificato <span className="mono hl">{t2.output}</span> · diversi: <span className="hl">{V.pesoUno(C.xor(C.hexABit(t.output), C.hexABit(t2.output)))}</span> bit su 64</p>
+              <div className="scrollx"><table className="table mono"><thead><tr><th>Round</th><th>Bit diversi</th><th></th></tr></thead>
+                <tbody>{diff.map((d, i) => <tr key={i}><td>{i + 1}</td><td className="hl">{d}</td><td style={{ width: '55%' }}><div className="barra" style={{ width: (100 * d / 64) + '%' }} /></td></tr>)}</tbody></table></div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      <p className="small muted mt-lg">Il DES è un cifrario superato: simulazione solo didattica.</p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>

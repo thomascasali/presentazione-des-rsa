@@ -1,0 +1,12 @@
+/* Stili condivisi delle viste S-DES / DES (modulo 6) */
+table.sbox th.hl-col { color: var(--on-accent); background: var(--accent-alt); }
+table.sbox td { text-align: center; }
+table.sbox td.cross { background: color-mix(in srgb, var(--info) 14%, var(--bg)); color: var(--text); }
+table.sbox td.sel { background: var(--accent); color: var(--on-accent); font-weight: 800; }
+table.perm th, table.perm td { padding: .15em .4em; min-width: 1.7em; }
+.sbox-card .table { font-size: var(--fs-xs); }
+.sbox-card .table th, .sbox-card .table td { padding: .1em .3em; }
+.cella-diff { display: inline-block; width: .55em; height: .55em; margin-right: 1px; border-radius: 2px; background: var(--bg-light); border: 1px solid var(--border); }
+.cella-diff.d { background: var(--danger-t); border-color: var(--danger-t); }
+.mini-bits { display: flex; flex-wrap: wrap; gap: 2px; max-width: 100%; }
+@media (max-width: 900px) { .grid.sbox8 { grid-template-columns: minmax(0, 1fr); } }

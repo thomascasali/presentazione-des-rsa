@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S-DES a mano — scheda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/print.css">
+<style>
+  table.perm td, table.perm th { text-align: center; padding: 2pt 5pt; }
+  table.perm { width: auto; margin-bottom: 5pt; }
+  table.sb { width: auto; margin: 0 8pt 6pt 0; display: inline-table; }
+  table.sb td, table.sb th { text-align: center; padding: 2pt 7pt; }
+  table.gr td:nth-child(1) { width: 2em; text-align: center; }
+  table.gr td { padding: 5pt 6pt; vertical-align: middle; }
+  .rs { color: #1d6b2f; font-weight: 600; }
+  .vuoto { min-width: 9em; height: 1.4em; }
+</style>
+</head>
+<body>
+<div class="toolbar no-stampa"><a href="../index.html">← Indice</a><button onclick="window.print()">Stampa</button></div>
+<section class="sheet">
+  <div class="meta">Modulo 6 · DES · attività su carta</div>
+  <h1>S-DES a mano</h1>
+  <p>Cifra due blocchi con lo S-DES (Simplified DES): <b>blocco di 8 bit, chiave di 10 bit, 2 round</b>. Le tabelle sono qui sotto; i bit si numerano da 1 a sinistra. Una tabella di permutazione dice, per ogni posto dell'uscita, quale bit dell'ingresso prendere.</p>
+  <h2>Tabelle di permutazione</h2>
+  <table class="perm"><tr><th>posto</th><td class="mono"><i>1</i></td><td class="mono"><i>2</i></td><td class="mono"><i>3</i></td><td class="mono"><i>4</i></td><td class="mono"><i>5</i></td><td class="mono"><i>6</i></td><td class="mono"><i>7</i></td><td class="mono"><i>8</i></td><td class="mono"><i>9</i></td><td class="mono"><i>10</i></td></tr><tr><th>P10</th><td class="mono">3</td><td class="mono">5</td><td class="mono">2</td><td class="mono">7</td><td class="mono">4</td><td class="mono">10</td><td class="mono">1</td><td class="mono">9</td><td class="mono">8</td><td class="mono">6</td></tr></table>
+  <table class="perm"><tr><th>posto</th><td class="mono"><i>1</i></td><td class="mono"><i>2</i></td><td class="mono"><i>3</i></td><td class="mono"><i>4</i></td><td class="mono"><i>5</i></td><td class="mono"><i>6</i></td><td class="mono"><i>7</i></td><td class="mono"><i>8</i></td></tr><tr><th>P8</th><td class="mono">6</td><td class="mono">3</td><td class="mono">7</td><td class="mono">4</td><td class="mono">8</td><td class="mono">5</td><td class="mono">10</td><td class="mono">9</td></tr><tr><th>IP</th><td class="mono">2</td><td class="mono">6</td><td class="mono">3</td><td class="mono">1</td><td class="mono">4</td><td class="mono">8</td><td class="mono">5</td><td class="mono">7</td></tr><tr><th>IP⁻¹</th><td class="mono">4</td><td class="mono">1</td><td class="mono">3</td><td class="mono">5</td><td class="mono">7</td><td class="mono">2</td><td class="mono">8</td><td class="mono">6</td></tr><tr><th>E/P</th><td class="mono">4</td><td class="mono">1</td><td class="mono">2</td><td class="mono">3</td><td class="mono">2</td><td class="mono">3</td><td class="mono">4</td><td class="mono">1</td></tr></table>
+  <table class="perm"><tr><th>posto</th><td class="mono"><i>1</i></td><td class="mono"><i>2</i></td><td class="mono"><i>3</i></td><td class="mono"><i>4</i></td></tr><tr><th>P4</th><td class="mono">2</td><td class="mono">4</td><td class="mono">3</td><td class="mono">1</td></tr></table>
+  <h2>S-box</h2>
+  <p>Ingresso di 4 bit <span class="mono">b1 b2 b3 b4</span>: riga = <span class="mono">b1 b4</span>, colonna = <span class="mono">b2 b3</span>. Il valore (0-3) si scrive in 2 bit.</p>
+  <table class="sb"><tr><th>S0</th><th>00</th><th>01</th><th>10</th><th>11</th></tr><tr><th>00</th><td class="mono">1</td><td class="mono">0</td><td class="mono">3</td><td class="mono">2</td></tr><tr><th>01</th><td class="mono">3</td><td class="mono">2</td><td class="mono">1</td><td class="mono">0</td></tr><tr><th>10</th><td class="mono">0</td><td class="mono">2</td><td class="mono">1</td><td class="mono">3</td></tr><tr><th>11</th><td class="mono">3</td><td class="mono">1</td><td class="mono">3</td><td class="mono">2</td></tr></table><table class="sb"><tr><th>S1</th><th>00</th><th>01</th><th>10</th><th>11</th></tr><tr><th>00</th><td class="mono">0</td><td class="mono">1</td><td class="mono">2</td><td class="mono">3</td></tr><tr><th>01</th><td class="mono">2</td><td class="mono">0</td><td class="mono">1</td><td class="mono">3</td></tr><tr><th>10</th><td class="mono">3</td><td class="mono">0</td><td class="mono">1</td><td class="mono">0</td></tr><tr><th>11</th><td class="mono">2</td><td class="mono">1</td><td class="mono">0</td><td class="mono">3</td></tr></table>
+  <h2>I passi dell'algoritmo</h2>
+  <ol>
+    <li><b>Sottochiavi.</b> P10 → due metà da 5 bit → LS-1 (rotazione a sinistra di 1, su ciascuna metà) → P8 = K1. Poi LS-2 (altre 2 rotazioni sulle metà <i>già ruotate</i>) → P8 = K2.</li>
+    <li><b>Cifratura.</b> IP → L (4 bit) e R (4 bit) → round 1: F(R, K1) = P4(S0·S1(E/P(R) ⊕ K1)), nuova L = L ⊕ F, R invariata → SW (scambio) → round 2 con K2 (senza scambio alla fine) → IP⁻¹.</li>
+  </ol>
+</section>
+<section class="sheet">
+  <h2>Griglie da compilare</h2>
+  <h3>Esercizio 1: chiave <span class="mono">1100011101</span> · blocco in chiaro <span class="mono">10100101</span></h3>
+<table class="gr"><tr><th>#</th><th>Passo</th><th>Risultato</th></tr>
+<tr><td>1</td><td>P10 della chiave (10 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>2</td><td>dopo LS-1 sulle due metà (10 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>3</td><td>P8 → <b>K1</b> (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>4</td><td>dopo LS-2 sulle metà già ruotate (10 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>5</td><td>P8 → <b>K2</b> (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>6</td><td>IP del blocco (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>7</td><td>L (4 bit) · R (4 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>8</td><td>round 1: E/P(R) (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>9</td><td>round 1: E/P(R) ⊕ K1 (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>10</td><td>round 1: uscita S0 · S1 (2 + 2 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>11</td><td>round 1: P4 (4 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>12</td><td>round 1: nuova L = L ⊕ P4 (4 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>13</td><td>SW: R | nuova L (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>14</td><td>round 2: E/P(R) (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>15</td><td>round 2: E/P(R) ⊕ K2 (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>16</td><td>round 2: uscita S0 · S1 (2 + 2 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>17</td><td>round 2: P4 (4 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>18</td><td>round 2: L ⊕ P4 (4 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>19</td><td><b>IP⁻¹: blocco cifrato</b> (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+</table>
+  <h3>Esercizio 2: chiave <span class="mono">0010010111</span> · blocco in chiaro <span class="mono">11001010</span></h3>
+<table class="gr"><tr><th>#</th><th>Passo</th><th>Risultato</th></tr>
+<tr><td>1</td><td>P10 della chiave (10 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>2</td><td>dopo LS-1 sulle due metà (10 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>3</td><td>P8 → <b>K1</b> (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>4</td><td>dopo LS-2 sulle metà già ruotate (10 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>5</td><td>P8 → <b>K2</b> (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>6</td><td>IP del blocco (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>7</td><td>L (4 bit) · R (4 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>8</td><td>round 1: E/P(R) (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>9</td><td>round 1: E/P(R) ⊕ K1 (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>10</td><td>round 1: uscita S0 · S1 (2 + 2 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>11</td><td>round 1: P4 (4 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>12</td><td>round 1: nuova L = L ⊕ P4 (4 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>13</td><td>SW: R | nuova L (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>14</td><td>round 2: E/P(R) (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>15</td><td>round 2: E/P(R) ⊕ K2 (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>16</td><td>round 2: uscita S0 · S1 (2 + 2 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>17</td><td>round 2: P4 (4 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>18</td><td>round 2: L ⊕ P4 (4 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+<tr><td>19</td><td><b>IP⁻¹: blocco cifrato</b> (8 bit)</td><td><span class="vuoto" style="min-width:9em"></span></td></tr>
+</table>
+  <p><b>Controllo:</b> confronta il tuo cifrato con quello del simulatore (<span class="mono">modulo-6-des/simulazione-sdes.html</span>). Se non coincide, cerca il primo passo diverso.</p>
+</section>
+</body>
+</html>

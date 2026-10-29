@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab PHP 07 — DES e OpenSSL (scheda)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/print.css">
+</head>
+<body>
+<div class="toolbar no-stampa">
+  <a href="../../index.html">← Indice</a>
+  <button onclick="window.print()">Stampa la scheda</button>
+</div>
+
+<section class="sheet">
+  <div class="meta">Laboratorio PHP 07 · Sistemi e Reti</div>
+  <h1>DES e cifrari a blocchi con OpenSSL</h1>
+  <p>In PHP non si riscrive un cifrario: si usa la libreria OpenSSL. In questo laboratorio cifri e decifri con <code>openssl_encrypt()</code> e <code>openssl_decrypt()</code>, osservi con i tuoi occhi perché la modalità ECB è debole e, come sfida facoltativa, riscrivi da zero lo S-DES. Lavori nel file <code>esercizio.php</code>; <code>test.php</code> controlla il tuo codice.</p>
+
+  <h2>Prima di iniziare</h2>
+  <table>
+    <tr><th>Funzione PHP</th><th>Cosa fa</th></tr>
+    <tr><td class="mono">openssl_encrypt($testo, $algo, $chiave, $opzioni, $iv)</td><td>cifra; restituisce byte grezzi con <code>OPENSSL_RAW_DATA</code>, <code>false</code> in caso di errore</td></tr>
+    <tr><td class="mono">openssl_decrypt($cifrato, $algo, $chiave, $opzioni, $iv)</td><td>l'operazione inversa</td></tr>
+    <tr><td class="mono">random_bytes($n)</td><td>$n byte casuali sicuri (per l'IV)</td></tr>
+    <tr><td class="mono">base64_encode() / base64_decode()</td><td>rendono stampabili i byte grezzi e li riportano indietro</td></tr>
+    <tr><td class="mono">substr(), str_split()</td><td>estraggono una parte di stringa / dividono in blocchi</td></tr>
+  </table>
+  <table>
+    <tr><th>Algoritmo</th><th>Blocco</th><th>Chiave</th><th>IV (CBC)</th></tr>
+    <tr><td class="mono">des-ede3-cbc (3DES)</td><td>8 byte</td><td>24 byte</td><td>8 byte</td></tr>
+    <tr><td class="mono">aes-128-cbc</td><td>16 byte</td><td>16 byte</td><td>16 byte</td></tr>
+    <tr><td class="mono">aes-128-ecb</td><td>16 byte</td><td>16 byte</td><td>nessuno</td></tr>
+  </table>
+  <div class="nota attenzione"><b>Il DES singolo può mancare.</b> Con OpenSSL 3 l'algoritmo <code>DES-ECB</code> è nel «provider legacy», di solito spento: <code>openssl_encrypt()</code> restituisce <code>false</code>. Il 3DES e l'AES ci sono sempre. Prova da terminale: <code>php -r "print_r(openssl_get_cipher_methods());"</code> e cerca <code>des</code>.</div>
+  <div class="nota"><b>Regola d'oro dell'IV.</b> Un IV è lungo quanto il blocco, si genera a caso a <i>ogni</i> messaggio, non è segreto e si trasmette insieme al cifrato.</div>
+
+  <h2><span class="livello">Livello 1</span> 3DES e DES singolo</h2>
+  <p>Completa tre funzioni in <code>esercizio.php</code>:</p>
+  <ul>
+    <li><code>cifra3des($testo, $chiave, $iv)</code>: 3DES in CBC, risultato in base64.</li>
+    <li><code>decifra3des($base64, $chiave, $iv)</code>: l'inversa; restituisce <code>''</code> se la decifratura fallisce.</li>
+    <li><code>cifraDesSingolo($bloccoHex, $chiaveHex)</code>: un blocco di DES semplice, anche se <code>DES-ECB</code> non c'è. Suggerimento: cosa succede al 3DES (cifra con K1, decifra con K2, cifra con K3) se le tre chiavi sono uguali? Il risultato atteso per il blocco <span class="mono">0123456789ABCDEF</span> con chiave <span class="mono">133457799BBCDFF1</span> è quello che hai visto nelle slide.</li>
+  </ul>
+  <p><b>Prima di scrivere, rispondi:</b> quanti byte deve avere l'IV per <code>des-ede3-cbc</code>? E la chiave?</p>
+  <p class="righe"></p>
+  <p><b>Controllo:</b> da terminale <code>php test.php</code>.</p>
+</section>
+
+<section class="sheet">
+  <h2><span class="livello">Livello 2</span> AES, IV e ECB contro CBC</h2>
+  <p>Scrivi quattro funzioni (solo firma e TODO):</p>
+  <ol>
+    <li><code>cifraAesCbc(string $testo, string $chiave): string</code> genera un IV casuale da 16 byte, cifra con <code>aes-128-cbc</code> e restituisce <code>base64($iv . $cifrato)</code>.</li>
+    <li><code>decifraAesCbc(string $dati, string $chiave): string|false</code> separa l'IV dal cifrato e decifra; restituisce <code>false</code> se il base64 non è valido o i dati sono troppo corti.</li>
+    <li><code>cifraAesEcb(string $testo, string $chiave): string</code> cifra con <code>aes-128-ecb</code> (byte grezzi).</li>
+    <li><code>contaBlocchiUguali(string $dati, int $dim = 16): int</code> conta quanti blocchi da <code>$dim</code> byte sono identici a uno già visto.</li>
+  </ol>
+  <p><b>Esperimento.</b> Quando i test sono verdi, prova a cifrare un testo con blocchi ripetuti, per esempio <code>str_repeat('A', 64)</code>, in ECB e in CBC e conta i blocchi uguali del cifrato. Scrivi cosa osservi:</p>
+  <table>
+    <tr><th></th><th>Blocchi uguali nel cifrato ECB</th><th>Blocchi uguali nel cifrato CBC</th></tr>
+    <tr><td>64 × «A»</td><td><span class="vuoto" style="min-width:5em"></span></td><td><span class="vuoto" style="min-width:5em"></span></td></tr>
+  </table>
+  <p><b>Per riflettere:</b> perché in CBC due cifrature dello stesso testo con la stessa chiave sono diverse? Come fa il destinatario a decifrare senza conoscere l'IV in anticipo?</p>
+  <p class="righe"></p><p class="righe"></p>
+
+  <h2><span class="livello">Livello 3</span> Facoltativo: S-DES in PHP</h2>
+  <p>Riscrivi lo S-DES visto nelle slide e nel gioco «S-DES a mano». Le tabelle sono già in <code>sdesTabelle()</code>. Devi scrivere:</p>
+  <ul>
+    <li><code>sdesPermuta(string $bit, array $tabella): string</code>;</li>
+    <li><code>sdesChiavi(string $chiave): array</code> che restituisce <code>['k1' =&gt; …, 'k2' =&gt; …]</code>;</li>
+    <li><code>sdesCifra()</code> e <code>sdesDecifra()</code>: blocco di 8 bit, chiave di 10 bit, come stringhe di <code>'0'</code> e <code>'1'</code>.</li>
+  </ul>
+  <div class="nota">Aiutati con funzioni di supporto (XOR di due stringhe di bit, rotazione, lettura di una S-box con <code>bindec()</code>). I test usano chiavi e blocchi diversi, anche tutti zeri e tutti uni: calcola prima a mano un esempio e confrontalo con quello del simulatore.</div>
+
+  <h2>Come eseguire i test</h2>
+  <table>
+    <tr><th>Da terminale</th><td class="mono">cd lab-php/07-des-openssl<br>php test.php</td></tr>
+    <tr><th>Con XAMPP</th><td>copia la cartella in <span class="mono">htdocs</span> e apri <span class="mono">http://localhost/…/07-des-openssl/test.php</span> (serve l'estensione <span class="mono">openssl</span> attiva)</td></tr>
+  </table>
+  <p>Ogni riga è <b>OK</b> oppure <b>ERRORE</b>, con il valore atteso e quello ottenuto. In fondo c'è un riepilogo per livello.</p>
+
+  <h2>Consegna</h2>
+  <p>Il file <code>esercizio.php</code> con i livelli completati e il riepilogo di <code>test.php</code>.</p>
+  <p>Nome e cognome: <span class="vuoto" style="min-width:14em"></span> &nbsp; Classe: <span class="vuoto" style="min-width:5em"></span> &nbsp; Test superati: <span class="vuoto" style="min-width:4em"></span> / 35</p>
+</section>
+</body>
+</html>

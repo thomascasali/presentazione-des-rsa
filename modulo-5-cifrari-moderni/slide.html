@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modulo 5 — Cifrari moderni: bit e XOR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  .byte-tab td, .byte-tab th { white-space: nowrap; }
+  .diffrow { display: flex; flex-wrap: wrap; gap: 2px; }
+  .dc { display: inline-block; width: .8em; height: .8em; border-radius: 2px; background: var(--bg-light); border: 1px solid var(--border); }
+  .dc.d { background: var(--danger-t); border-color: var(--danger-t); }
+  .tab-spn td { vertical-align: middle; }
+  .hexbox { font-family: var(--f-mono); letter-spacing: .08em; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Box, Glow, Chip, Grid, Card, Btn, Field, Table, Flow, CompareTwo, ActivityBadge, BitRow, Steps } = UI;
+const C = window.Cripto;
+
+/* ---------- utilità ---------- */
+const enc = new TextEncoder();
+const hex2 = (n) => n.toString(16).toUpperCase().padStart(2, '0');
+const bin8 = (n) => n.toString(2).padStart(8, '0');
+const pesoUno = (b) => b.split('').filter(x => x === '1').length;
+const casuale = (nBit) => {
+  let o = '';
+  try { const a = new Uint8Array(Math.ceil(nBit / 8)); crypto.getRandomValues(a); a.forEach(x => { o += bin8(x); }); }
+  catch (e) { for (let i = 0; i < nBit; i++) o += Math.random() < .5 ? '0' : '1'; }
+  return o.slice(0, nBit);
+};
+const flip = (bit, i) => bit.split('').map((b, j) => (j === i ? (b === '1' ? '0' : '1') : b)).join('');
+const bytesDa = (bit) => bit.match(/.{8}/g) || [];
+const hexSpazi = (bit) => bytesDa(bit).map(b => hex2(parseInt(b, 2))).join(' ');
+function MiniDiff({ a, b }) {
+  return <div className="diffrow" aria-hidden="true">{a.split('').map((x, i) => <span key={i} className={'dc' + (x !== b[i] ? ' d' : '')} />)}</div>;
+}
+
+/* ---------- componenti delle slide ---------- */
+
+// Testo -> byte UTF-8, carattere per carattere.
+function TestoByte() {
+  const [t, setT] = useState('Ciao è €');
+  const car = Array.from(t).slice(0, 10);
+  const righe = car.map(c => {
+    const by = Array.from(enc.encode(c));
+    return [c === ' ' ? '␣' : c, c.codePointAt(0), by.length, by.map(hex2).join(' '), by.map(bin8).join(' ')];
+  });
+  const tot = car.reduce((s, c) => s + enc.encode(c).length, 0);
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · da carattere a byte</div>
+      <Field label="Scrivi un testo (max 10 caratteri)" htmlFor="tb"><input id="tb" className="input" value={t} onChange={e => setT(e.target.value)} /></Field>
+      <div className="scrollx">
+        <table className="table mono byte-tab"><thead><tr><th>Car.</th><th>Codice</th><th>Byte</th><th>Esadecimale</th><th>Bit</th></tr></thead>
+          <tbody>{righe.map((r, i) => <tr key={i}><td className="hl">{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td><td>{r[3]}</td><td>{r[4]}</td></tr>)}</tbody></table>
+      </div>
+      <p className="small muted">{car.length} caratteri → <span className="hl">{tot}</span> byte = {tot * 8} bit. Le lettere ASCII occupano 1 byte, le accentate 2, il simbolo € ne occupa 3.</p>
+    </div>
+  );
+}
+
+// Un byte con bit cliccabili e lettura esadecimale.
+function ByteHex() {
+  const [b, setB] = useState('01001011');
+  const n = parseInt(b, 2);
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · un byte, due cifre esadecimali</div>
+      <BitRow bits={b} group={4} label="Clicca i bit per cambiarli" onToggle={i => setB(flip(b, i))} />
+      <Table mono center head={['Nibble sinistro', 'Nibble destro', 'Esadecimale', 'Decimale', 'Carattere ASCII']}
+        rows={[[b.slice(0, 4) + ' = ' + parseInt(b.slice(0, 4), 2), b.slice(4) + ' = ' + parseInt(b.slice(4), 2), hex2(n), n, n >= 32 && n < 127 ? String.fromCharCode(n) : '(non stampabile)']]} />
+      <p className="small muted">Ogni gruppo di 4 bit (nibble) vale da 0 a 15 e si scrive con una cifra: 0-9 poi A=10, B=11, C=12, D=13, E=14, F=15.</p>
+    </div>
+  );
+}
+
+// Tabella delle proprietà con bit cliccabili.
+function ProprietaXor() {
+  const [a, setA] = useState('01101001');
+  const [k, setK] = useState('10110100');
+  const c = C.xor(a, k), d = C.xor(c, k);
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · A ⊕ K ⊕ K = A</div>
+      <BitRow bits={a} label="A (messaggio) · clicca per cambiare" onToggle={i => setA(flip(a, i))} />
+      <BitRow bits={k} label="K (chiave) · clicca per cambiare" onToggle={i => setK(flip(k, i))} />
+      <BitRow bits={c} label="C = A ⊕ K (cifrato)" marks={Object.fromEntries(c.split('').map((x, i) => [i, 'danger']))} />
+      <BitRow bits={d} label="C ⊕ K (decifrato)" marks={Object.fromEntries(d.split('').map((x, i) => [i, d[i] === a[i] ? 'success' : 'danger']))} />
+      <div className={'feedback ' + (d === a ? 'ok' : 'ko')} role="status">{d === a ? 'Decifrato uguale ad A, qualunque siano A e K.' : 'Errore'}</div>
+    </div>
+  );
+}
+
+// Cifrario XOR su testo con chiave testuale ripetuta.
+function CifrarioXor() {
+  const [msg, setMsg] = useState('Ciao a tutti');
+  const [chiave, setChiave] = useState('K3y');
+  const mb = C.testoABit(msg);
+  const kb = C.testoABit(chiave || ' ');
+  const cb = mb ? C.xorCiclico(mb, kb) : '';
+  const db = cb ? C.xorCiclico(cb, kb) : '';
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · cifrario XOR su testo</div>
+      <Grid cols={2}>
+        <Field label="Messaggio" htmlFor="xm"><input id="xm" className="input" value={msg} onChange={e => setMsg(e.target.value)} /></Field>
+        <Field label="Chiave (si ripete)" htmlFor="xk"><input id="xk" className="input mono" value={chiave} onChange={e => setChiave(e.target.value)} /></Field>
+      </Grid>
+      <div className="small muted">messaggio (hex)</div><div className="out hexbox">{hexSpazi(mb)}</div>
+      <div className="small muted">chiave ripetuta (hex)</div><div className="out hexbox">{hexSpazi(mb ? C.xorCiclico(mb.length ? '0'.repeat(mb.length) : '', kb) : '')}</div>
+      <div className="small muted">cifrato = messaggio ⊕ chiave (hex)</div><div className="out hexbox hl">{hexSpazi(cb)}</div>
+      <div className="small muted">cifrato ⊕ chiave, riletto come testo</div><div className="out">{db ? C.bitATesto(db) : ' '}</div>
+    </div>
+  );
+}
+
+// One-time pad: stesso cifrato, qualunque messaggio della stessa lunghezza.
+function OneTimePad() {
+  const M1 = 'ATTACCO';
+  const [chiave, setChiave] = useState(() => casuale(M1.length * 8));
+  const [alt, setAlt] = useState('RITIRATA'.slice(0, 7));
+  const m1b = C.testoABit(M1), cif = C.xor(m1b, chiave);
+  const alt7 = (alt + 'XXXXXXX').slice(0, 7);
+  const k2 = C.xor(cif, C.testoABit(alt7));
+  const stampabile = (b) => bytesDa(b).every(x => { const n = parseInt(x, 2); return n >= 32 && n < 127; });
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · one-time pad</div>
+      <div className="small muted">messaggio «{M1}» ⊕ chiave casuale (hex) → cifrato (hex)</div>
+      <div className="out hexbox">{hexSpazi(m1b)} ⊕ {hexSpazi(chiave)}</div>
+      <div className="out hexbox hl">{hexSpazi(cif)}</div>
+      <div className="row"><Btn small onClick={() => setChiave(casuale(M1.length * 8))}>Nuova chiave casuale</Btn></div>
+      <Field label="E se il messaggio fosse un altro? (7 lettere)" htmlFor="alt"><input id="alt" className="input mono" maxLength={7} value={alt} onChange={e => setAlt(e.target.value.toUpperCase())} /></Field>
+      <div className="small muted">chiave che trasformerebbe questo stesso cifrato in «{alt7}» (hex)</div>
+      <div className="out hexbox">{hexSpazi(k2)}</div>
+      <p className="small muted">{stampabile(k2) ? '' : 'Quella chiave è una sequenza qualsiasi di byte: per chi intercetta è indistinguibile dalla chiave vera. '}Per ogni messaggio di 7 lettere esiste una chiave che lo produce: il cifrato da solo non dice nulla.</p>
+    </div>
+  );
+}
+
+// Riuso della chiave.
+function DueVolte() {
+  const [m1, setM1] = useState('ATTACCO ALBA');
+  const [m2, setM2] = useState('RITIRATA SUD');
+  const n = Math.min(m1.length, m2.length);
+  const a = m1.slice(0, n), b = m2.slice(0, n);
+  const [chiave] = useState(() => casuale(64 * 8));
+  const k = chiave.slice(0, n * 8);
+  const c1 = n ? C.xor(C.testoABit(a), k) : '', c2 = n ? C.xor(C.testoABit(b), k) : '';
+  const cx = n ? C.xor(c1, c2) : '', mx = n ? C.xor(C.testoABit(a), C.testoABit(b)) : '';
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · la stessa chiave usata due volte</div>
+      <Grid cols={2}>
+        <Field label="Messaggio 1" htmlFor="d1"><input id="d1" className="input mono" value={m1} onChange={e => setM1(e.target.value)} /></Field>
+        <Field label="Messaggio 2" htmlFor="d2"><input id="d2" className="input mono" value={m2} onChange={e => setM2(e.target.value)} /></Field>
+      </Grid>
+      <div className="small muted">C1 = M1 ⊕ K</div><div className="out hexbox">{hexSpazi(c1)}</div>
+      <div className="small muted">C2 = M2 ⊕ K</div><div className="out hexbox">{hexSpazi(c2)}</div>
+      <div className="small muted">C1 ⊕ C2 (la chiave è sparita)</div><div className="out hexbox hl">{hexSpazi(cx)}</div>
+      <div className="small muted">M1 ⊕ M2</div><div className="out hexbox">{hexSpazi(mx)}</div>
+      <div className={'feedback ' + (cx === mx ? 'ok' : 'ko')} role="status">{cx === mx ? 'Uguali: chi intercetta C1 e C2 ottiene M1 ⊕ M2 senza conoscere K. Se indovina una parola di M1, legge la parte corrispondente di M2.' : '—'}</div>
+    </div>
+  );
+}
+
+// Attacco a testo noto contro una chiave corta ripetuta.
+function ChiaveCorta() {
+  const [chiave, setChiave] = useState('SOL');
+  const [ipotesi, setIpotesi] = useState('Gentile ');
+  const messaggio = 'Gentile cliente, la informiamo che la riunione di domani e stata spostata alle ore dieci.';
+  const kb = C.testoABit(chiave || 'A');
+  const cif = useMemo(() => C.xorCiclico(C.testoABit(messaggio), kb), [kb]);
+  const n = Math.min(ipotesi.length, bytesDa(cif).length);
+  const frammento = n ? C.xor(cif.slice(0, n * 8), C.testoABit(ipotesi.slice(0, n))) : '';
+  const testoFr = frammento ? C.bitATesto(frammento) : '';
+  const chiaveL = (chiave || 'A').length;
+  const ricostr = n >= chiaveL ? (() => { const kk = C.bitATesto(frammento).slice(0, chiaveL); return C.bitATesto(C.xorCiclico(cif, C.testoABit(kk))); })() : null;
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · attacco a testo noto</div>
+      <Field label="Chiave segreta (3-6 caratteri, il nemico non la conosce)" htmlFor="ck"><input id="ck" className="input mono" maxLength={6} value={chiave} onChange={e => setChiave(e.target.value)} /></Field>
+      <div className="small muted">cifrato intercettato (hex, primi 24 byte)</div>
+      <div className="out hexbox">{hexSpazi(cif.slice(0, 24 * 8))}…</div>
+      <Field label="Il nemico ipotizza come inizia il messaggio" htmlFor="ip"><input id="ip" className="input mono" value={ipotesi} onChange={e => setIpotesi(e.target.value)} /></Field>
+      <div className="small muted">cifrato ⊕ ipotesi = pezzo di chiave ripetuta</div>
+      <div className="out hexbox hl">{n ? hexSpazi(frammento) : ' '} {n ? <span className="muted">→ «{testoFr}»</span> : null}</div>
+      <p className="small muted">{n >= chiaveL * 2 ? 'Il pattern si ripete ogni ' + chiaveL + ' byte: la chiave è saltata fuori.' : n >= chiaveL ? 'Già un giro intero: la chiave è visibile.' : 'Serve almeno una parola lunga come la chiave.'}</p>
+      {ricostr ? <div className="feedback ok" role="status">Con la chiave ricostruita il testo si legge tutto: «{ricostr.slice(0, 60)}…»</div> : null}
+    </div>
+  );
+}
+
+// Effetto valanga: XOR (nessuna diffusione) contro DES.
+const CHIAVE_DES = '133457799BBCDFF1';
+function Valanga() {
+  const base = C.hexABit('0123456789ABCDEF');
+  const [m, setM] = useState(base);
+  const kx = C.hexABit(CHIAVE_DES);
+  const cx0 = C.xor(base, kx), cx1 = C.xor(m, kx);
+  const cd0 = C.hexABit(C.des.cifra('0123456789ABCDEF', CHIAVE_DES));
+  const cd1 = C.hexABit(C.des.cifra(C.bitAHex(m), CHIAVE_DES));
+  const dx = C.xor(cx0, cx1), dd = C.xor(cd0, cd1);
+  const nIn = pesoUno(C.xor(base, m));
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · cambia un bit del messaggio</div>
+      <BitRow bits={m} group={8} compact label="Messaggio (64 bit, clicca per invertire un bit; originale 0123456789ABCDEF)" onToggle={i => setM(flip(m, i))} />
+      <Grid cols={2}>
+        <div className="stack">
+          <div className="small"><b>Cifrario XOR</b> con la chiave {CHIAVE_DES}</div>
+          <div className="diffrow" aria-label="Bit diversi nel cifrato XOR">{dx.split('').map((x, i) => <span key={i} className={'dc' + (x === '1' ? ' d' : '')} />)}</div>
+          <div className="mono hl">{pesoUno(dx)} bit cambiati su 64</div>
+        </div>
+        <div className="stack">
+          <div className="small"><b>DES</b> con la stessa chiave</div>
+          <div className="diffrow" aria-label="Bit diversi nel cifrato DES">{dd.split('').map((x, i) => <span key={i} className={'dc' + (x === '1' ? ' d' : '')} />)}</div>
+          <div className="mono hl">{pesoUno(dd)} bit cambiati su 64</div>
+        </div>
+      </Grid>
+      <div className="row"><Btn small onClick={() => setM(base)}>Ripristina</Btn><span className="small muted">Bit invertiti nel messaggio: {nIn}. Quadrato rosso = bit del cifrato diverso dall'originale.</span></div>
+    </div>
+  );
+}
+
+// Rete SP giocattolo a 16 bit, 4 round.
+const SBOX4 = [0xC, 5, 6, 0xB, 9, 0, 0xA, 0xD, 3, 0xE, 0xF, 8, 4, 7, 1, 2];
+const CHIAVI_SPN = ['A3C5', '5E71', '9B2D', '47F8'];
+const permSpn = (bit) => { const o = Array(16).fill('0'); for (let i = 0; i < 16; i++) o[i === 15 ? 15 : (i * 4) % 15] = bit[i]; return o.join(''); };
+function spn(bit) {
+  const stati = [bit];
+  let s = bit;
+  CHIAVI_SPN.forEach((k, r) => {
+    s = C.xor(s, C.hexABit(k));
+    s = s.match(/.{4}/g).map(n => SBOX4[parseInt(n, 2)].toString(2).padStart(4, '0')).join('');
+    if (r < CHIAVI_SPN.length - 1) s = permSpn(s);
+    stati.push(s);
+  });
+  return stati;
+}
+function ReteSP() {
+  const base = '0001001000110100';
+  const [m, setM] = useState(base);
+  const a = useMemo(() => spn(base), []);
+  const b = spn(m);
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · mini rete SP (16 bit, 4 round)</div>
+      <BitRow bits={m} group={4} compact label="Ingresso: clicca per invertire un bit (originale 0001 0010 0011 0100)" onToggle={i => setM(flip(m, i))} />
+      <div className="scrollx"><table className="table mono tab-spn"><thead><tr><th>Dopo</th><th>Stato</th><th>Bit diversi</th><th>Mappa</th></tr></thead>
+        <tbody>{b.map((s, r) => <tr key={r}><td>{r === 0 ? 'ingresso' : 'round ' + r}</td><td>{s.match(/.{4}/g).join(' ')}</td><td className="hl">{pesoUno(C.xor(s, a[r]))}</td><td><MiniDiff a={a[r]} b={s} /></td></tr>)}</tbody></table></div>
+      <p className="small muted">Ogni round: XOR con la sottochiave, 4 S-box da 4 bit (confusione), permutazione dei 16 bit (diffusione; l'ultimo round non la fa). Un solo bit cambiato si propaga a molti bit.</p>
+    </div>
+  );
+}
+
+/* ---------- slide ---------- */
+const bitsCiao = C.testoABit('Ciao');
+const XOR_TAB = [[0, 0], [0, 1], [1, 0], [1, 1]].map(([a, b]) => [a, b, a ^ b]);
+
+const slides = [
+  { copertina: true, sezione: 'Apertura', titolo: 'Cifrari moderni: bit e XOR',
+    sottotitolo: 'Dai caratteri ai bit, dalla porta XOR ai cifrari a blocchi: le idee che portano al DES.',
+    note: ['Apertura del modulo. Con Cesare e Vigenère si lavorava sulle lettere. I cifrari moderni lavorano su bit: serve una base comune prima di entrare nel DES.', 'Percorso: bit ed esadecimale, XOR, one-time pad e suoi limiti, principi di Shannon (confusione e diffusione), cifrari a flusso e a blocchi, reti SP e idea di Feistel. Tasti: frecce, N note, I elenco, F schermo intero.'] },
+
+  { sezione: 'Dai caratteri ai bit', titolo: 'Il computer vede solo bit',
+    contenuto: () => (
+      <div className="stack-lg">
+        <p className="lead">Un cifrario moderno non sposta lettere: trasforma <span className="hl">sequenze di bit</span>.</p>
+        <Flow steps={[
+          { icon: '📝', label: 'Testo', sub: 'Ciao' },
+          { icon: '🔢', label: 'Codici', sub: Array.from(enc.encode('Ciao')).join(' '), color: 'var(--info)' },
+          { icon: '0️⃣', label: 'Byte (hex)', sub: C.testoAHex('Ciao').match(/../g).join(' '), color: 'var(--info)' },
+          { icon: '🔒', label: 'Cifratura sui bit', sub: 'XOR, permutazioni…', color: 'var(--danger)' },
+        ]} />
+        <BitRow bits={bitsCiao} group={8} compact label="«Ciao» in 32 bit (4 byte)" />
+        <Box type="info" title="Perché i bit">Ogni dato (testo, immagine, file) è una sequenza di byte. Se il cifrario lavora sui bit, funziona su qualunque dato, non solo sulle lettere dell'alfabeto.</Box>
+      </div>
+    ),
+    note: 'Passaggio concettuale: l\'alfabeto di 26 lettere non serve più. I numeri dello schema (codici, esadecimale, bit) sono calcolati dal motore crypto.js. Chiedete: quanti bit servono per 26 lettere? (5, ma il computer usa 8 per includere tutto il resto.)' },
+
+  { sezione: 'Dai caratteri ai bit', titolo: 'ASCII e UTF-8',
+    contenuto: () => (
+      <div className="stack">
+        <p>ASCII dà un numero a ogni carattere base (A = 65, a = 97). <span className="hl">UTF-8</span> lo estende: i caratteri comuni usano 1 byte, gli altri da 2 a 4.</p>
+        <TestoByte />
+      </div>
+    ),
+    note: 'Fate scrivere «è», «€», un emoji. Nota importante per il cifrario di Cesare del modulo 1: le lettere accentate in UTF-8 sono più byte e finivano nel ramo «else» del codice PHP. Qui diventa evidente il perché. L\'emoji vale 4 byte ma può non starci nelle 10 posizioni: il simulatore ne mostra al massimo 10.' },
+
+  { sezione: 'Dai caratteri ai bit', titolo: 'Esadecimale: i bit in breve',
+    contenuto: () => (
+      <div className="stack">
+        <p>Leggere 64 bit è faticoso. Si raggruppano a <span className="hl">4 bit</span> e ogni gruppo diventa una cifra: <span className="mono">0-9, A-F</span>. Un byte = 2 cifre.</p>
+        <ByteHex />
+        <p className="small muted">Il DES scriverà il blocco di 64 bit con 16 cifre esadecimali, per esempio <span className="mono hl">0123456789ABCDEF</span>.</p>
+      </div>
+    ),
+    note: 'Fate cliccare i bit e leggere ad alta voce nibble per nibble. Chi sbaglia di solito confonde B (11) con 8. Preparate il terreno: nel DES chiave e blocco sono sempre in esadecimale, e ogni sottochiave di 48 bit corrisponde a 12 cifre.' },
+
+  { sezione: 'XOR', titolo: 'XOR: l\'operazione dei cifrari',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2}>
+          <div className="stack">
+            <p>XOR (⊕, «o esclusivo») dà <span className="hl">1 se i due bit sono diversi</span>, 0 se sono uguali.</p>
+            <Table mono center head={['A', 'K', 'A ⊕ K']} rows={XOR_TAB} />
+          </div>
+          <div className="stack">
+            <p className="small dim">Su due sequenze si opera bit per bit:</p>
+            <BitRow bits="01101001" label="A" /><BitRow bits="10110100" label="K" />
+            <BitRow bits={C.xor('01101001', '10110100')} label="A ⊕ K" marks={{ 0: 'warn', 1: 'warn', 2: 'warn', 3: 'warn', 4: 'warn', 5: 'warn', 6: 'warn', 7: 'warn' }} />
+          </div>
+        </Grid>
+        <Box type="tip" title="Chiave = interruttore">Dove la chiave ha un 1, il bit del messaggio viene invertito; dove ha uno 0, resta com'è.</Box>
+      </div>
+    ),
+    note: 'Insistete sull\'interpretazione «la chiave decide quali bit invertire»: rende ovvia la proprietà successiva. In PHP e JavaScript l\'operatore è ^. In Python anche. La tabella è calcolata, non scritta a mano.' },
+
+  { sezione: 'XOR', titolo: 'Le proprietà: A ⊕ K ⊕ K = A',
+    contenuto: () => (
+      <div className="stack">
+        <Grid cols={2} stretch>
+          <Card tone="accent"><h3>Regole</h3><ul className="small"><li>A ⊕ 0 = A</li><li>A ⊕ A = 0</li><li>A ⊕ K = K ⊕ A</li><li>(A ⊕ K) ⊕ K = A ⊕ (K ⊕ K) = A ⊕ 0 = <span className="hl">A</span></li></ul></Card>
+          <Card tone="info"><h3>Conseguenza</h3><p className="small">Per cifrare e per decifrare si fa la <span className="hl">stessa operazione</span> con la stessa chiave. Nessun «algoritmo inverso».</p></Card>
+        </Grid>
+        <ProprietaXor />
+      </div>
+    ),
+    note: 'Cambiate bit di A e K e verificate che l\'ultima riga resti uguale ad A (il riquadro verde lo conferma). Il fatto che cifratura e decifratura coincidano è il motivo per cui XOR compare in ogni cifrario moderno, DES compreso (modulo 6).' },
+
+  { sezione: 'XOR', titolo: 'Il cifrario XOR sul testo',
+    contenuto: () => (
+      <div className="stack">
+        <p>Si trasforma il messaggio in byte e si fa lo XOR con la chiave, <span className="hl">ripetendola</span> se è più corta.</p>
+        <CifrarioXor />
+      </div>
+    ),
+    note: 'Il cifrato in generale non è testo leggibile: per questo si mostra in esadecimale. Provate con chiave di un solo carattere: è un cifrario che somiglia a Cesare, con poche chiavi. Con chiave lunga quanto il messaggio si arriva alla slide successiva.' },
+
+  { sezione: 'One-time pad', titolo: 'One-time pad: la cifratura perfetta',
+    contenuto: () => (
+      <div className="stack">
+        <Box type="success" title="Le tre regole">La chiave è <span className="hl">casuale</span>, lunga <span className="hl">quanto il messaggio</span> e usata <span className="hl">una volta sola</span>.</Box>
+        <OneTimePad />
+        <p className="small muted">Claude Shannon dimostrò nel 1949 che in queste condizioni il cifrato non rivela nulla sul messaggio (segretezza perfetta).</p>
+      </div>
+    ),
+    note: 'Il cifrario di Vernam (1917) con la chiave casuale di Mauborgne è il one-time pad; la dimostrazione di segretezza perfetta è di Shannon (1949). Il punto didattico della demo: dato un cifrato, per ogni messaggio della stessa lunghezza esiste una chiave che lo produce, quindi non c\'è modo di scegliere. Problema pratico: la chiave va scambiata in sicurezza ed è lunga quanto il messaggio. Nel simulatore la chiave usa il generatore casuale del browser.' },
+
+  { sezione: 'One-time pad', titolo: 'Se la chiave si riusa, crolla tutto',
+    contenuto: () => (
+      <div className="stack">
+        <p>Con la stessa chiave su due messaggi, lo XOR dei cifrati <span className="hl">cancella la chiave</span>: C1 ⊕ C2 = M1 ⊕ M2.</p>
+        <DueVolte />
+        <Box type="warn" title="Capitato davvero">Nel progetto Venona i crittoanalisti statunitensi lessero parti di messaggi sovietici perché alcune pagine di one-time pad erano state riusate: «una volta sola» non è una raccomandazione.</Box>
+      </div>
+    ),
+    note: 'Dimostrazione algebrica: (M1 ⊕ K) ⊕ (M2 ⊕ K) = M1 ⊕ M2 ⊕ (K ⊕ K) = M1 ⊕ M2. Chi conosce o indovina una parola in M1 recupera la parte corrispondente di M2. La chiave di questa demo è generata a caso a ogni apertura della pagina. Il riquadro finale è volutamente generico: se citate casi storici, verificate le fonti.' },
+
+  { sezione: 'Chiave corta', titolo: 'Chiave corta e ripetuta: debole',
+    contenuto: () => (
+      <div className="stack">
+        <p>Se la chiave è più corta del messaggio si ripete, e chi conosce (o indovina) l'inizio del testo la <span className="hl">legge direttamente</span>.</p>
+        <ChiaveCorta />
+      </div>
+    ),
+    note: 'Attacco a testo noto: cifrato ⊕ testo in chiaro = chiave. Qui l\'attaccante ipotizza «Gentile » (inizio tipico di una lettera) e ottiene un pezzo di chiave; se la chiave è lunga 3 vede la ripetizione. Ricorda Vigenère, che ha la stessa debolezza (modulo 3): la chiave ripetuta lascia una struttura periodica. Provate chiave di 6 caratteri e ipotesi di 8: funziona comunque.' },
+
+  { sezione: 'Principi di Shannon', titolo: 'Confusione e diffusione',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2} stretch>
+          <Card tone="accent"><h3>Confusione</h3><p>Il legame tra chiave e cifrato deve essere <span className="hl">complicato</span>: ogni bit del cifrato dipende dalla chiave in modo non lineare. Si ottiene con la <b>sostituzione</b> (S-box).</p></Card>
+          <Card tone="info"><h3>Diffusione</h3><p>Ogni bit del messaggio deve influenzare <span className="hl">molti bit</span> del cifrato, nascondendo le statistiche. Si ottiene con la <b>permutazione</b> e con più round.</p></Card>
+        </Grid>
+        <Box type="tip" title="Shannon, 1949">I due termini compaiono in «Communication Theory of Secrecy Systems»: sono ancora il criterio con cui si progettano i cifrari a blocchi.</Box>
+        <p className="small muted">Cesare e il solo XOR hanno entrambe le proprietà molto basse: un bit in ingresso cambia un solo bit in uscita.</p>
+      </div>
+    ),
+    note: 'Gli studenti conoscono già la sostituzione (Cesare) e la trasposizione (modulo 4): ora le si vede come i due ingredienti, confusione e diffusione, da combinare ripetutamente. Il DES fa proprio questo per 16 volte.' },
+
+  { sezione: 'Principi di Shannon', titolo: 'Effetto valanga',
+    contenuto: () => (
+      <div className="stack">
+        <p>Un buon cifrario: cambia <span className="hl">un solo bit</span> del messaggio e circa <span className="hl">metà</span> dei bit del cifrato cambia.</p>
+        <Valanga />
+      </div>
+    ),
+    note: 'Cliccate un bit: con lo XOR cambia esattamente un bit nel cifrato, con il DES intorno a 32 su 64 (il valore esatto dipende dal bit). È il motivo per cui nel DES non si può «indovinare a pezzi» la chiave. Nel modulo 6 si ritrova la misura round per round.' },
+
+  { sezione: 'Famiglie di cifrari', titolo: 'Cifrari a flusso e a blocchi',
+    contenuto: () => (
+      <div className="stack-lg">
+        <CompareTwo
+          left={{ icon: '🌊', title: 'A flusso', color: 'var(--info)', points: ['Genera una sequenza pseudocasuale di bit dalla chiave', 'La combina con il messaggio con XOR, bit per bit', 'Adatto a dati continui (comunicazioni in tempo reale)', 'Esempi: ChaCha20, RC4 (oggi sconsigliato)'] }}
+          right={{ icon: '🧱', title: 'A blocchi', color: 'var(--accent)', points: ['Divide il messaggio in blocchi di lunghezza fissa', 'Ogni blocco passa per più round di trasformazione', 'Serve una modalità per messaggi più lunghi (ECB, CBC…)', 'Esempi: DES (64 bit), AES (128 bit)'] }} />
+        <Flow steps={[
+          { label: 'Chiave', sub: 'segreta' },
+          { label: 'Generatore', sub: 'sequenza di bit', color: 'var(--info)' },
+          { label: '⊕ messaggio', sub: 'bit per bit', color: 'var(--accent)' },
+          { label: 'Cifrato', sub: 'stessa lunghezza', color: 'var(--danger)' },
+        ]} />
+      </div>
+    ),
+    note: 'Il cifrario a flusso è un one-time pad in cui la chiave infinita è sostituita da una sequenza pseudocasuale generata da una chiave breve: si perde la sicurezza perfetta, ma si guadagna la praticità. Il DES è a blocchi e dedichiamo il modulo 6 alla sua struttura. Il riuso della stessa sequenza (stessa chiave e stesso nonce) ricrea il problema della slide sul riuso.' },
+
+  { sezione: 'Cifrari a blocchi', titolo: 'Rete di sostituzione-permutazione',
+    contenuto: () => (
+      <div className="stack">
+        <Flow steps={[
+          { label: 'XOR chiave', sub: 'sottochiave del round', color: 'var(--info)' },
+          { label: 'S-box', sub: 'sostituzione: confusione', color: 'var(--accent)' },
+          { label: 'P-box', sub: 'permutazione: diffusione', color: 'var(--accent)' },
+          { label: '× n round', sub: 'ripeti', color: 'var(--success)' },
+        ]} />
+        <ReteSP />
+      </div>
+    ),
+    note: 'Mini rete didattica a 16 bit costruita nella pagina (S-box e permutazione prese da un cifrario leggero, sottochiavi fissate a mano): non è DES e non va usata per proteggere dati. Fate invertire un solo bit e osservate la colonna «Bit diversi» crescere round dopo round. È la stessa idea di AES, che è una rete SP.' },
+
+  { sezione: 'Cifrari a blocchi', titolo: 'L\'idea della rete di Feistel',
+    contenuto: () => (
+      <div className="stack-lg">
+        <p>Il DES non è una rete SP pura: usa la struttura di <span className="hl">Feistel</span>. Si divide il blocco in due metà, L e R.</p>
+        <Flow steps={[
+          { label: 'L, R', sub: 'due metà' },
+          { label: 'F(R, K)', sub: 'funzione con la sottochiave', color: 'var(--accent)' },
+          { label: 'L ⊕ F', sub: 'XOR con la metà sinistra', color: 'var(--info)' },
+          { label: 'Scambio', sub: 'nuova L = R, nuova R = L ⊕ F', color: 'var(--success)' },
+        ]} />
+        <Box type="info" title="Il vantaggio">La funzione F <b>non deve essere invertibile</b>: per decifrare si ripete la stessa struttura con le sottochiavi in ordine inverso. Nel modulo 6 lo si vede passo per passo.</Box>
+      </div>
+    ),
+    note: 'Solo l\'idea: la dimostrazione e l\'animazione sono nel modulo 6. Il punto da far passare: grazie allo XOR (A ⊕ K ⊕ K = A) si può usare come F qualunque trasformazione complicata, anche non reversibile, e il cifrario resta reversibile.' },
+
+  { sezione: 'Riepilogo', titolo: 'Riepilogo e prossimi passi',
+    contenuto: () => (
+      <div className="stack-lg">
+        <ul>
+          <li>Il computer cifra <span className="hl">bit</span>: testo → byte (ASCII/UTF-8) → esadecimale.</li>
+          <li>XOR: <span className="mono">A ⊕ K ⊕ K = A</span>. Con chiave casuale, lunga come il messaggio e usata una volta è <span className="hl">perfetto</span>; altrimenti è debole.</li>
+          <li>Shannon: <span className="hl">confusione</span> (S-box) e <span className="hl">diffusione</span> (permutazioni, round, effetto valanga).</li>
+          <li>Cifrari a flusso e a blocchi; reti SP e reti di Feistel.</li>
+        </ul>
+        <Grid cols={3} stretch>
+          <Card tone="accent"><h3>Simulazione</h3><p className="small">XOR bit per bit anche da smartphone.</p><ActivityBadge href="simulazione-xor.html" label="Simulazione XOR" icon="🔀" /></Card>
+          <Card tone="info"><h3>Quiz</h3><p className="small">Verifica i concetti del modulo.</p><ActivityBadge href="../quiz/quiz.html" label="Vai al quiz" icon="✅" /></Card>
+          <Card tone="success"><h3>Avanti</h3><p className="small">Feistel, S-DES e DES.</p><ActivityBadge href="../modulo-6-des/slide.html" stesso label="Modulo 6" icon="➡️" /></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Chiusura: quattro messaggi da portarsi via. Il modulo 6 userà tutto: XOR e bit, confusione e diffusione, struttura di Feistel, effetto valanga. La simulazione da smartphone permette di giocare con i bit anche a casa.' },
+];
+
+Deck.mount(slides, { modulo: 5, nome: 'Cifrari moderni', indice: '../index.html' });
+</script>
+</body>
+</html>

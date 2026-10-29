@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XOR bit a bit — simulazione</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<style>
+  .tabs { display: flex; gap: .4rem; margin: .5rem 0 .8rem; flex-wrap: wrap; }
+  .tabs .btn { flex: 1 1 0; }
+  .hexbox { font-family: var(--f-mono); letter-spacing: .06em; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+const { Btn, Field, Box, BitRow, PaginaGioco } = UI;
+const C = window.Cripto;
+const hex2 = (n) => n.toString(16).toUpperCase().padStart(2, '0');
+const flip = (b, i) => b.split('').map((x, j) => (j === i ? (x === '1' ? '0' : '1') : x)).join('');
+const hexSp = (bit) => (bit.match(/.{8}/g) || []).map(b => hex2(parseInt(b, 2))).join(' ');
+const casuale = (n) => { const a = new Uint8Array(n); try { crypto.getRandomValues(a); } catch (e) { a.forEach((_, i) => { a[i] = Math.floor(Math.random() * 256); }); } return Array.from(a).map(x => x.toString(2).padStart(8, '0')).join(''); };
+
+function Bit() {
+  const [a, setA] = useState('01001000');
+  const [k, setK] = useState('10101100');
+  const c = C.xor(a, k), d = C.xor(c, k);
+  return (
+    <div className="stack">
+      <p>Tocca i bit per invertirli. Dove la chiave vale 1, il bit del messaggio si inverte.</p>
+      <BitRow bits={a} label="Messaggio A" onToggle={i => setA(flip(a, i))} />
+      <BitRow bits={k} label="Chiave K" onToggle={i => setK(flip(k, i))} />
+      <BitRow bits={c} label="Cifrato A ⊕ K" marks={Object.fromEntries(c.split('').map((x, i) => [i, 'danger']))} />
+      <BitRow bits={d} label="Decifrato (A ⊕ K) ⊕ K" marks={Object.fromEntries(d.split('').map((x, i) => [i, x === a[i] ? 'success' : 'danger']))} />
+      <div className="feedback ok" role="status">Il decifrato è sempre uguale ad A: A ⊕ K ⊕ K = A.</div>
+    </div>
+  );
+}
+
+function Testo() {
+  const [m, setM] = useState('Ciao');
+  const [k, setK] = useState('Key');
+  const mb = C.testoABit(m), kb = C.testoABit(k || ' ');
+  const cb = mb ? C.xorCiclico(mb, kb) : '';
+  const righe = (mb.match(/.{8}/g) || []).slice(0, 8);
+  return (
+    <div className="stack">
+      <Field label="Messaggio" htmlFor="m"><input id="m" className="input" value={m} onChange={e => setM(e.target.value)} /></Field>
+      <Field label="Chiave (si ripete)" htmlFor="k"><input id="k" className="input mono" value={k} onChange={e => setK(e.target.value)} /></Field>
+      <div className="small muted">Primi byte, uno per riga</div>
+      {righe.map((b, i) => {
+        const kbyte = (kb.match(/.{8}/g) || [])[i % (kb.length / 8)];
+        return (
+          <div key={i} className="card light"><div className="mono small">byte {i + 1}</div>
+            <BitRow bits={b} group={0} compact label="messaggio" />
+            <BitRow bits={kbyte} group={0} compact label="chiave" />
+            <BitRow bits={C.xor(b, kbyte)} group={0} compact label="cifrato" marks={Object.fromEntries(Array.from({ length: 8 }, (_, j) => [j, 'danger']))} />
+          </div>
+        );
+      })}
+      <div className="small muted">Cifrato completo (esadecimale)</div>
+      <div className="out hexbox hl">{hexSp(cb) || ' '}</div>
+      <div className="small muted">Cifrato ⊕ chiave, letto come testo</div>
+      <div className="out">{cb ? C.bitATesto(C.xorCiclico(cb, kb)) : ' '}</div>
+    </div>
+  );
+}
+
+function Otp() {
+  const [m, setM] = useState('SEGRETO');
+  const [kb, setKb] = useState(() => casuale(24));
+  const mb = C.testoABit(m);
+  const k = (kb + casuale(Math.ceil(mb.length / 8))).slice(0, mb.length);
+  const cb = mb ? C.xor(mb, k) : '';
+  return (
+    <div className="stack">
+      <p>Chiave casuale lunga quanto il messaggio, usata una volta sola. Cambia il messaggio: la chiave resta la stessa finché non ne generi una nuova.</p>
+      <Field label="Messaggio" htmlFor="mo"><input id="mo" className="input" maxLength={24} value={m} onChange={e => setM(e.target.value)} /></Field>
+      <div className="small muted">Chiave casuale (hex)</div><div className="out hexbox">{hexSp(k.slice(0, mb.length)) || ' '}</div>
+      <div className="small muted">Cifrato (hex)</div><div className="out hexbox hl">{hexSp(cb) || ' '}</div>
+      <div className="row"><Btn onClick={() => setKb(casuale(24))}>Nuova chiave</Btn></div>
+      <Box type="warn" title="Attenzione">Se se ne usa la stessa chiave su un secondo messaggio la sicurezza svanisce: C1 ⊕ C2 = M1 ⊕ M2.</Box>
+    </div>
+  );
+}
+
+function App() {
+  const [t, setT] = useState('bit');
+  const voci = [['bit', 'Bit'], ['testo', 'Testo'], ['otp', 'One-time pad']];
+  return (
+    <PaginaGioco titolo="XOR bit a bit" indietro="slide.html#6" indietroEtichetta="Modulo 5">
+      <div className="tabs" role="group" aria-label="Sezioni">
+        {voci.map(([id, et]) => <Btn key={id} variant={t === id ? 'primary' : ''} aria-pressed={t === id} onClick={() => setT(id)}>{et}</Btn>)}
+      </div>
+      {t === 'bit' ? <Bit /> : t === 'testo' ? <Testo /> : <Otp />}
+      <p className="small muted mt-lg">Simulazione didattica: non usare questi cifrari per proteggere dati veri.</p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>

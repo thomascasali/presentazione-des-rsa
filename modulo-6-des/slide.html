@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modulo 6 — DES</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="viste.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<script src="viste.js"></script>
+<style>
+  .img-box canvas { width: min(100%, 36vh); margin: 0 auto; height: auto; image-rendering: pixelated; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); display: block; }
+  .img-box { text-align: center; }
+  .barra { height: .8em; background: var(--danger-t); border-radius: 3px; min-width: 2px; }
+  .grid-tab td, .grid-tab th { padding: .1em .35em; }
+  @media (min-width: 901px) { .split-code { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) !important; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useEffect, useRef } = React;
+const { Box, Glow, Chip, Grid, Card, Btn, Field, Table, Flow, CompareTwo, ActivityBadge, BitRow, Steps, Code } = UI;
+const C = window.Cripto;
+const V = window.VisteDES;
+const { m, PermView, Permutazione, segna } = V;
+const BitsJ = (p) => V.Bits(p.label, p.bits, p);
+const SDT = C.sdes.tabelle, DT = C.des.tabelle;
+
+/* ---------- vettori di prova (tutti i numeri escono da crypto.js) ---------- */
+const TV_KEY = '133457799BBCDFF1', TV_PT = '0123456789ABCDEF';
+const TD = C.des.traccia(TV_PT, TV_KEY);                 // output atteso 85E813540F0AB405
+const SD_KEY = '1010000010', SD_PT = '01110010';
+const TS = C.sdes.traccia(SD_PT, SD_KEY);                // output atteso 01110111
+const TSD = C.sdes.traccia(TS.output, SD_KEY, true);
+const PASSI_SDES = V.sdesPassi(TS, false);
+const hexDiGruppi = (bit, n) => V.raggruppa(bit, n);
+const pesoUno = V.pesoUno;
+const flip = (bit, i) => bit.split('').map((b, j) => (j === i ? (b === '1' ? '0' : '1') : b)).join('');
+
+// Griglia di una tabella DES (r righe x c colonne)
+function Griglia({ tab, c, nome }) {
+  const righe = []; for (let i = 0; i < tab.length; i += c) righe.push(tab.slice(i, i + c));
+  return <div className="scrollx"><table className="table mono center grid-tab"><thead>{nome ? <tr><th colSpan={c}>{nome}</th></tr> : null}</thead><tbody>{righe.map((r, i) => <tr key={i}>{r.map((v, j) => <td key={j}>{v}</td>)}</tr>)}</tbody></table></div>;
+}
+
+/* ---------- Feistel giocattolo: 2 metà da 8 bit, 4 round ---------- */
+const K_TOY = [0x3A, 0xC5, 0x7E, 0x91];
+const F_TOY = (r, k) => (((r ^ k) & 0x3F) * 7) & 0xFF;      // volutamente NON invertibile (perde 2 bit)
+const h2 = (n) => n.toString(16).toUpperCase().padStart(2, '0');
+function feistelRound(L, R, k) { return { L: R, R: L ^ F_TOY(R, k), f: F_TOY(R, k) }; }
+function FeistelGiocattolo() {
+  const [L0, setL0] = useState('4C');
+  const [R0, setR0] = useState('A7');
+  const [n, setN] = useState(4);
+  const l0 = parseInt(L0 || '0', 16) & 255 || 0, r0 = parseInt(R0 || '0', 16) & 255 || 0;
+  const enc = []; let L = l0, R = r0;
+  K_TOY.forEach((k, i) => { const x = feistelRound(L, R, k); enc.push({ n: i + 1, k, Lin: L, Rin: R, ...x }); L = x.L; R = x.R; });
+  const uscita = { L: R, R: L };                                      // scambio finale
+  const dec = []; L = uscita.L; R = uscita.R;
+  [...K_TOY].reverse().forEach((k, i) => { const x = feistelRound(L, R, k); dec.push({ n: i + 1, k, kn: 4 - i, Lin: L, Rin: R, ...x }); L = x.L; R = x.R; });
+  const finale = { L: R, R: L };
+  const ok = finale.L === l0 && finale.R === r0;
+  const sanit = (s) => s.replace(/[^0-9a-fA-F]/g, '').slice(0, 2).toUpperCase();
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · Feistel a 4 round (metà da 8 bit)</div>
+      <div className="row">
+        <Field label="L0 (hex)" htmlFor="l0"><input id="l0" className="input mono" style={{ width: '4.5em' }} value={L0} onChange={e => setL0(sanit(e.target.value))} /></Field>
+        <Field label="R0 (hex)" htmlFor="r0"><input id="r0" className="input mono" style={{ width: '4.5em' }} value={R0} onChange={e => setR0(sanit(e.target.value))} /></Field>
+        <Field label={'Round mostrati: ' + n} className="grow"><input type="range" min="0" max="4" value={n} onChange={e => setN(+e.target.value)} aria-label="Round mostrati" /></Field>
+      </div>
+      <Grid cols={2}>
+        <div>
+          <div className="xs muted">CIFRATURA · sottochiavi K1…K4 in ordine</div>
+          <Table mono center head={['r', 'chiave', 'L', 'R', 'F(R,K)']} rows={enc.slice(0, n).map(e => [e.n, 'K' + e.n + '=' + h2(e.k), h2(e.L), h2(e.R), h2(e.f)])} />
+          {n === 4 ? <p className="small">Dopo l'ultimo round si scambiano le metà: cifrato = <span className="mono hl">{h2(uscita.L)} {h2(uscita.R)}</span></p> : null}
+        </div>
+        <div>
+          <div className="xs muted">DECIFRATURA · stessa struttura, sottochiavi K4…K1</div>
+          <Table mono center head={['r', 'chiave', 'L', 'R', 'F(R,K)']} rows={dec.slice(0, n).map(e => [e.n, 'K' + e.kn + '=' + h2(e.k), h2(e.L), h2(e.R), h2(e.f)])} />
+          {n === 4 ? <p className="small">Scambio finale: <span className="mono hl">{h2(finale.L)} {h2(finale.R)}</span></p> : null}
+        </div>
+      </Grid>
+      <div className={'feedback ' + (ok ? 'ok' : 'ko')} role="status">
+        {n === 4 ? (ok ? 'Il blocco decifrato è uguale all\'originale ' + h2(l0) + ' ' + h2(r0) + ', anche se F perde informazione.' : 'Qualcosa non torna.') : 'Alza il cursore fino a 4 per vedere il ritorno.'}
+      </div>
+      <p className="xs muted">F(R, K) = ((R ⊕ K) AND 3F) × 7 (mod 256): scarta 2 bit, quindi non è invertibile.</p>
+    </div>
+  );
+}
+
+/* ---------- lettura di una S-box S-DES ---------- */
+function LeggiSdesSbox() {
+  const [b, setB] = useState('0110');
+  const [quale, setQuale] = useState(0);
+  const S = quale === 0 ? SDT.S0 : SDT.S1;
+  const riga = parseInt(b[0] + b[3], 2), col = parseInt(b[1] + b[2], 2);
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · leggere una S-box</div>
+      <div className="row">
+        <Btn variant={quale === 0 ? 'primary' : ''} aria-pressed={quale === 0} onClick={() => setQuale(0)}>S0</Btn>
+        <Btn variant={quale === 1 ? 'primary' : ''} aria-pressed={quale === 1} onClick={() => setQuale(1)}>S1</Btn>
+      </div>
+      <BitRow bits={b} group={0} label="4 bit in ingresso (clicca): 1° e 4° scelgono la riga, 2° e 3° la colonna" marks={{ 0: 'warn', 3: 'warn', 1: 'info', 2: 'info' }} onToggle={i => setB(flip(b, i))} />
+      <p className="small">Riga: <span className="mono hl">{b[0]}{b[3]} = {riga}</span> · colonna: <span className="mono hl">{b[1]}{b[2]} = {col}</span> · valore: <span className="mono hl">{S[riga][col]}</span> = in 2 bit <span className="mono hl">{S[riga][col].toString(2).padStart(2, '0')}</span></p>
+      <V.SboxMatrice righe={S} riga={riga} colonna={col} nome={quale === 0 ? 'S0' : 'S1'} />
+    </div>
+  );
+}
+
+/* ---------- lettura di una S-box DES ---------- */
+function LeggiDesSbox() {
+  const [b, setB] = useState('011011');
+  const [i, setI] = useState(0);
+  const riga = parseInt(b[0] + b[5], 2), col = parseInt(b.slice(1, 5), 2);
+  const val = DT.S[i][riga * 16 + col];
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · S-box del DES (6 bit → 4 bit)</div>
+      <div className="row">
+        <Field label={'S-box numero ' + (i + 1)} className="grow"><input type="range" min="0" max="7" value={i} onChange={e => setI(+e.target.value)} aria-label="Numero S-box" /></Field>
+      </div>
+      <BitRow bits={b} group={0} label="6 bit in ingresso (clicca)" marks={{ 0: 'warn', 5: 'warn', 1: 'info', 2: 'info', 3: 'info', 4: 'info' }} onToggle={j => setB(flip(b, j))} />
+      <p className="small">Riga: bit esterni <span className="mono hl">{b[0]}{b[5]} = {riga}</span> · colonna: bit interni <span className="mono hl">{b.slice(1, 5)} = {col}</span> → valore <span className="mono hl">{val}</span> = <span className="mono hl">{val.toString(2).padStart(4, '0')}</span></p>
+      <V.SboxMatrice righe={V.desRighe(i)} riga={riga} colonna={col} nome={'S' + (i + 1)} compattaCol />
+    </div>
+  );
+}
+
+/* ---------- effetto valanga sul DES ---------- */
+function ValangaDes() {
+  const [pos, setPos] = useState(0);
+  const mod = flip(C.hexABit(TV_PT), pos);
+  const t2 = C.des.traccia(C.bitAHex(mod), TV_KEY);
+  const diff = TD.round.map((r, i) => pesoUno(C.xor(r.uscita.L + r.uscita.R, t2.round[i].uscita.L + t2.round[i].uscita.R)));
+  const fin = pesoUno(C.xor(C.hexABit(TD.output), C.hexABit(t2.output)));
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · un bit cambiato, round per round</div>
+      <BitRow bits={mod} group={8} compact label="Messaggio con un bit invertito (clicca un altro bit per spostarlo)" marks={{ [pos]: 'danger' }} onToggle={i => setPos(i)} />
+      <p className="small">Messaggio: <span className="mono">{C.bitAHex(mod)}</span> (originale <span className="mono">{TV_PT}</span>) → cifrato <span className="mono hl">{t2.output}</span> contro <span className="mono">{TD.output}</span></p>
+      <div className="scrollx"><table className="table mono"><thead><tr><th>Round</th><th>Bit diversi su 64</th><th></th></tr></thead>
+        <tbody>{diff.map((d, i) => <tr key={i}><td>{i + 1}</td><td className="hl">{d}</td><td style={{ width: '60%' }}><div className="barra" style={{ width: (100 * d / 64) + '%' }} /></td></tr>)}</tbody></table></div>
+      <p className="small">Cifrato finale: <span className="hl">{fin}</span> bit diversi su 64.</p>
+    </div>
+  );
+}
+
+/* ---------- ECB e CBC con immagine ---------- */
+function disegnaPinguino(ctx) {
+  ctx.fillStyle = '#aaaaaa'; ctx.fillRect(0, 0, 64, 64);
+  const el = (x, y, rx, ry, col, rot) => { ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); ctx.fill(); };
+  el(15, 36, 4, 14, '#000000', 0.25); el(49, 36, 4, 14, '#000000', -0.25);
+  el(24, 59, 7, 3, '#555555'); el(40, 59, 7, 3, '#555555');
+  el(32, 34, 17, 24, '#000000');
+  el(32, 41, 10, 16, '#ffffff');
+  el(27, 17, 4, 4, '#ffffff'); el(37, 17, 4, 4, '#ffffff'); el(27, 17, 1.6, 1.6, '#000000'); el(37, 17, 1.6, 1.6, '#000000');
+  ctx.fillStyle = '#555555'; ctx.beginPath(); ctx.moveTo(28, 22); ctx.lineTo(36, 22); ctx.lineTo(32, 28); ctx.closePath(); ctx.fill();
+}
+function livelliPinguino() {
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64;
+  const ctx = cv.getContext('2d'); disegnaPinguino(ctx);
+  const d = ctx.getImageData(0, 0, 64, 64).data, lv = [0, 85, 170, 255], out = [];
+  for (let i = 0; i < 64 * 64; i++) {
+    const y = (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3;
+    out.push(lv.reduce((b, x) => (Math.abs(x - y) < Math.abs(b - y) ? x : b), 0));
+  }
+  return out;
+}
+function cbcCifraHex(dati, chiave, iv) {
+  let prec = iv, out = '';
+  for (let p = 0; p < dati.length; p += 16) {
+    const x = C.bitAHex(C.xor(C.hexABit(dati.substr(p, 16)), C.hexABit(prec)));
+    prec = C.des.cifra(x, chiave); out += prec;
+  }
+  return out;
+}
+const IV_DEMO = 'A1B2C3D4E5F60718';
+const cacheImg = {};
+function calcolaImmagini(chiave) {
+  if (cacheImg[chiave]) return cacheImg[chiave];
+  const lv = livelliPinguino();
+  const hex = lv.map(v => h2(v)).join('');
+  const ecb = C.ecb(hex, chiave, { padding: false }).output;
+  const cbc = cbcCifraHex(hex, chiave, IV_DEMO);
+  const ris = { orig: lv, ecb: ecb.match(/../g).map(x => parseInt(x, 16)), cbc: cbc.match(/../g).map(x => parseInt(x, 16)) };
+  cacheImg[chiave] = ris; return ris;
+}
+function Tela({ valori, titolo }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const cv = ref.current; if (!cv) return;
+    const ctx = cv.getContext('2d'), id = ctx.createImageData(64, 64);
+    valori.forEach((v, i) => { id.data[i * 4] = v; id.data[i * 4 + 1] = v; id.data[i * 4 + 2] = v; id.data[i * 4 + 3] = 255; });
+    ctx.putImageData(id, 0, 0);
+  }, [valori]);
+  return <div className="img-box"><canvas ref={ref} width="64" height="64" role="img" aria-label={titolo} /><div className="small muted">{titolo}</div></div>;
+}
+function Pinguino({ conCbc }) {
+  const [chiave, setChiave] = useState(TV_KEY);
+  const [img, setImg] = useState(null);
+  const valida = /^[0-9a-fA-F]{16}$/.test(chiave);
+  useEffect(() => { if (valida) { const t = setTimeout(() => setImg(calcolaImmagini(chiave.toUpperCase())), 30); return () => clearTimeout(t); } }, [chiave]);
+  return (
+    <div className="sim">
+      <div className="sim-title">Simulatore · cifrare un'immagine con il DES</div>
+      <Field label="Chiave DES (16 cifre esadecimali)" htmlFor="pk"><input id="pk" className="input mono" value={chiave} onChange={e => setChiave(e.target.value.toUpperCase())} /></Field>
+      {!valida ? <div className="feedback ko">La chiave deve avere 16 cifre esadecimali.</div> : null}
+      {img ? (
+        <Grid cols={conCbc ? 3 : 2} gap=".6rem">
+          <Tela valori={img.orig} titolo="Originale (4096 pixel, 1 byte ciascuno)" />
+          <Tela valori={img.ecb} titolo="Cifrata con ECB" />
+          {conCbc ? <Tela valori={img.cbc} titolo={'Cifrata con CBC (IV ' + IV_DEMO + ')'} /> : null}
+        </Grid>
+      ) : <p className="small muted">Calcolo in corso…</p>}
+      <p className="xs muted">L'immagine è 64×64 pixel con 4 livelli di grigio, un byte per pixel: 512 blocchi da 8 byte (8 pixel in riga).</p>
+    </div>
+  );
+}
+
+/* ---------- debolezza dei 56 bit ---------- */
+const SPAZIO = 72057594037927936;   // 2^56 (esattamente rappresentabile)
+function durata(s) {
+  if (s < 60) return s.toFixed(0) + ' secondi';
+  if (s < 3600) return (s / 60).toFixed(0) + ' minuti';
+  if (s < 86400) return (s / 3600).toFixed(0) + ' ore';
+  if (s < 86400 * 365) return (s / 86400).toFixed(1).replace('.', ',') + ' giorni';
+  return (s / (86400 * 365)).toLocaleString('it-IT', { maximumFractionDigits: 0 }) + ' anni';
+}
+const sepMigliaia = (n) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const RITMI = [['1 milione di chiavi/s', 1e6], ['1 miliardo di chiavi/s', 1e9], ['92 miliardi di chiavi/s (Deep Crack, dato EFF)', 92e9]];
+
+/* ---------- codice PHP ---------- */
+const CODICE_3DES = `<?php
+$chiave = random_bytes(24);          // 3DES: tre chiavi DES da 8 byte
+$iv     = random_bytes(8);           // blocco DES = 8 byte, quindi IV di 8 byte
+$testo  = 'Messaggio segreto';
+
+$cifrato = openssl_encrypt($testo, 'des-ede3-cbc', $chiave, OPENSSL_RAW_DATA, $iv);
+$invio   = base64_encode($iv . $cifrato);      // IV in chiaro davanti al cifrato
+
+$dati  = base64_decode($invio);
+$iv2   = substr($dati, 0, 8);
+$chiaro = openssl_decrypt(substr($dati, 8), 'des-ede3-cbc', $chiave, OPENSSL_RAW_DATA, $iv2);
+echo $chiaro;`;
+const SPIEGA_3DES = [
+  'Tag di apertura PHP.',
+  'random_bytes() produce byte casuali crittograficamente sicuri. 3DES vuole 24 byte di chiave (3 × 8).',
+  'Il vettore di inizializzazione (IV) ha la lunghezza del blocco: 8 byte. Va generato casuale a ogni messaggio.',
+  'Il testo da cifrare.', '',
+  'des-ede3-cbc è Triple DES in modalità EDE con CBC. OPENSSL_RAW_DATA restituisce byte grezzi, non base64. OpenSSL aggiunge da solo il padding.',
+  'L\'IV non è segreto: si trasmette davanti al cifrato. base64 rende il risultato stampabile.', '',
+  'Lato ricevente: si decodifica base64…',
+  '…si separa l\'IV (primi 8 byte)…',
+  '…e si decifra con la stessa chiave e lo stesso IV.',
+  'Stampa il messaggio originale.',
+];
+const CODICE_DES = `<?php
+$m = hex2bin('0123456789ABCDEF');
+$k = hex2bin('133457799BBCDFF1');
+
+// DES singolo: con OpenSSL 3 e' nel "provider legacy", di solito disattivato
+var_dump(openssl_encrypt($m, 'DES-ECB', $k, OPENSSL_RAW_DATA));   // bool(false)
+
+// Trucco: 3DES con K1 = K2 = K3 coincide con il DES singolo
+$c = openssl_encrypt($m, 'des-ede-ecb', $k . $k, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING);
+echo strtoupper(bin2hex($c));        // 85E813540F0AB405`;
+
+/* ---------- le slide ---------- */
+const kk2 = C.des.tripleCifra(TV_PT, TV_KEY, TV_KEY, TV_KEY);
+const K2_3 = '0E329232EA6D0D73', K3_3 = '8787878787878787';
+const c3 = C.des.tripleCifra(TV_PT, TV_KEY, K2_3, K3_3);
+const sk = TD.sottochiavi;
+
+const slides = [
+  { copertina: true, sezione: 'Apertura', titolo: 'DES',
+    sottotitolo: 'Il cifrario a blocchi che ha dominato per vent\'anni: struttura di Feistel, S-DES a mano, DES reale, modalità e successori.',
+    note: ['Modulo cardine del percorso. Si procede dal semplice al complesso: prima la struttura (Feistel), poi una versione giocattolo da calcolare a mano (S-DES), poi il DES vero con il vettore di prova ufficiale, infine le debolezze e i successori.', 'Prerequisiti dal modulo 5: bit, esadecimale, XOR, confusione e diffusione. Tasti: frecce, N note, I elenco, F schermo intero.'] },
+
+  { sezione: 'Storia', titolo: 'Da Lucifer al DES',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Table head={['Quando', 'Cosa è successo']} rows={[
+          ['Anni \'70', 'IBM, con Horst Feistel, sviluppa il cifrario Lucifer (chiave a 128 bit nelle versioni descritte).'],
+          ['1973-1974', 'Il National Bureau of Standards (NBS, oggi NIST) chiede proposte per uno standard di cifratura civile. IBM propone una variante di Lucifer.'],
+          ['1977', 'L\'NBS pubblica il DES come standard federale (FIPS 46): blocchi di 64 bit, chiave di 56 bit.'],
+          ['1999', 'Si affianca la versione Triple DES (FIPS 46-3); nel 2001 nasce AES e nel 2005 il DES viene ritirato come standard.'],
+        ]} />
+        <Box type="info" title="Perché è importante">Per la prima volta un algoritmo di cifratura <b>pubblico e standardizzato</b> poteva essere studiato da tutti. Ha ispirato quasi tutta la ricerca successiva sui cifrari a blocchi.</Box>
+      </div>
+    ),
+    note: 'Date e fatti essenziali: IBM/Lucifer, bando NBS (1973-74), standard FIPS 46 del 1977. Il ritiro formale è del 2005. Chi vuole approfondire può cercare «FIPS 46-3» sul sito del NIST. Non serve ricordare le date esatte, ma l\'ordine: Lucifer, standard, Triple DES, AES.' },
+
+  { sezione: 'Storia', titolo: 'Le polemiche: chiave corta e S-box',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2} stretch>
+          <Card tone="danger"><h3>56 bit, non 128</h3><p className="small">Lucifer usava chiavi più lunghe; nello standard la chiave è di 56 bit. Gli studiosi dell\'epoca criticarono la scelta: uno spazio di 2<sup>56</sup> chiavi sarebbe stato attaccabile con hardware dedicato.</p></Card>'
+          <Card tone="warn"><h3>Il ruolo della NSA</h3><p className="small">L\'agenzia collaborò alla revisione e si sospettò un «passaggio segreto». Un\'indagine del Senato USA (1978) non trovò manomissioni dell\'algoritmo.</p></Card>'
+        </Grid>
+        <Box type="tip" title="Il sospetto che rientrò">Nel 1990 Biham e Shamir scoprirono la crittoanalisi differenziale e si vide che le S-box del DES la resistevano bene. Coppersmith (IBM) raccontò nel 1994 che il team la conosceva già dal 1974 e aveva progettato le S-box di conseguenza.</Box>
+      </div>
+    ),
+    note: 'Sintetizzare con equilibrio: l\'accorciamento della chiave a 56 bit è un fatto; il sospetto di backdoor nelle S-box non ha trovato conferme e anzi le S-box risultarono ben progettate contro un attacco che il pubblico scoprì solo dopo. Lezione da portare: il principio di Kerckhoffs (modulo 1): l\'algoritmo pubblico ha permesso di analizzarlo per decenni. Riferimenti: Biham-Shamir 1990-91, Coppersmith 1994.' },
+
+  { sezione: 'Schema generale', titolo: 'Il DES in una figura',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { label: 'Blocco in chiaro', sub: '64 bit = 16 cifre hex' },
+          { label: 'IP', sub: 'permutazione iniziale', color: 'var(--info)' },
+          { label: '16 round', sub: 'struttura di Feistel', color: 'var(--accent)' },
+          { label: 'Scambio L/R', sub: 'dopo il round 16', color: 'var(--info)' },
+          { label: 'IP⁻¹', sub: 'permutazione finale', color: 'var(--info)' },
+          { label: 'Blocco cifrato', sub: '64 bit', color: 'var(--danger)' },
+        ]} />
+        <Grid cols={3} stretch>
+          <Card tone="accent"><h3>Blocco</h3><p className="small">64 bit in ingresso e in uscita.</p></Card>
+          <Card tone="info"><h3>Chiave</h3><p className="small">64 bit, ma 8 sono di parità: solo <span className="hl">56</span> contano. Da essa si ricavano 16 sottochiavi da 48 bit.</p></Card>
+          <Card tone="success"><h3>Round</h3><p className="small">16, ognuno con la propria sottochiave.</p></Card>
+        </Grid>
+        <p className="small muted">Esempio che useremo: chiave <span className="mono hl">{TV_KEY}</span>, blocco <span className="mono hl">{TV_PT}</span> → cifrato <span className="mono hl">{TD.output}</span>.</p>
+      </div>
+    ),
+    note: 'Visione d\'insieme da tenere davanti per il resto del modulo. La chiave da 64 bit contiene 8 bit di parità (uno per byte) che il DES ignora: da qui i 56 bit. L\'esempio finale è il vettore di prova ufficiale, calcolato dal motore crypto.js e verificato dai test del repository.' },
+
+  { sezione: 'Struttura di Feistel', titolo: 'La rete di Feistel',
+    contenuto: () => (
+      <div className="stack-lg">
+        <p>Il blocco si divide in due metà, <span className="hl">L</span> e <span className="hl">R</span>. In ogni round:</p>
+        <Glow>
+          <p className="center mono">L<sub>i</sub> = R<sub>i−1</sub></p>
+          <p className="center mono">R<sub>i</sub> = L<sub>i−1</sub> ⊕ F(R<sub>i−1</sub>, K<sub>i</sub>)</p>
+        </Glow>
+        <Flow steps={[
+          { label: 'R passa invariata', sub: 'diventa la nuova L', color: 'var(--info)' },
+          { label: 'F(R, K)', sub: 'la funzione complicata', color: 'var(--accent)' },
+          { label: '⊕ L', sub: 'XOR con la vecchia L', color: 'var(--accent)' },
+          { label: 'Nuova R', sub: 'e si ripete', color: 'var(--success)' },
+        ]} />
+        <p className="small muted">Metà del blocco resta uguale, l'altra viene mescolata con lo XOR. Dopo il round successivo le parti si invertono.</p>
+      </div>
+    ),
+    note: 'Schema cardine. Disegnate alla lavagna le due colonne L e R con le frecce incrociate. La funzione F è dove stanno la confusione e la diffusione (S-box e permutazioni); lo XOR e lo scambio sono semplici. Nel DES F ha ingresso 32 bit, sottochiave 48 bit e uscita 32 bit.' },
+
+  { sezione: 'Struttura di Feistel', titolo: 'Feistel in azione (e al contrario)',
+    contenuto: () => (
+      <div className="stack">
+        <p>Alza il cursore round dopo round: a sinistra cifri, a destra <span className="hl">decifri con la stessa struttura</span> e le sottochiavi invertite.</p>
+        <FeistelGiocattolo />
+      </div>
+    ),
+    note: 'Mini cifrario Feistel con metà da 8 bit e 4 round, costruito per la lezione (non è il DES). Fate scegliere L0 e R0 e portate il cursore passo per passo: le righe della decifratura ricalcano quelle della cifratura in ordine inverso, con le metà scambiate. Notate che la funzione F non è invertibile eppure il ritorno funziona: la dimostrazione è nella slide successiva.' },
+
+  { sezione: 'Struttura di Feistel', titolo: 'Perché si può decifrare',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2} stretch>
+          <Card tone="accent"><h3>Un round all'andata</h3><p className="mono small">L₁ = R₀</p><p className="mono small">R₁ = L₀ ⊕ F(R₀, K₁)</p></Card>
+          <Card tone="info"><h3>Come tornare indietro</h3><p className="mono small">R₀ = L₁</p><p className="mono small">L₀ = R₁ ⊕ F(L₁, K₁)</p></Card>
+        </Grid>
+        <Glow><p className="center">Perché <span className="mono hl">R₁ ⊕ F(R₀, K₁) = L₀ ⊕ F ⊕ F = L₀</span> (A ⊕ K ⊕ K = A).</p></Glow>
+        <Box type="success" title="Conseguenza">Per decifrare si applica la stessa struttura, partendo dall'ultimo round, con <b>K₁₆ per primo e K₁ per ultimo</b>. F non deve essere invertibile: basta calcolarla, non annullarla.</Box>
+      </div>
+    ),
+    note: 'Collegare al modulo 5: la proprietà dello XOR è la chiave di tutto. Nel decifrare, la metà L1 è nota (è la R0) e quindi si può ricalcolare F(R0, K1) e toglierla con XOR. Il DES applica questo ragionamento sedici volte. È il motivo per cui l\'hardware poteva usare lo stesso circuito per cifrare e decifrare.' },
+
+  { sezione: 'S-DES a mano', titolo: 'S-DES: il DES in miniatura',
+    contenuto: () => (
+      <div className="stack-lg">
+        <p>Il DES a 16 round è troppo lungo da seguire a mano. <span className="hl">S-DES</span> (Simplified DES, versione didattica di Stallings) ha la stessa struttura in piccolo.</p>
+        <Table head={['', 'DES', 'S-DES']} rows={[
+          ['Blocco', '64 bit', '8 bit'], ['Chiave', '56 bit (64 con parità)', '10 bit'], ['Round', '16', '2'], ['Sottochiavi', '16 × 48 bit', '2 × 8 bit'], ['S-box', '8 (6 → 4 bit)', '2 (4 → 2 bit)'],
+        ]} />
+        <Box type="warn" title="Attenzione">S-DES è solo un esercizio: 2<sup>10</sup> = 1024 chiavi si provano tutte in un istante. Serve a capire, non a proteggere.</Box>
+        <p className="small muted">Esempio: chiave <span className="mono hl">{SD_KEY}</span>, blocco <span className="mono hl">{SD_PT}</span> → cifrato <span className="mono hl">{TS.output}</span>.</p>
+      </div>
+    ),
+    note: 'Annunciate: nei prossimi minuti calcoliamo un blocco a mano con carta e penna. Ogni passaggio che vediamo in piccolo si ritrova identico (con tabelle più grandi) nel DES vero. Il vettore chiave 1010000010, blocco 01110010 è l\'esempio classico del libro di Stallings ed è verificato nei test del motore.' },
+
+  { sezione: 'S-DES a mano', titolo: 'Le tabelle di S-DES e come si leggono',
+    contenuto: () => (
+      <div className="stack">
+        <p className="small">Una tabella di permutazione elenca, per ogni posizione di <b>uscita</b>, da quale bit dell'<b>ingresso</b> prendere (i bit si numerano da 1).</p>
+        <Grid cols={3} gap=".6rem">
+          <Card><b>P10</b><p className="mono small">{SDT.P10.join(' ')}</p><b>P8</b><p className="mono small">{SDT.P8.join(' ')}</p></Card>
+          <Card><b>IP</b><p className="mono small">{SDT.IP.join(' ')}</p><b>IP⁻¹</b><p className="mono small">{SDT.IP_INV.join(' ')}</p></Card>
+          <Card><b>E/P</b><p className="mono small">{SDT.EP.join(' ')}</p><b>P4</b><p className="mono small">{SDT.P4.join(' ')}</p></Card>
+        </Grid>
+        <Permutazione ingresso="1011" tabella={[2, 4, 3, 1]} uscita={'1011'.split('').map((_, i) => '1011'[[2, 4, 3, 1][i] - 1]).join('')} etichetta="Esempio con P4 su 1011" uscitaEtichetta="uscita" group={0} />
+        <p className="small muted">P4 = 2 4 3 1: l'uscita prende il bit 2, poi il 4, poi il 3, poi il 1 dell'ingresso. P8 scarta 2 dei 10 bit; E/P ne ripete alcuni per passare da 4 a 8.</p>
+      </div>
+    ),
+    note: 'Passaggio da fare con calma: la lettura delle tabelle di permutazione è la prima fonte di errori. Esempio dal vivo con P4: l\'uscita prende nell\'ordine i bit 2, 4, 3, 1 dell\'ingresso. Le tabelle complete di S0 e S1 si leggono nella slide successiva. Una scheda stampabile con tutte le tabelle è in schede/sdes-a-mano.html.' },
+
+  { sezione: 'S-DES a mano', titolo: 'Leggere una S-box',
+    contenuto: () => (
+      <div className="stack">
+        <p>Una S-box trasforma pochi bit in meno bit usando una <span className="hl">tabella</span>. I bit esterni scelgono la riga, quelli interni la colonna.</p>
+        <LeggiSdesSbox />
+      </div>
+    ),
+    note: 'Provate a leggere a mano due o tre valori prima di cambiare il bit: «0110» in S0 dà riga 0 (primo e ultimo bit: 0 e 0) e colonna 3 (bit centrali: 1 e 1), valore 2, cioè «10». La stessa regola vale nel DES con 6 bit: bit esterni per la riga, 4 interni per la colonna.' },
+
+  { sezione: 'S-DES a mano', titolo: 'Le due sottochiavi',
+    contenuto: () => <Steps steps={PASSI_SDES.slice(0, 6)} />,
+    note: 'Si procede con Avanti: sei passi (P10, LS-1, P8, LS-2, P8). Errore frequente: nel passo LS-2 si ruota il risultato di LS-1 e non la chiave originale. Chiedete agli studenti di tenere sul quaderno i valori: chiave, dopo P10, metà sinistra e destra, K1, K2. Vettore: chiave 1010000010 → K1 10100100, K2 01000011.' },
+
+  { sezione: 'S-DES a mano', titolo: 'Cifrare un blocco, passo per passo',
+    contenuto: () => <Steps steps={PASSI_SDES.slice(6)} />,
+    note: 'Undici passi: IP; per ciascun round E/P, XOR con la sottochiave, S-box, P4 e XOR con L; tra i due round lo scambio SW; infine IP⁻¹. Fate prevedere il risultato di ogni passo prima di premere Avanti. Attenzione: dopo il secondo round non c\'è lo scambio. Lo stesso percorso, con input libero, è nella pagina simulazione-sdes.html.' },
+
+  { sezione: 'S-DES a mano', titolo: 'Decifrare: stesso schema, sottochiavi inverse',
+    contenuto: () => (
+      <div className="stack-lg">
+        <p>Per decifrare si ripete <b>tutto</b> l'algoritmo, ma nel primo round si usa <span className="mono hl">K2</span> e nel secondo <span className="mono hl">K1</span>.</p>
+        <Table mono center head={['', 'Cifratura', 'Decifratura']} rows={[
+          ['Ingresso', TS.ingresso, TSD.ingresso], ['Round 1 usa', 'K1 = ' + TS.round1.chiave, 'K2 = ' + TSD.round1.chiave], ['Round 2 usa', 'K2 = ' + TS.round2.chiave, 'K1 = ' + TSD.round2.chiave], ['Uscita', TS.output, TSD.output],
+        ]} />
+        <Box type="success" title={'Verifica: ' + TSD.output + ' = ' + SD_PT}>Il cifrato {TS.output} decifrato con la stessa chiave torna al blocco di partenza {SD_PT}.</Box>
+      </div>
+    ),
+    note: 'Applicazione della proprietà dimostrata con la rete di Feistel. I numeri della tabella sono calcolati dal motore. Se c\'è tempo, fate decifrare a mano un secondo blocco dagli studenti.' },
+
+  { sezione: 'S-DES a mano', titolo: 'Tocca a te: S-DES a mano',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={2} stretch>
+          <Card tone="accent"><h3>Su carta</h3><p>Scheda con tutte le tabelle e griglia da compilare: calcola chiavi e cifrato di un blocco.</p><ActivityBadge href="../schede/sdes-a-mano.html" label="Scheda S-DES da stampare" icon="🖨️" /></Card>
+          <Card tone="info"><h3>Sul telefono</h3><p>La pagina dà chiave e blocco a caso: inserisci i risultati intermedi e ricevi la verifica a ogni passo.</p><ActivityBadge href="gioco-sdes-a-mano.html" label="Gioco: S-DES a mano" icon="📱" /><br /><ActivityBadge href="simulazione-sdes.html" label="Simulatore S-DES con input libero" icon="🧮" /></Card>
+        </Grid>
+        <Box type="tip" title="Consiglio">Prima calcola a mano, poi controlla con il simulatore: se un passo non torna, il confronto indica subito dove.</Box>
+      </div>
+    ),
+    note: 'Attività da 15-20 minuti. Metà classe lavora sulla scheda stampata, metà sul gioco da telefono; poi si invertono. Passate tra i banchi: l\'errore tipico è la lettura delle tabelle (indici da 1, non da 0).' },
+
+  { sezione: 'DES reale', titolo: 'IP e IP⁻¹: le permutazioni iniziale e finale',
+    contenuto: () => (
+      <div className="stack">
+        <Grid cols={2}>
+          <Griglia tab={DT.IP} c={8} nome="IP (64 → 64)" />
+          <Griglia tab={DT.FP} c={8} nome="IP⁻¹ (64 → 64)" />
+        </Grid>
+        <BitsJ label={'Blocco ' + TV_PT} bits={C.hexABit(TV_PT)} />
+        <BitsJ label="Dopo IP" bits={TD.ip} marks={segna(0, 32, 'info', segna(32, 64, 'warn'))} />
+        <p className="small">L<sub>0</sub> = <span className="mono hl">{C.bitAHex(TD.L0)}</span> · R<sub>0</sub> = <span className="mono hl">{C.bitAHex(TD.R0)}</span>. IP⁻¹ è la permutazione inversa: annulla IP.</p>
+      </div>
+    ),
+    note: 'Le due permutazioni non aggiungono sicurezza (sono pubbliche e fisse): servivano all\'hardware dell\'epoca per caricare i dati. Si leggono come quelle di S-DES: l\'uscita in posizione 1 è il bit 58 dell\'ingresso, e così via. Dopo IP il blocco si divide in L0 (primi 32 bit) e R0 (ultimi 32).' },
+
+  { sezione: 'DES reale', titolo: 'La funzione F del DES',
+    contenuto: () => {
+      const r = TD.round[0], f = r.f;
+      return (
+        <div className="stack-lg">
+          <Flow steps={[
+            { label: 'R', sub: '32 bit: ' + C.bitAHex(r.R), color: 'var(--info)' },
+            { label: 'E', sub: 'espansione → 48 bit', color: 'var(--accent)' },
+            { label: '⊕ K', sub: 'sottochiave 48 bit', color: 'var(--accent)' },
+            { label: '8 S-box', sub: '6 → 4 bit ciascuna', color: 'var(--danger)' },
+            { label: 'P', sub: 'permutazione 32 bit', color: 'var(--accent)' },
+            { label: 'F(R,K)', sub: C.bitAHex(f.p), color: 'var(--success)' },
+          ]} />
+          <Grid cols={2} stretch>
+            <Card tone="danger"><h3>Confusione</h3><p className="small">Le 8 S-box sono l'unica parte <b>non lineare</b>: senza di esse il DES sarebbe una funzione lineare (XOR e permutazioni) e si romperebbe risolvendo equazioni.</p></Card>
+            <Card tone="info"><h3>Diffusione</h3><p className="small">L'espansione E e la permutazione P distribuiscono l'effetto di ogni bit su più S-box del round successivo.</p></Card>
+          </Grid>
+          <p className="small muted">Valori del round 1 con il vettore ufficiale: R<sub>0</sub> = <span className="mono">{C.bitAHex(r.R)}</span>, K<sub>1</sub> = <span className="mono">{C.bitAHex(r.K)}</span>, F = <span className="mono hl">{C.bitAHex(f.p)}</span>.</p>
+        </div>
+      );
+    },
+    note: 'Panoramica prima del dettaglio. Il termine «non lineare» significa che le uscite non si possono scrivere come semplici XOR degli ingressi: è ciò che impedisce di scrivere il cifrario come sistema di equazioni lineari. Nelle slide seguenti: espansione, S-box, sottochiavi, un round completo.' },
+
+  { sezione: 'DES reale', titolo: 'Espansione E e S-box a 6 bit',
+    contenuto: () => (
+      <div className="stack">
+        <p className="small">E ripete i bit ai bordi di ogni gruppo da 4 e porta R da 32 a 48 bit. Poi ogni gruppo da 6 bit entra in una S-box: <span className="hl">bit esterni = riga, bit interni = colonna</span>.</p>
+        <LeggiDesSbox />
+        <p className="xs muted">Tabella E: {DT.E.join(' ')}</p>
+      </div>
+    ),
+    note: 'Fate scegliere una S-box e un ingresso e leggere a voce riga e colonna. Esempio da proporre: S1 con ingresso 011011: riga = 0 e 1 → 01 = 1; colonna = 1101 = 13; il valore è S1[1][13] (nel simulatore si vede evidenziato). La tabella E è stampata sotto la figura in forma di lista.' },
+
+  { sezione: 'DES reale', titolo: 'Le sottochiavi: PC-1, rotazioni, PC-2',
+    contenuto: () => (
+      <Steps steps={[
+        { title: '1 · PC-1: da 64 a 56 bit', content: (<div className="stack"><p className="small">PC-1 scarta gli 8 bit di parità e rimescola i 56 rimasti. Poi li divide in due metà da 28: <span className="mono hl">C<sub>0</sub></span> e <span className="mono hl">D<sub>0</sub></span>.</p><BitsJ label={'chiave ' + TV_KEY} bits={C.hexABit(TV_KEY)} group={8} compact /><BitsJ label="dopo PC-1 (56 bit)" bits={sk.pc1} group={7} compact marks={segna(0, 28, 'info', segna(28, 56, 'warn'))} /><p className="small">C<sub>0</sub> = <span className="mono">{sk.pc1.slice(0, 28)}</span><br />D<sub>0</sub> = <span className="mono">{sk.pc1.slice(28)}</span></p></div>) },
+        { title: '2 · Rotazioni a sinistra', content: (<div className="stack"><p className="small">In ogni round C e D ruotano a sinistra di 1 o 2 posti, secondo una tabella fissa. Le rotazioni sono cumulative.</p><Table mono center head={['Round'].concat(V.range(1, 17))} rows={[['Rotazioni'].concat(DT.SHIFT)]} /><p className="small">Dopo il round 1: C<sub>1</sub> = <span className="mono">{sk[0].c}</span> · D<sub>1</sub> = <span className="mono">{sk[0].d}</span></p></div>) },
+        { title: '3 · PC-2: 56 → 48 bit', content: (<div className="stack"><p className="small">C<sub>i</sub> e D<sub>i</sub> si riuniscono (56 bit) e PC-2 ne sceglie 48: ecco la sottochiave K<sub>i</sub>.</p><BitsJ label="C₁D₁" bits={sk[0].cd || (sk[0].c + sk[0].d)} group={7} compact /><BitsJ label="K₁ (dopo PC-2)" bits={sk[0].k} group={6} compact marks={segna(0, 48, 'success')} /><p className="small">K<sub>1</sub> = <span className="mono hl">{C.bitAHex(sk[0].k)}</span></p></div>) },
+        { title: '4 · Tutte le 16 sottochiavi', content: (<Grid cols={2}><div>{V.TabellaSottochiavi(sk, 0, 8)}</div><div>{V.TabellaSottochiavi(sk, 8, 16)}</div></Grid>) },
+      ]} />
+    ),
+    note: 'Il key schedule trasforma la chiave in 16 sottochiavi diverse. Per decifrare le stesse sottochiavi si usano da K16 a K1. Le rotazioni totali fanno 28 posti (1+1+2+2+2+2+2+2+1+2+2+2+2+2+2+1 = 28): dopo 16 round C e D sono tornate al valore iniziale. Le 16 sottochiavi nell\'ultimo passo sono calcolate per il vettore ufficiale.' },
+
+  { sezione: 'DES reale', titolo: 'Un round completo del DES',
+    contenuto: () => <Steps steps={V.desRoundPassi(TD.round[0])} />,
+    note: 'Round 1 del vettore ufficiale, in sei passi: ingresso, espansione E, XOR con K1, otto S-box, permutazione P, XOR con L. Nella pagina simulazione-des.html si può scegliere qualunque round da 1 a 16 e cambiare chiave e blocco. Chiedete: quale dei sei passi è non lineare?' },
+
+  { sezione: 'DES reale', titolo: 'I 16 round e il risultato finale',
+    contenuto: () => (
+      <div className="stack">
+        <Grid cols={2}>
+          <Table mono center head={['n', 'L', 'R']} rows={TD.round.slice(0, 8).map(r => [r.n, C.bitAHex(r.uscita.L), C.bitAHex(r.uscita.R)])} />
+          <Table mono center head={['n', 'L', 'R']} rows={TD.round.slice(8).map(r => [r.n, C.bitAHex(r.uscita.L), C.bitAHex(r.uscita.R)])} />
+        </Grid>
+        <p className="small">Dopo il round 16: <span className="mono">R<sub>16</sub>L<sub>16</sub></span> = <span className="mono">{C.bitAHex(TD.preuscita)}</span> (con lo scambio finale), poi IP⁻¹ → <span className="mono hl">{TD.output}</span>.</p>
+        <Box type="success" title="Vettore di prova ufficiale">Chiave <b>{TV_KEY}</b> · testo <b>{TV_PT}</b> → <b>{TD.output}</b></Box>
+      </div>
+    ),
+    note: 'Nella riga di ogni round la colonna L è la R del round precedente (round 1: L = F0AAF0AA, che è R0) e la colonna R è il risultato dello XOR (round 1: EF4A6544). Gli studenti possono controllare i valori con la pagina simulazione-des.html. Il risultato 85E813540F0AB405 coincide con quello di OpenSSL/PHP (slide sul codice).' },
+
+  { sezione: 'DES reale', titolo: 'Effetto valanga nel DES',
+    contenuto: () => (
+      <div className="stack">
+        <p className="small">Dopo pochi round, un singolo bit cambiato nel messaggio ha già modificato circa <span className="hl">metà</span> dei 64 bit (32).</p>
+        <ValangaDes />
+      </div>
+    ),
+    note: 'Il bit selezionato (rosso) è quello invertito nel messaggio. Dopo 4-5 round il numero di bit diversi si assesta intorno a 32 su 64. Ripetete con altri bit: i valori finali variano ma stanno vicino a 32. È la verifica numerica della proprietà vista nel modulo 5 (diffusione).' },
+
+  { sezione: 'Modalità operative', titolo: 'ECB: blocchi uguali, cifrati uguali',
+    contenuto: () => (
+      <div className="stack">
+        <p className="small">Il DES cifra 8 byte per volta. In <span className="hl">ECB</span> (Electronic Codebook) ogni blocco si cifra da solo con la stessa chiave: blocchi uguali producono cifrati uguali.</p>
+        <Pinguino />
+      </div>
+    ),
+    note: 'Dimostrazione chiave del problema di ECB: l\'immagine è disegnata nella pagina e cifrata blocco per blocco con il motore DES. Le zone uniformi producono blocchi identici, quindi cifrati identici: la forma del pinguino resta riconoscibile. Il cifrario è perfetto sul singolo blocco, la modalità è il problema. La slide successiva mostra CBC.' },
+
+  { sezione: 'Modalità operative', titolo: 'CBC e il vettore di inizializzazione',
+    contenuto: () => (
+      <div className="stack">
+        <Flow steps={[
+          { label: 'Blocco i', sub: 'in chiaro', color: 'var(--info)' },
+          { label: '⊕ cifrato i−1', sub: 'per i = 1 si usa l\'IV', color: 'var(--accent)' },
+          { label: 'DES', sub: 'con la chiave', color: 'var(--accent)' },
+          { label: 'Cifrato i', sub: 'va al blocco successivo', color: 'var(--success)' },
+        ]} />
+        <Pinguino conCbc />
+        <p className="small muted">L'IV (qui <span className="mono">{IV_DEMO}</span>) è casuale, non segreto, e va cambiato a ogni messaggio.</p>
+      </div>
+    ),
+    note: 'In CBC ogni blocco in chiaro viene combinato con XOR con il cifrato precedente prima di essere cifrato: blocchi uguali producono cifrati diversi e l\'immagine diventa rumore. La modalità CBC è calcolata nella pagina con il motore DES (nella libreria è implementata solo ECB, il concatenamento è fatto qui). L\'IV serve per il primo blocco: stesso testo e stessa chiave con IV diverso danno cifrati diversi.' },
+
+  { sezione: 'Debolezze', titolo: 'Il problema dei 56 bit',
+    contenuto: () => (
+      <div className="stack">
+        <p>Le chiavi possibili sono <span className="mono hl">2<sup>56</sup> = {sepMigliaia('72057594037927936')}</span>, circa 7,2 × 10<sup>16</sup>.</p>
+        <Table head={['Velocità di ricerca', 'Tempo per provarle tutte']} rows={RITMI.map(([n, r]) => [n, durata(SPAZIO / r)])} />
+        <Box type="warn" title="Ordini di grandezza">In media si trova la chiave dopo aver provato metà dello spazio: la metà dei tempi indicati. Con hardware specializzato e molti chip in parallelo la ricerca diventa realistica.</Box>
+      </div>
+    ),
+    note: 'I tempi sono calcolati dividendo 2^56 per la velocità: sono ordini di grandezza, non misure. 92 miliardi di chiavi al secondo è la velocità dichiarata dall\'EFF per Deep Crack (la slide successiva). Confrontare con Cesare: 25 chiavi.' },
+
+  { sezione: 'Debolezze', titolo: 'Deep Crack, 1998',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Table head={['Quando', 'Chi', 'Risultato']} rows={[
+          ['1997', 'Progetto DESCHALL (distribuito)', 'Prima «DES Challenge» di RSA risolta in 96 giorni.'],
+          ['Gen-feb 1998', 'distributed.net', 'DES Challenge II-1 risolta in 39 giorni.'],
+          ['Luglio 1998', 'EFF, macchina «Deep Crack»', 'DES Challenge II-2 risolta in 56 ore. Costo di costruzione sotto i 250.000 dollari.'],
+          ['Gen 1999', 'EFF e distributed.net', 'DES Challenge III risolta in circa 22 ore.'],
+        ]} />
+        <Box type="danger" title="Conclusione">Il DES con una sola chiave a 56 bit non è più sicuro: dimostrazione pubblica che un attacco a forza bruta era alla portata di organizzazioni con pochi mezzi.</Box>
+      </div>
+    ),
+    note: 'Fonti: Electronic Frontier Foundation (libro «Cracking DES», 1998), RSA Laboratories DES Challenges. Dettagli: Deep Crack aveva circa 1.800 chip dedicati; la data esatta di fine ricerca è il 15 luglio 1998 (annuncio del 17). I numeri sono quelli diffusi dall\'EFF; in caso di dubbio, citare le fonti prima di ripeterli. Insistere sul messaggio: non cambia l\'algoritmo ma la potenza di calcolo disponibile.' },
+
+  { sezione: 'Successori', titolo: 'Triple DES (3DES)',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Flow steps={[
+          { label: 'Blocco', sub: '64 bit' },
+          { label: 'Cifra con K1', sub: 'E', color: 'var(--info)' },
+          { label: 'Decifra con K2', sub: 'D', color: 'var(--accent)' },
+          { label: 'Cifra con K3', sub: 'E', color: 'var(--info)' },
+          { label: 'Cifrato', sub: '64 bit', color: 'var(--success)' },
+        ]} />
+        <Grid cols={2} stretch>
+          <Card tone="accent"><h3>EDE: perché «decifra» al centro</h3><p className="small">Con K1 = K2 = K3 le tre operazioni si semplificano e si ottiene il DES singolo: compatibilità con i sistemi vecchi. Qui: <span className="mono hl">{kk2}</span> = DES singolo di {TV_PT}.</p></Card>
+          <Card tone="danger"><h3>Sicurezza</h3><p className="small">Chiave di 168 bit (3 × 56), ma l'attacco «meet-in-the-middle» riduce la sicurezza effettiva a circa <span className="hl">112 bit</span>. Resta lento e con blocchi di 64 bit: oggi è sconsigliato.</p></Card>
+        </Grid>
+        <p className="small muted">Con tre chiavi diverse ({TV_KEY}, {K2_3}, {K3_3}) lo stesso blocco diventa <span className="mono hl">{c3}</span>.</p>
+      </div>
+    ),
+    note: 'Perché non cifrare due volte? Il «meet-in-the-middle» rende il doppio DES poco più forte del singolo (circa 57 bit). Perciò si passa a tre operazioni. Triple DES è rimasto in uso per anni nei circuiti bancari; NIST ne ha progressivamente vietato l\'uso per nuove cifrature (verificare le date più recenti). I valori mostrati sono calcolati da crypto.js e controllati con OpenSSL.' },
+
+  { sezione: 'Successori', titolo: 'AES: il successore',
+    contenuto: () => (
+      <div className="stack-lg">
+        <Grid cols={3} stretch>
+          <Card tone="accent"><h3>Concorso</h3><p className="small">NIST lancia una gara pubblica nel 1997. Vince <b>Rijndael</b> (Daemen e Rijmen, Belgio). AES diventa standard nel <span className="hl">2001</span> (FIPS 197).</p></Card>
+          <Card tone="info"><h3>Parametri</h3><p className="small">Blocco da <span className="hl">128 bit</span>, chiave da 128, 192 o 256 bit; 10, 12 o 14 round.</p></Card>
+          <Card tone="success"><h3>Struttura</h3><p className="small">Non è Feistel ma una <span className="hl">rete di sostituzione-permutazione</span>: tutto il blocco viene trasformato a ogni round.</p></Card>
+        </Grid>
+        <Box type="success" title="Oggi">AES-128 e AES-256 sono lo standard di fatto (Wi-Fi WPA2, HTTPS, dischi cifrati). Le idee viste nel DES (confusione, diffusione, round, sottochiavi) si ritrovano tutte.</Box>
+      </div>
+    ),
+    note: 'Cenno, senza entrare nel dettaglio. Il concorso AES è stato pubblico, come per DES: i candidati sono stati analizzati da tutta la comunità. Per gli studenti: il vantaggio del blocco da 128 bit e della chiave da 128 bit è enorme; anche con 10^12 chiavi al secondo servirebbero tempi astronomici.' },
+
+  { sezione: 'Codice PHP', titolo: 'Cifrare con openssl_encrypt()',
+    contenuto: () => (
+      <Code title="3des-cbc.php" code={CODICE_3DES} reveal explain={SPIEGA_3DES} />
+    ),
+    note: 'In PHP non si riscrive il DES: si usa la libreria OpenSSL con openssl_encrypt() e openssl_decrypt(). Insistete su tre scelte: algoritmo moderno quando possibile (AES), IV casuale a ogni messaggio, IV trasmesso in chiaro insieme al cifrato. In laboratorio (lab-php/07-des-openssl) si fa lo stesso con 3DES e AES-128-CBC e si confronta ECB con CBC su blocchi ripetuti.' },
+
+  { sezione: 'Codice PHP', titolo: 'E il DES singolo?',
+    contenuto: () => (
+      <div className="stack">
+        <Code title="des-singolo.php" code={CODICE_DES} highlight={[5, 6, 9]} />
+        <Box type="warn" title="Comportamento reale con PHP 8.3 e OpenSSL 3">
+          <span className="mono">openssl_encrypt(…, 'DES-ECB', …)</span> restituisce <span className="mono hl">false</span> (errore «unsupported»): in OpenSSL 3 il DES singolo sta nel provider legacy, spesso non attivo. 3DES e AES funzionano. Con K1 = K2 = K3 il 3DES dà lo stesso risultato del vettore ufficiale <span className="mono hl">85E813540F0AB405</span>.
+        </Box>
+      </div>
+    ),
+    note: 'Comportamento verificato in locale con PHP 8.3 e OpenSSL 3.0: openssl_get_cipher_methods() non contiene più DES-ECB / des-cbc; contiene des-ede e des-ede3. Il trucco di usare des-ede-ecb con la chiave ripetuta (K||K) riproduce il DES singolo e la prova è il vettore ufficiale. Su altre installazioni (provider legacy attivo, PHP/OpenSSL diversi) il risultato può essere diverso: provare con openssl_get_cipher_methods().' },
+
+  { sezione: 'Riepilogo', titolo: 'Riepilogo e prossimi passi',
+    contenuto: () => (
+      <div className="stack-lg">
+        <ul>
+          <li>Feistel: <span className="mono">L′ = R, R′ = L ⊕ F(R, K)</span>; per decifrare stessa struttura, sottochiavi invertite.</li>
+          <li>DES: blocco 64 bit, chiave 56 bit, 16 round; F = E, XOR, 8 S-box, P.</li>
+          <li>ECB lascia vedere la struttura dei dati; CBC la nasconde con IV e concatenamento.</li>
+          <li>56 bit si forzano (Deep Crack, 1998): 3DES e poi AES.</li>
+        </ul>
+        <Grid cols={3} stretch>
+          <Card tone="accent"><h3>Laboratorio</h3><p className="small">openssl_encrypt, ECB contro CBC, S-DES in PHP.</p><ActivityBadge href="../lab-php/07-des-openssl/scheda.html" label="Scheda del lab" icon="🧪" /></Card>
+          <Card tone="info"><h3>Simulazioni</h3><p className="small">S-DES e DES con input libero.</p><ActivityBadge href="simulazione-des.html" label="Simulatore DES" icon="🔐" /></Card>
+          <Card tone="success"><h3>Avanti</h3><p className="small">Chiavi pubbliche: matematica per RSA.</p><ActivityBadge href="../modulo-7-matematica-rsa/slide.html" stesso label="Modulo 7" icon="➡️" /></Card>
+        </Grid>
+      </div>
+    ),
+    note: 'Chiusura: quattro idee da portarsi via. Il problema che resta aperto, anche con AES, è lo scambio della chiave: chiave segreta condivisa tra chi cifra e chi decifra. Il modulo 7 introduce la matematica che permette di risolverlo con RSA.' },
+];
+
+Deck.mount(slides, { modulo: 6, nome: 'DES', indice: '../index.html' });
+</script>
+</body>
+</html>

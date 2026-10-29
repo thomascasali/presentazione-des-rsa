@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gioco: S-DES a mano</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="viste.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<script src="viste.js"></script>
+<style>
+  .statistiche { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; text-align: center; margin-bottom: .8rem; }
+  .statistiche div { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: .4rem; }
+  .statistiche b { display: block; font-family: var(--f-mono); font-size: 1.3rem; color: var(--accent-alt); }
+  .statistiche span { font-size: .8rem; color: var(--text-muted); }
+  .dati td { padding: .15em .5em; }
+  details.rif { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: .4rem .8rem; margin: .8rem 0; }
+  details.rif summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 700; color: var(--info-t); }
+  .barra-pass { height: 8px; background: var(--bg-light); border-radius: 4px; overflow: hidden; margin-bottom: .8rem; }
+  .barra-pass > div { height: 100%; background: var(--accent); transition: width .3s; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Btn, Field, Box, Chip, Table, PaginaGioco } = UI;
+const C = window.Cripto, V = window.VisteDES;
+const SD = C.sdes.tabelle;
+const casuale = (n) => Array.from({ length: n }, () => (Math.random() < .5 ? '0' : '1')).join('');
+const M = (t) => <span className="mono hl">{t}</span>;
+const ruota = (b, n) => b.slice(n) + b.slice(0, n);
+
+// Suggerimento generico per una permutazione: dice da dove arrivano i primi bit
+function suggPerm(nome, tab, ingresso) {
+  const primi = tab.slice(0, 3).map((n, i) => 'il bit ' + (i + 1) + ' dell\'uscita è il bit ' + n + ' dell\'ingresso (' + ingresso[n - 1] + ')').join('; ');
+  return nome + ' = [' + tab.join(', ') + ']. Ad esempio: ' + primi + '.';
+}
+function suggSbox(inp, S, nome) {
+  const riga = parseInt(inp[0] + inp[3], 2), col = parseInt(inp[1] + inp[2], 2);
+  return nome + ': ingresso ' + inp + ' → riga (bit 1 e 4) = ' + inp[0] + inp[3] + ' = ' + riga + ', colonna (bit 2 e 3) = ' + inp[1] + inp[2] + ' = ' + col + ', il valore in tabella si scrive in 2 bit.';
+}
+
+// Costruisce i 18 passi dalla traccia: ogni passo parte dai valori CORRETTI dei precedenti.
+function passi(k, b) {
+  const t = C.sdes.traccia(b, k), ch = t.chiavi, r1 = t.round1, r2 = t.round2;
+  const L = (nome, v) => [nome, v];
+  return [
+    { id: 'p10', titolo: 'P10 sulla chiave', n: 10, atteso: ch.p10, q: <>Applica <b>P10</b> alla chiave {M(k)}.</>, hint: suggPerm('P10', SD.P10, k), noto: [L('chiave', k)] },
+    { id: 'ls1', titolo: 'LS-1', n: 10, atteso: ch.ls1, q: <>Dividi {M(ch.p10)} in due metà da 5 bit e ruota <b>ciascuna</b> a sinistra di 1. Scrivi i 10 bit.</>, hint: 'Metà sinistra ' + ch.c0 + ' → il primo bit va in fondo; metà destra ' + ch.d0 + ' idem.' },
+    { id: 'k1', titolo: 'K1 con P8', n: 8, atteso: ch.k1, q: <>Applica <b>P8</b> a {M(ch.ls1)}: ottieni la sottochiave <b>K1</b>.</>, hint: suggPerm('P8', SD.P8, ch.ls1) },
+    { id: 'ls2', titolo: 'LS-2', n: 10, atteso: ch.ls2, q: <>Dalle due metà dopo LS-1 ({M(ch.ls1.slice(0, 5))} e {M(ch.ls1.slice(5))}) ruota ciascuna a sinistra di altri <b>2</b> posti. Scrivi i 10 bit.</>, hint: 'Non partire dalla chiave originale: ruota di 2 le metà già ruotate di 1.' },
+    { id: 'k2', titolo: 'K2 con P8', n: 8, atteso: ch.k2, q: <>Applica <b>P8</b> a {M(ch.ls2)}: ottieni <b>K2</b>.</>, hint: suggPerm('P8', SD.P8, ch.ls2) },
+    { id: 'ip', titolo: 'IP sul blocco', n: 8, atteso: t.ip, q: <>Applica <b>IP</b> al blocco {M(b)}.</>, hint: suggPerm('IP', SD.IP, b) },
+    { id: 'ep1', titolo: 'Round 1: E/P', n: 8, atteso: r1.F.ep, q: <>Dopo IP: L = {M(r1.L)}, R = {M(r1.R)}. Applica <b>E/P</b> a R.</>, hint: suggPerm('E/P', SD.EP, r1.R) },
+    { id: 'x1', titolo: 'Round 1: XOR con K1', n: 8, atteso: r1.F.xorChiave, q: <>Calcola E/P(R) ⊕ K1 = {M(r1.F.ep)} ⊕ {M(ch.k1)}.</>, hint: 'XOR: 1 se i bit sono diversi, 0 se uguali, posizione per posizione.' },
+    { id: 's1', titolo: 'Round 1: S-box', n: 4, atteso: r1.F.uscitaS, q: <>Il risultato {M(r1.F.xorChiave)} si divide: i primi 4 bit ({M(r1.F.s0In)}) vanno a <b>S0</b>, gli ultimi 4 ({M(r1.F.s1In)}) a <b>S1</b>. Scrivi le due uscite da 2 bit una dopo l'altra (4 bit).</>, hint: suggSbox(r1.F.s0In, SD.S0, 'S0') + ' · ' + suggSbox(r1.F.s1In, SD.S1, 'S1') },
+    { id: 'p41', titolo: 'Round 1: P4', n: 4, atteso: r1.F.p4, q: <>Applica <b>P4</b> a {M(r1.F.uscitaS)}.</>, hint: suggPerm('P4', SD.P4, r1.F.uscitaS) },
+    { id: 'l1', titolo: 'Round 1: XOR con L', n: 4, atteso: r1.uscitaL, q: <>Nuova L = L ⊕ P4 = {M(r1.L)} ⊕ {M(r1.F.p4)}.</>, hint: 'La metà R non cambia: resta ' + r1.R + '.' },
+    { id: 'sw', titolo: 'SW: scambio', n: 8, atteso: t.sw, q: <>Dopo il round 1 si ha L = {M(r1.uscitaL)}, R = {M(r1.R)}. Scambia le metà (SW): scrivi <b>R | L</b> in 8 bit.</>, hint: 'Prima i 4 bit di R (' + r1.R + '), poi i 4 della nuova L (' + r1.uscitaL + ').' },
+    { id: 'ep2', titolo: 'Round 2: E/P', n: 8, atteso: r2.F.ep, q: <>Secondo round: L = {M(r2.L)}, R = {M(r2.R)}. Applica <b>E/P</b> a R.</>, hint: suggPerm('E/P', SD.EP, r2.R) },
+    { id: 'x2', titolo: 'Round 2: XOR con K2', n: 8, atteso: r2.F.xorChiave, q: <>Calcola E/P(R) ⊕ K2 = {M(r2.F.ep)} ⊕ {M(ch.k2)}.</>, hint: 'XOR bit a bit con la sottochiave K2.' },
+    { id: 's2', titolo: 'Round 2: S-box', n: 4, atteso: r2.F.uscitaS, q: <>Primi 4 bit ({M(r2.F.s0In)}) a S0, ultimi 4 ({M(r2.F.s1In)}) a S1. Scrivi le due uscite da 2 bit.</>, hint: suggSbox(r2.F.s0In, SD.S0, 'S0') + ' · ' + suggSbox(r2.F.s1In, SD.S1, 'S1') },
+    { id: 'p42', titolo: 'Round 2: P4', n: 4, atteso: r2.F.p4, q: <>Applica <b>P4</b> a {M(r2.F.uscitaS)}.</>, hint: suggPerm('P4', SD.P4, r2.F.uscitaS) },
+    { id: 'l2', titolo: 'Round 2: XOR con L', n: 4, atteso: r2.uscitaL, q: <>L ⊕ P4 = {M(r2.L)} ⊕ {M(r2.F.p4)}. Dopo il round 2 non c'è scambio.</>, hint: 'Solo XOR di 4 bit.' },
+    { id: 'ipi', titolo: 'IP⁻¹: il cifrato', n: 8, atteso: t.output, q: <>Applica <b>IP⁻¹</b> a {M(t.preuscita)}: è il blocco cifrato.</>, hint: suggPerm('IP⁻¹', SD.IP_INV, t.preuscita) },
+  ];
+}
+const nuova = () => ({ k: casuale(10), b: casuale(8) });
+
+function Gioco() {
+  const [p, setP] = useState(nuova);
+  const [i, setI] = useState(0);
+  const [val, setVal] = useState('');
+  const [tent, setTent] = useState(0);
+  const [stato, setStato] = useState(null);           // null | 'ko' | 'ok' | 'sol'
+  const [punti, setPunti] = useState(0);
+  const [hint, setHint] = useState(false);
+  const [stat, setStat] = useState(() => UI.carica('sdes-gioco', { migliore: 0, partite: 0 }));
+  const lista = useMemo(() => passi(p.k, p.b), [p]);
+  const fine = i >= lista.length;
+  const s = lista[i];
+  const registra = (tot) => { const n = { migliore: Math.max(stat.migliore, tot), partite: stat.partite + 1 }; setStat(n); UI.salva('sdes-gioco', n); };
+  const verifica = () => {
+    if (val.length !== s.n) { setStato('len'); return; }
+    if (val === s.atteso) {
+      const g = tent === 0 ? 10 : tent === 1 ? 5 : 2;
+      setPunti(punti + g); setStato('ok');
+    } else { setTent(tent + 1); setStato('ko'); }
+  };
+  const avanti = () => {
+    const ni = i + 1;
+    if (ni >= lista.length) registra(punti);
+    setI(ni); setVal(''); setTent(0); setStato(null); setHint(false);
+  };
+  const soluzione = () => { setVal(s.atteso); setStato('sol'); };
+  const nuovaPartita = () => { setP(nuova()); setI(0); setVal(''); setTent(0); setStato(null); setPunti(0); setHint(false); };
+  const chiuso = stato === 'ok' || stato === 'sol';
+  const noti = lista.slice(0, i);
+
+  return (
+    <div>
+      <div className="statistiche" aria-label="Statistiche">
+        <div><b>{punti}</b><span>punti (max 180)</span></div>
+        <div><b>{Math.min(i + 1, lista.length)}/{lista.length}</b><span>passo</span></div>
+        <div><b>{stat.migliore}</b><span>record</span></div>
+      </div>
+      <div className="barra-pass" aria-hidden="true"><div style={{ width: (100 * i / lista.length) + '%' }} /></div>
+
+      <div className="card"><b>Dati della partita</b>
+        <p className="mono">chiave {M(p.k)}<br />blocco in chiaro {M(p.b)}</p>
+        <p className="small muted">Cifra il blocco con S-DES: un risultato alla volta, verificato subito. I valori sbagliati non si trascinano: a ogni passo si riparte da quelli corretti.</p>
+      </div>
+
+      <details className="rif"><summary>Tabelle di riferimento</summary>
+        <div className="stack">
+          <p className="mono small">P10 = {SD.P10.join(' ')}<br />P8 = {SD.P8.join(' ')}<br />IP = {SD.IP.join(' ')}<br />IP⁻¹ = {SD.IP_INV.join(' ')}<br />E/P = {SD.EP.join(' ')}<br />P4 = {SD.P4.join(' ')}</p>
+          <V.SboxMatrice righe={SD.S0} nome="S0" />
+          <V.SboxMatrice righe={SD.S1} nome="S1" />
+          <p className="xs muted">Permutazioni: l'uscita in posizione j prende il bit indicato dall'ingresso (da 1). S-box: riga = bit 1 e 4, colonna = bit 2 e 3. Rotazioni: LS-1 sposta di 1 posto a sinistra, LS-2 di 2.</p>
+        </div>
+      </details>
+
+      {!fine ? (
+        <div className="step-card">
+          <h3>Passo {i + 1}: {s.titolo}</h3>
+          <p>{s.q}</p>
+          <Field label={'La tua risposta (' + s.n + ' bit): ' + val.length + '/' + s.n} htmlFor="r">
+            <input id="r" className="input mono" inputMode="numeric" autoComplete="off" disabled={chiuso} value={val} onChange={e => { setVal(e.target.value.replace(/[^01]/g, '').slice(0, s.n)); if (stato === 'ko' || stato === 'len') setStato(null); }} />
+          </Field>
+          <div className="row mt">
+            <Btn variant="primary" onClick={verifica} disabled={chiuso}>Verifica</Btn>
+            <Btn onClick={() => setHint(true)} disabled={chiuso || hint}>Suggerimento</Btn>
+            {tent >= 2 && !chiuso ? <Btn variant="ghost" onClick={soluzione}>Mostra la soluzione</Btn> : null}
+          </div>
+          {hint && !chiuso ? <Box type="tip" title="Suggerimento">{s.hint}</Box> : null}
+          {stato === 'len' ? <div className="feedback ko mt" role="status">Servono esattamente {s.n} bit.</div> : null}
+          {stato === 'ko' ? <div className="feedback ko mt" role="status">Non torna (tentativo {tent}). Ricontrolla la lettura della tabella o usa il suggerimento.</div> : null}
+          {stato === 'ok' ? <div className="feedback ok mt" role="status"><b>Esatto!</b> {M(s.atteso)} {tent === 0 ? '+10' : tent === 1 ? '+5' : '+2'} punti.</div> : null}
+          {stato === 'sol' ? <div className="feedback mt" role="status">Il valore corretto era {M(s.atteso)} (0 punti per questo passo).</div> : null}
+          {chiuso ? <div className="row mt"><Btn variant="primary" onClick={avanti}>{i + 1 >= lista.length ? 'Concludi' : 'Passo successivo →'}</Btn></div> : null}
+        </div>
+      ) : (
+        <div className="feedback ok" role="status">
+          <b>Fine!</b> Il blocco cifrato è {M(lista[lista.length - 1].atteso)}. Punteggio: <b>{punti}</b> su 180. Record: {stat.migliore}.
+          <div className="row mt"><Btn variant="primary" onClick={nuovaPartita}>Nuova partita</Btn></div>
+        </div>
+      )}
+
+      {noti.length ? (
+        <details className="rif"><summary>Risultati dei passi già fatti ({noti.length})</summary>
+          <table className="table mono dati"><tbody>{noti.map((n, j) => <tr key={j}><td>{j + 1}. {n.titolo}</td><td className="hl">{n.atteso}</td></tr>)}</tbody></table>
+        </details>
+      ) : null}
+
+      {!fine ? <div className="row mt"><Btn variant="ghost" onClick={nuovaPartita}>Nuova partita</Btn></div> : null}
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <PaginaGioco titolo="S-DES a mano" indietro="slide.html#14" indietroEtichetta="Modulo 6">
+      <Gioco />
+      <p className="small muted mt-lg">Punteggi e record restano solo su questo dispositivo. Non viene raccolto nessun dato. <a className="text-link" href="simulazione-sdes.html">Vedi tutti i passi nel simulatore</a></p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>

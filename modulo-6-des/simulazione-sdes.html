@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S-DES passo per passo — simulazione</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<link rel="stylesheet" href="viste.css">
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js"></script>
+<script src="../assets/crypto.js"></script>
+<script src="../assets/deck.js"></script>
+<script src="viste.js"></script>
+<style>
+  .tabs { display: flex; gap: .4rem; margin: .5rem 0 .8rem; }
+  .tabs .btn { flex: 1; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+const { Btn, Field, Box, Steps, PaginaGioco } = UI;
+const C = window.Cripto, V = window.VisteDES;
+const casuale = (n) => Array.from({ length: n }, () => (Math.random() < .5 ? '0' : '1')).join('');
+const soloBit = (s, n) => s.replace(/[^01]/g, '').slice(0, n);
+
+function App() {
+  const [chiave, setChiave] = useState(() => UI.carica('sdes-sim-k', '1010000010'));
+  const [blocco, setBlocco] = useState(() => UI.carica('sdes-sim-b', '01110010'));
+  const [decifra, setDecifra] = useState(false);
+  const okK = chiave.length === 10, okB = blocco.length === 8;
+  const t = useMemo(() => (okK && okB ? C.sdes.traccia(blocco, chiave, decifra) : null), [chiave, blocco, decifra]);
+  const passi = useMemo(() => (t ? V.sdesPassi(t, decifra) : []), [t, decifra]);
+  const cambiaK = (v) => { setChiave(v); UI.salva('sdes-sim-k', v); };
+  const cambiaB = (v) => { setBlocco(v); UI.salva('sdes-sim-b', v); };
+  return (
+    <PaginaGioco titolo="S-DES passo per passo" indietro="slide.html#12" indietroEtichetta="Modulo 6" largo>
+      <div className="sim">
+        <Field label={'Chiave (10 bit): ' + chiave.length + '/10'} htmlFor="k"><input id="k" className="input mono" inputMode="numeric" value={chiave} onChange={e => cambiaK(soloBit(e.target.value, 10))} /></Field>
+        <Field label={(decifra ? 'Blocco cifrato' : 'Blocco in chiaro') + ' (8 bit): ' + blocco.length + '/8'} htmlFor="b"><input id="b" className="input mono" inputMode="numeric" value={blocco} onChange={e => cambiaB(soloBit(e.target.value, 8))} /></Field>
+        <div className="tabs" role="group" aria-label="Modo">
+          <Btn variant={!decifra ? 'primary' : ''} aria-pressed={!decifra} onClick={() => setDecifra(false)}>Cifra</Btn>
+          <Btn variant={decifra ? 'primary' : ''} aria-pressed={decifra} onClick={() => setDecifra(true)}>Decifra</Btn>
+        </div>
+        <div className="row">
+          <Btn small onClick={() => { cambiaK('1010000010'); cambiaB(decifra ? '01110111' : '01110010'); }}>Esempio</Btn>
+          <Btn small onClick={() => { cambiaK(casuale(10)); cambiaB(casuale(8)); }}>Valori casuali</Btn>
+        </div>
+        {!okK || !okB ? <div className="feedback ko" role="status">Servono una chiave di 10 bit e un blocco di 8 bit (solo 0 e 1).</div>
+          : <div className="feedback ok" role="status">{decifra ? 'Decifrato' : 'Cifrato'}: <b className="mono">{t.output}</b> · K1 = <span className="mono">{t.chiavi.k1}</span> · K2 = <span className="mono">{t.chiavi.k2}</span></div>}
+      </div>
+      {t ? <div className="mt"><Steps key={chiave + blocco + decifra} steps={passi} keys={false} /></div> : null}
+      <p className="small muted mt-lg">S-DES è un cifrario didattico: non proteggere dati veri. <a className="text-link" href="gioco-sdes-a-mano.html">Prova il gioco a mano</a></p>
+    </PaginaGioco>
+  );
+}
+UI.render(<App />);
+</script>
+</body>
+</html>
