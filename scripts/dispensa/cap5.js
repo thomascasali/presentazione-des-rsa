@@ -132,6 +132,7 @@ module.exports = () => capitolo(5, 'Cifrari moderni: bit e XOR',
     rimandi([
       ['../modulo-5-cifrari-moderni/slide.html', 'Slide del modulo 5', ''],
       ['../modulo-5-cifrari-moderni/simulazione-xor.html', 'Simulazione: XOR bit a bit', 'anche da smartphone'],
+      ['../quiz/quiz.html?modulo=5', 'Quiz del modulo 5', ''],
     ]),
   ].join('\n');
 });

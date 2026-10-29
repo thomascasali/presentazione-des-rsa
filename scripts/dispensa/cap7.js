@@ -155,6 +155,7 @@ module.exports = () => capitolo(7, 'La matematica di RSA',
       ['../modulo-7-matematica-rsa/simulazione-potenza-modulare.html', 'Simulazione: potenza modulare', ''],
       ['../schede/esercizi-matematica-rsa.html', 'Scheda: esercizi di matematica per RSA', 'Euclide, inverso e potenze su carta'],
       ['../lab-php/06-rsa-giocattolo/scheda.html', 'Lab PHP 06: RSA giocattolo', 'mcd, inverso e potenza modulare in PHP'],
+      ['../quiz/quiz.html?modulo=7', 'Quiz del modulo 7', ''],
     ]),
   ].join('\n');
 });

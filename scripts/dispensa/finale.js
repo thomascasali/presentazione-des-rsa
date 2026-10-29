@@ -94,6 +94,7 @@ function fonti() {
 ${lista('Standard e specifiche', FONTI.standard)}
 ${lista('Libri', FONTI.libri)}
 ${lista('Articoli originali', FONTI.articoli)}
+<section class="rimandi"><h3>Verifica finale</h3><ul><li><a href="../quiz/quiz.html?modulo=finale">Verifica finale del percorso</a></li></ul></section>
 </section>`;
 }
 module.exports = { glossario, fonti, GLOSSARIO };

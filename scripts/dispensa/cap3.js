@@ -136,6 +136,7 @@ module.exports = () => capitolo(3, 'Il cifrario di Vigenère',
       ['../modulo-3-vigenere/gioco-rompi-vigenere.html', 'Gioco: rompi il messaggio di Vigenère', 'Kasiski e frequenze per colonna'],
       ['../schede/bigliettini-vigenere.html', 'Bigliettini di Vigenère', 'da ritagliare'],
       ['../lab-php/03-vigenere/scheda.html', 'Lab PHP 03: Vigenère', 'cifra, decifra e attacca'],
+      ['../quiz/quiz.html?modulo=3', 'Quiz del modulo 3', ''],
     ]),
   ].join('\n');
 });

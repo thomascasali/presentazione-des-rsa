@@ -141,6 +141,7 @@ module.exports = () => capitolo(2, 'Cesare con chiave numerica',
       ['../modulo-2-cesare-generalizzato/simulazione-chiave-numerica.html', 'Simulatore e sfida: Cesare a chiave numerica', 'trova la chiave di un messaggio intercettato'],
       ['../schede/bigliettini-cesare-generalizzato.html', 'Bigliettini a chiave numerica', 'da ritagliare'],
       ['../lab-php/02-cesare-generalizzato/scheda.html', 'Lab PHP 02: Cesare generalizzato', 'cifra, decifra e attacca con chiave di lunghezza nota'],
+      ['../quiz/quiz.html?modulo=2', 'Quiz del modulo 2', ''],
     ]),
   ].join('\n');
 });

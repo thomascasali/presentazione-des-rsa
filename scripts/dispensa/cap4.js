@@ -125,6 +125,7 @@ module.exports = () => capitolo(4, 'La trasposizione',
       ['../modulo-4-trasposizione/simulazione-colonne.html', 'Simulatore della trasposizione a colonne', 'con lo strumento per riordinare le colonne'],
       ['../schede/bigliettini-trasposizione.html', 'Bigliettini della trasposizione', 'da ritagliare, con griglia vuota'],
       ['../lab-php/04-trasposizione/scheda.html', 'Lab PHP 04: trasposizione a colonne', ''],
+      ['../quiz/quiz.html?modulo=4', 'Quiz del modulo 4', ''],
     ]),
   ].join('\n');
 });

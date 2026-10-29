@@ -122,6 +122,7 @@ module.exports = () => capitolo(0, 'Introduzione alla crittografia',
     rimandi([
       ['../modulo-0-introduzione/slide.html', 'Slide del modulo 0', 'la presentazione di questo capitolo'],
       ['../modulo-0-introduzione/simulazione-lucchetti.html', 'Simulazione: la scatola con il doppio lucchetto', 'anche da smartphone'],
+      ['../quiz/quiz.html?modulo=0', 'Quiz del modulo 0', ''],
     ]),
   ].join('\n');
 });

@@ -103,6 +103,7 @@ module.exports = () => capitolo(1, 'Il cifrario di Cesare',
       ['../schede/bigliettini-cesare.html', 'Bigliettini di Cesare', 'da ritagliare e scambiare'],
       ['../lab-php/01-cesare/scheda.html', 'Lab PHP 01: il cifrario di Cesare', 'completa, scrivi l\'inversa, scrivi l\'attacco'],
       ['../lab-php/05-frequenze/scheda.html', 'Lab PHP 05: analisi delle frequenze', ''],
+      ['../quiz/quiz.html?modulo=1', 'Quiz del modulo 1', ''],
     ]),
   ].join('\n');
 });

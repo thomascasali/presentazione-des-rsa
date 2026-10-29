@@ -211,6 +211,7 @@ module.exports = () => capitolo(8, 'RSA',
       ['../modulo-8-rsa/gioco-rsa-di-classe.html', 'Gioco: RSA di classe', 'ogni studente genera la coppia di chiavi'],
       ['../schede/rsa-di-classe.html', 'Scheda: RSA di classe', 'da stampare'],
       ['../lab-php/06-rsa-giocattolo/scheda.html', 'Lab PHP 06: RSA giocattolo', 'MCD, inverso, potenza modulare e attacco'],
+      ['../quiz/quiz.html?modulo=8', 'Quiz del modulo 8', ''],
     ]),
   ].join('\n');
 });

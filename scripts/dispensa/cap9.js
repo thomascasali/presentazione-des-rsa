@@ -207,6 +207,7 @@ openssl dgst -sha256 -verify alice_pub.pem -signature documento.sig documento.tx
       ['../modulo-9-ibrida/slide.html', 'Slide del modulo 9', ''],
       ['../modulo-9-ibrida/simulazione-ibrida.html', 'Simulazione: crittografia ibrida', 'con la tua chiave e il tuo messaggio'],
       ['../lab-openssl/scheda.html', 'Lab OpenSSL', 'simmetrica, asimmetrica, ibrida, firme e certificati dei siti'],
+      ['../quiz/quiz.html?modulo=9', 'Quiz del modulo 9', ''],
     ]),
   ].join('\n');
 });

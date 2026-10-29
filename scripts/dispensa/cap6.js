@@ -251,6 +251,7 @@ module.exports = () => capitolo(6, 'DES',
       ['../modulo-6-des/gioco-sdes-a-mano.html', 'Gioco: S-DES a mano', 'chiave e blocco casuali, verifica a ogni passo'],
       ['../schede/sdes-a-mano.html', 'Scheda S-DES a mano', 'da stampare'],
       ['../lab-php/07-des-openssl/scheda.html', 'Lab PHP 07: DES e OpenSSL', 'openssl_encrypt, ECB contro CBC'],
+      ['../quiz/quiz.html?modulo=6', 'Quiz del modulo 6', ''],
     ]),
   ].join('\n');
 });
