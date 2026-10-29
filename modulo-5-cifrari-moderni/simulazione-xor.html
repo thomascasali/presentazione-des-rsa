@@ -88,7 +88,7 @@ function Otp() {
       <div className="small muted">Chiave casuale (hex)</div><div className="out hexbox">{hexSp(k.slice(0, mb.length)) || ' '}</div>
       <div className="small muted">Cifrato (hex)</div><div className="out hexbox hl">{hexSp(cb) || ' '}</div>
       <div className="row"><Btn onClick={() => setKb(casuale(24))}>Nuova chiave</Btn></div>
-      <Box type="warn" title="Attenzione">Se se ne usa la stessa chiave su un secondo messaggio la sicurezza svanisce: C1 ⊕ C2 = M1 ⊕ M2.</Box>
+      <Box type="warn" title="Attenzione">Se si usa la stessa chiave su un secondo messaggio la sicurezza svanisce: C1 ⊕ C2 = M1 ⊕ M2.</Box>
     </div>
   );
 }

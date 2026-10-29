@@ -393,7 +393,7 @@ const slides = [
         <Box type="warn" title="Se n è piccolo">Con n ≤ 2626 si può usare un blocco di una sola lettera: è una semplice sostituzione monoalfabetica, rompibile con le frequenze (modulo 1).</Box>
       </div>
     ),
-    note: 'Codifica scolastica A = 01 … Z = 26: due cifre per lettera, così i blocchi si decodificano senza ambiguità. In RSA vero si cifrano byte, con padding. I valori dello schema (309, 115 → 2851, 1230) sono prodotti dal motore. Il riquadro avverte che un n troppo piccolo rende RSA equivalente a Cesare: la sicurezza sta nella dimensione.' },
+    note: 'Codifica scolastica A = 01 … Z = 26: due cifre per lettera, così i blocchi si decodificano senza ambiguità. In RSA vero si cifrano byte, con padding. I valori dello schema (309, 115 → 2851, 1230) sono prodotti dal motore. Il riquadro avverte che un n troppo piccolo rende RSA equivalente a una sostituzione monoalfabetica: la sicurezza sta nella dimensione.' },
 
   { sezione: 'Messaggi', titolo: 'Prova: cifra, decifra, firma',
     contenuto: () => (
@@ -478,9 +478,9 @@ const slides = [
       <div className="stack-lg">
         <Table mono head={['', 'Esempio', 'RSA-2048']} rows={[
           ['Cifre di n', '4', String(CIFRE_2048)],
-          ['Divisioni per tentativi (circa √n/2)', String(C.fattorizza(3233).tentativi), 'circa 10^' + (CIFRE_RADICE - 1)],
+          ['Divisioni per tentativi (circa √n/2)', String(C.fattorizza(3233).tentativi), 'circa 10^' + CIFRE_RADICE],
         ]} />
-        <Box type="danger" title="Un confronto">Anche a un miliardo di miliardi (10^18) di divisioni al secondo servirebbero circa 10^{CIFRE_RADICE - 19} secondi. L'età dell'universo è circa 4·10^17 secondi.</Box>
+        <Box type="danger" title="Un confronto">Anche a un miliardo di miliardi (10^18) di divisioni al secondo servirebbero circa 10^{CIFRE_RADICE - 18} secondi. L'età dell'universo è circa 4·10^17 secondi.</Box>
         <p className="small muted">Esistono algoritmi molto più rapidi della divisione per tentativi, ma restano impraticabili a questa dimensione: vedi i record di fattorizzazione.</p>
       </div>
     ),
@@ -500,7 +500,7 @@ const slides = [
         <p className="small muted">Fonti: sfide RSA Laboratories; annunci dei team di ricerca (CADO-NFS, INRIA) per RSA-240 e RSA-250.</p>
       </div>
     ),
-    note: 'I dati sono quelli delle sfide pubbliche RSA: RSA-129 (1994, con la sfida lanciata da Martin Gardner nel 1977), RSA-768 (2009), RSA-240 (novembre 2019), RSA-250 (febbraio 2020, circa 2700 anni-core su processori Xeon Gold 6130 a 2,1 GHz). Non sono record assoluti per tutti i tipi di numeri, ma sono i traguardi usati come riferimento. Usate la tabella per mostrare che un salto di 80 bit richiede un lavoro enorme.' },
+    note: 'I dati sono quelli delle sfide pubbliche RSA: RSA-129 (1994, con la sfida lanciata da Martin Gardner nel 1977), RSA-768 (2009), RSA-240 (novembre 2019), RSA-250 (febbraio 2020, circa 2700 anni-core su processori Xeon Gold 6130 a 2,1 GHz). Non sono record assoluti per tutti i tipi di numeri, ma sono i traguardi usati come riferimento. Usate la tabella per mostrare che un salto di circa 60 bit (da RSA-768 a RSA-250) richiede un lavoro enorme.' },
 
   { sezione: 'Sicurezza', titolo: 'Dimensioni consigliate',
     contenuto: () => (

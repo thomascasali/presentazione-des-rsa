@@ -539,11 +539,11 @@ const slides = [
         <ConfrontoFreq />
         <div className="stack">
           <Box type="success" title="Il profilo si appiattisce">L'indice di coincidenza (IC) misura quanto il profilo è «a picchi»: ~0,074 per l'italiano, ~0,038 per lettere casuali. Cesare lo conserva, Vigenère lo abbassa.</Box>
-          <Table mono head={['Lunghezza chiave', 'Chiavi possibili']} rows={[[1, '26'], [4, (26 ** 4).toLocaleString('it-IT')], [8, (26 ** 8).toLocaleString('it-IT')], [12, (26 ** 12).toExponential(1).replace('e+', ' · 10^')]]} />
+          <Table mono head={['Lunghezza chiave', 'Chiavi possibili']} rows={[[1, '26'], [4, (26 ** 4).toLocaleString('it-IT')], [8, (26 ** 8).toLocaleString('it-IT')], [12, (26 ** 12).toExponential(1).replace('.', ',').replace('e+', ' · 10^')]]} />
         </div>
       </Grid>
     ),
-    note: 'Il grafico è calcolato sullo stesso testo di 400 lettere. Cesare traslata il profilo ma ne conserva forma e IC; Vigenère mescola più traslazioni e l\'IC scende verso 0,04-0,05. Lo spazio delle chiavi cresce a 26 elevato alla lunghezza: una forza bruta diventa impraticabile già con 8-10 lettere. La debolezza però non sta nel numero di chiavi, come vedremo.' },
+    note: 'Il grafico è calcolato sullo stesso testo di 400 lettere. Cesare traslata il profilo ma ne conserva forma e IC; Vigenère mescola più traslazioni e l\'IC scende verso 0,04-0,05. Lo spazio delle chiavi cresce a 26 elevato alla lunghezza: una forza bruta diventa impraticabile con chiavi di una dozzina di lettere (a un miliardo di chiavi al secondo, 26^12 richiede circa tre anni). La debolezza però non sta nel numero di chiavi, come vedremo.' },
 
   { sezione: 'Attività', titolo: 'Il gioco dei bigliettini',
     contenuto: () => (
@@ -605,7 +605,7 @@ const slides = [
     ),
     note: 'Cambiate lettera, chiave e posizione $j nel pannello. Provate: $j oltre la lunghezza della chiave, una cifra al posto della lettera, una minuscola. Le righe evidenziate a sinistra producono la tabella a destra.' },
 
-  { sezione: 'Attacco', titolo: 'L\'attacco: due mosse',
+  { sezione: 'Attacco', titolo: 'L\'attacco: tre mosse',
     contenuto: () => (
       <div className="stack-lg">
         <Flow steps={[
@@ -699,7 +699,7 @@ const slides = [
         </Grid>
       </div>
     ),
-    note: 'Tre messaggi: formula, attacco in due mosse, one-time pad come limite teorico. Il laboratorio 03 propone cifratura, decifratura e attacco guidato; il laboratorio 05 approfondisce le frequenze. Il modulo successivo cambia strada: non si sostituiscono le lettere, si cambia l\'ordine.' },
+    note: 'Tre messaggi: formula, attacco in tre mosse, one-time pad come limite teorico. Il laboratorio 03 propone cifratura, decifratura e attacco guidato; il laboratorio 05 approfondisce le frequenze. Il modulo successivo cambia strada: non si sostituiscono le lettere, si cambia l\'ordine.' },
 ];
 
 Deck.mount(slides, { modulo: 3, nome: 'Il cifrario di Vigenère', indice: '../index.html' });

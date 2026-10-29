@@ -517,7 +517,7 @@ const slides = [
         <Box type="info" title="Contare lettere, non caratteri">Se <span className="mono">$j</span> aumentasse anche sugli spazi, il cifrato cambierebbe e non sarebbe più leggibile con la convenzione del corso.</Box>
       </Grid>
     ),
-    note: 'I tre errori più frequenti nel laboratorio. Il primo è lo stesso del modulo 1 (il resto negativo). Il secondo è un errore a tempo di esecuzione: con strict_types e PHP 8 la divisione per zero lancia un\'eccezione. Il terzo produce un cifrato diverso da quello atteso dai test, ma senza segnalare errori: si scopre solo confrontando con un esempio svolto a mano.' },
+    note: 'I tre errori più frequenti nel laboratorio. Il primo è lo stesso del modulo 1 (il resto negativo). Il secondo è un errore a tempo di esecuzione: in PHP 8 il resto della divisione per zero lancia l\'eccezione DivisionByZeroError. Il terzo produce un cifrato diverso da quello atteso dai test, ma senza segnalare errori: si scopre solo confrontando con un esempio svolto a mano.' },
 
   { sezione: 'Attacco', titolo: 'Quante chiavi? 26 alla n',
     contenuto: () => (
@@ -527,7 +527,7 @@ const slides = [
         <Box type="warn" title="Ma attenzione">Il conto vale per chi prova le chiavi una per una. Nella slide sulle colonne si vede che la struttura del cifrario permette di fare molto meglio.</Box>
       </div>
     ),
-    note: 'Il tempo è calcolato supponendo un miliardo di chiavi al secondo, ordine di grandezza di un singolo computer che prova chiavi molto semplici: con una chiave da 8 numeri si passa da secondi a giorni, con 12 a anni. Il numero di chiavi cresce in modo esponenziale con la lunghezza. La prima riga corrisponde a Cesare (26 chiavi, 25 utili). I valori sono calcolati con BigInt nel browser.' },
+    note: 'Il tempo è calcolato supponendo un miliardo di chiavi al secondo, ordine di grandezza di un singolo computer che prova chiavi molto semplici: con 6 numeri bastano meno di un secondo, con 8 circa tre minuti, con 10 circa due giorni, con 12 circa tre anni. Il numero di chiavi cresce in modo esponenziale con la lunghezza. La prima riga corrisponde a Cesare (26 chiavi, 25 utili). I valori sono calcolati con BigInt nel browser.' },
 
   { sezione: 'Attacco', titolo: 'Le frequenze si spalmano',
     contenuto: () => (

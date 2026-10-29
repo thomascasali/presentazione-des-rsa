@@ -237,7 +237,7 @@ function durata(s) {
   return (s / (86400 * 365)).toLocaleString('it-IT', { maximumFractionDigits: 0 }) + ' anni';
 }
 const sepMigliaia = (n) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-const RITMI = [['1 milione di chiavi/s', 1e6], ['1 miliardo di chiavi/s', 1e9], ['92 miliardi di chiavi/s (Deep Crack, dato EFF)', 92e9]];
+const RITMI = [['1 milione di chiavi/s', 1e6], ['1 miliardo di chiavi/s', 1e9], ['90 miliardi di chiavi/s (Deep Crack, dato EFF)', 90e9]];
 
 /* ---------- codice PHP ---------- */
 const CODICE_3DES = `<?php
@@ -304,10 +304,10 @@ const slides = [
     contenuto: () => (
       <div className="stack-lg">
         <Grid cols={2} stretch>
-          <Card tone="danger"><h3>56 bit, non 128</h3><p className="small">Lucifer usava chiavi più lunghe; nello standard la chiave è di 56 bit. Gli studiosi dell\'epoca criticarono la scelta: uno spazio di 2<sup>56</sup> chiavi sarebbe stato attaccabile con hardware dedicato.</p></Card>'
-          <Card tone="warn"><h3>Il ruolo della NSA</h3><p className="small">L\'agenzia collaborò alla revisione e si sospettò un «passaggio segreto». Un\'indagine del Senato USA (1978) non trovò manomissioni dell\'algoritmo.</p></Card>'
+          <Card tone="danger"><h3>56 bit, non 128</h3><p className="small">Lucifer usava chiavi più lunghe; nello standard la chiave è di 56 bit. Gli studiosi dell'epoca criticarono la scelta: uno spazio di 2<sup>56</sup> chiavi sarebbe stato attaccabile con hardware dedicato.</p></Card>
+          <Card tone="warn"><h3>Il ruolo della NSA</h3><p className="small">L'agenzia collaborò alla revisione e si sospettò un «passaggio segreto». Un'indagine del Senato USA (1978) non trovò manomissioni dell'algoritmo.</p></Card>
         </Grid>
-        <Box type="tip" title="Il sospetto che rientrò">Nel 1990 Biham e Shamir scoprirono la crittoanalisi differenziale e si vide che le S-box del DES la resistevano bene. Coppersmith (IBM) raccontò nel 1994 che il team la conosceva già dal 1974 e aveva progettato le S-box di conseguenza.</Box>
+        <Box type="tip" title="Il sospetto che rientrò">Nel 1990 Biham e Shamir resero pubblica la crittoanalisi differenziale e si vide che le S-box del DES le resistevano bene. Coppersmith (IBM) raccontò nel 1994 che il team la conosceva già dal 1974 e aveva progettato le S-box di conseguenza.</Box>
       </div>
     ),
     note: 'Sintetizzare con equilibrio: l\'accorciamento della chiave a 56 bit è un fatto; il sospetto di backdoor nelle S-box non ha trovato conferme e anzi le S-box risultarono ben progettate contro un attacco che il pubblico scoprì solo dopo. Lezione da portare: il principio di Kerckhoffs (modulo 1): l\'algoritmo pubblico ha permesso di analizzarlo per decenni. Riferimenti: Biham-Shamir 1990-91, Coppersmith 1994.' },
@@ -559,7 +559,7 @@ const slides = [
         <Box type="warn" title="Ordini di grandezza">In media si trova la chiave dopo aver provato metà dello spazio: la metà dei tempi indicati. Con hardware specializzato e molti chip in parallelo la ricerca diventa realistica.</Box>
       </div>
     ),
-    note: 'I tempi sono calcolati dividendo 2^56 per la velocità: sono ordini di grandezza, non misure. 92 miliardi di chiavi al secondo è la velocità dichiarata dall\'EFF per Deep Crack (la slide successiva). Confrontare con Cesare: 25 chiavi.' },
+    note: 'I tempi sono calcolati dividendo 2^56 per la velocità: sono ordini di grandezza, non misure. Circa 90 miliardi di chiavi al secondo è la velocità dichiarata dall\'EFF per Deep Crack (la slide successiva). Confrontare con Cesare: 25 chiavi.' },
 
   { sezione: 'Debolezze', titolo: 'Deep Crack, 1998',
     contenuto: () => (
@@ -573,7 +573,7 @@ const slides = [
         <Box type="danger" title="Conclusione">Il DES con una sola chiave a 56 bit non è più sicuro: dimostrazione pubblica che un attacco a forza bruta era alla portata di organizzazioni con pochi mezzi.</Box>
       </div>
     ),
-    note: 'Fonti: Electronic Frontier Foundation (libro «Cracking DES», 1998), RSA Laboratories DES Challenges. Dettagli: Deep Crack aveva circa 1.800 chip dedicati; la data esatta di fine ricerca è il 15 luglio 1998 (annuncio del 17). I numeri sono quelli diffusi dall\'EFF; in caso di dubbio, citare le fonti prima di ripeterli. Insistere sul messaggio: non cambia l\'algoritmo ma la potenza di calcolo disponibile.' },
+    note: 'Fonti: Electronic Frontier Foundation (libro «Cracking DES», 1998), RSA Laboratories DES Challenges. Dettagli: Deep Crack aveva 1.856 chip dedicati; la data esatta di fine ricerca è il 15 luglio 1998 (annuncio del 17). I numeri sono quelli diffusi dall\'EFF; in caso di dubbio, citare le fonti prima di ripeterli. Insistere sul messaggio: non cambia l\'algoritmo ma la potenza di calcolo disponibile.' },
 
   { sezione: 'Successori', titolo: 'Triple DES (3DES)',
     contenuto: () => (
@@ -592,7 +592,7 @@ const slides = [
         <p className="small muted">Con tre chiavi diverse ({TV_KEY}, {K2_3}, {K3_3}) lo stesso blocco diventa <span className="mono hl">{c3}</span>.</p>
       </div>
     ),
-    note: 'Perché non cifrare due volte? Il «meet-in-the-middle» rende il doppio DES poco più forte del singolo (circa 57 bit). Perciò si passa a tre operazioni. Triple DES è rimasto in uso per anni nei circuiti bancari; NIST ne ha progressivamente vietato l\'uso per nuove cifrature (verificare le date più recenti). I valori mostrati sono calcolati da crypto.js e controllati con OpenSSL.' },
+    note: 'Perché non cifrare due volte? Il «meet-in-the-middle» rende il doppio DES poco più forte del singolo (circa 57 bit). Perciò si passa a tre operazioni. Triple DES è rimasto in uso per anni nei circuiti bancari; NIST lo ha dichiarato deprecato nel 2019 (SP 800-131A rev. 2) e dal 2024 non ne ammette più l\'uso per cifrare: resta consentito solo per decifrare dati già cifrati. I valori mostrati sono calcolati da crypto.js e controllati con OpenSSL.' },
 
   { sezione: 'Successori', titolo: 'AES: il successore',
     contenuto: () => (

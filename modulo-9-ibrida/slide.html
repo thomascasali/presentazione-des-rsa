@@ -398,13 +398,13 @@ const slides = [
       <Grid cols={2} className="split-ssh">
         <Code title="terminale" lang="bash" code={COMANDI_SSH} />
         <div className="stack">
-          <Card tone="info"><h3>Server → utente</h3><p className="small">Al primo accesso il client mostra l'impronta della chiave del server e la salva in <span className="mono">known_hosts</span>. Dalle volte successive la confronta.</p></Card>
+          <Card tone="info"><h3>Server → utente</h3><p className="small">Al primo accesso il client mostra l'impronta della chiave del server e la salva in <span className="mono">known_hosts</span>. Alle connessioni successive la confronta.</p></Card>
           <Card tone="accent"><h3>Utente → server</h3><p className="small">Il server sfida il client, che firma con la chiave privata. La privata non viaggia mai.</p></Card>
           <Code title="se la chiave del server cambia" lang="bash" code={SSH_AVVISO} />
         </div>
       </Grid>
     ),
-    note: 'SSH usa gli stessi ingredienti: scambio di chiavi con Diffie-Hellman (di solito su curva25519), cifratura simmetrica (AES o ChaCha20) per i dati, firme per autenticare il server (host key) e l\'utente (chiave in ~/.ssh). Il primo accesso funziona sulla fiducia (trust on first use): chi si connette dovrebbe verificare l\'impronta. L\'avviso REMOTE HOST IDENTIFICATION HAS CHANGED è proprio il segnale di un possibile man-in-the-middle (oppure di un server reinstallato). Mostrate gli studenti il proprio ~/.ssh solo a livello di nomi dei file, mai il contenuto della chiave privata.' },
+    note: 'SSH usa gli stessi ingredienti: scambio di chiavi con Diffie-Hellman (di solito su curva25519), cifratura simmetrica (AES o ChaCha20) per i dati, firme per autenticare il server (host key) e l\'utente (chiave in ~/.ssh). Il primo accesso funziona sulla fiducia (trust on first use): chi si connette dovrebbe verificare l\'impronta. L\'avviso REMOTE HOST IDENTIFICATION HAS CHANGED è proprio il segnale di un possibile man-in-the-middle (oppure di un server reinstallato). Mostrate agli studenti la cartella ~/.ssh solo a livello di nomi dei file, mai il contenuto della chiave privata.' },
 
   { sezione: 'Dove si usa', titolo: 'Email cifrata e firma digitale qualificata',
     contenuto: () => (
@@ -475,7 +475,7 @@ const slides = [
           ['RSA', 'asimmetrico', 'coppia, n = p·q', 'se n si fattorizza; serve ≥ 2048 bit e padding'],
         ]} />
     ),
-    note: 'Tabella di ripasso: potete usarla come quiz orale coprendo una colonna. Dettagli: l\'affine ha 12 valori ammessi per a (coprimi con 26) e 26 per b, quindi 312 chiavi. DES ha chiave di 64 bit di cui 56 utili; nel 1998 una macchina dedicata (EFF) lo ha rotto in pochi giorni. 3DES offre al massimo circa 112 bit di sicurezza e blocchi di 64 bit: oggi è deprecato. ECB cifra blocchi uguali in blocchi uguali, come si vede nel laboratorio OpenSSL. RSA: la sicurezza si basa sulla difficoltà di fattorizzare n; dimensioni consigliate almeno 2048 bit.' },
+    note: 'Tabella di ripasso: potete usarla come quiz orale coprendo una colonna. Dettagli: l\'affine ha 12 valori ammessi per a (coprimi con 26) e 26 per b, quindi 312 chiavi. DES ha chiave di 64 bit di cui 56 utili; nel 1998 una macchina dedicata (EFF) lo ha rotto in 56 ore. 3DES offre al massimo circa 112 bit di sicurezza e blocchi di 64 bit: oggi è deprecato. ECB cifra blocchi uguali in blocchi uguali, come si vede nel laboratorio OpenSSL. RSA: la sicurezza si basa sulla difficoltà di fattorizzare n; dimensioni consigliate almeno 2048 bit.' },
 
   { sezione: 'Riepilogo', titolo: 'Riepilogo e laboratorio',
     contenuto: () => (

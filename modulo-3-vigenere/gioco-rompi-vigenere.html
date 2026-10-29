@@ -51,7 +51,7 @@ const mod26 = (n) => ((n % 26) + 26) % 26;
 // Testi lunghi (300+ lettere): servono molte lettere per colonna perché le frequenze emergano.
 const FRASI = [
   'Per quasi tre secoli il cifrario di Vigenère fu considerato impossibile da violare. Il segreto stava nella chiave: una parola che si ripete sotto il messaggio e cambia lo spostamento a ogni lettera. Ma anche una parola ripetuta lascia delle tracce, perché due frammenti uguali del testo, cifrati con la stessa parte della chiave, producono frammenti uguali. Charles Babbage prima e Friedrich Kasiski poi capirono come usare queste ripetizioni per scoprire la lunghezza della chiave.',
-  'Una rete informatica è un insieme di computer collegati tra loro per scambiarsi dati. Ogni messaggio viene diviso in piccoli pacchetti che attraversano router e switch fino a raggiungere il destinatario. Chi si trova nel mezzo può leggere i pacchetti se non sono protetti, ed è per questo che si usano protocolli cifrati come il sicuro HTTPS e la connessione remota SSH. La cifratura trasforma il contenuto in una sequenza di lettere senza senso.',
+  'Una rete informatica è un insieme di computer collegati tra loro per scambiarsi dati. Ogni messaggio viene diviso in piccoli pacchetti che attraversano router e switch fino a raggiungere il destinatario. Chi si trova nel mezzo può leggere i pacchetti se non sono protetti, ed è per questo che si usano protocolli cifrati come HTTPS e la connessione remota SSH. La cifratura trasforma il contenuto in una sequenza di lettere senza senso.',
   'Durante la seconda guerra mondiale i servizi segreti di molti paesi cercavano di leggere i messaggi del nemico. I tedeschi usavano una macchina chiamata Enigma, che cambiava la cifratura a ogni lettera. A Bletchley Park un gruppo di matematici e ingegneri costruì macchine speciali per provare moltissime chiavi in poco tempo. Il loro lavoro accorciò la guerra e diede inizio all\'informatica moderna.',
   'Il laboratorio di informatica si trova al secondo piano della scuola. Ogni postazione ha un computer collegato alla rete interna e un armadio con i cavi per le prove di cablaggio. Prima di iniziare l\'esercitazione bisogna accendere il server, controllare che gli switch siano in funzione e verificare che tutti i computer riescano a comunicare tra loro. Alla fine della lezione si spegne tutto con attenzione.',
   'Una buona password non deve essere una parola che si trova nel dizionario e non deve contenere il nome di chi la usa. Conviene scegliere una frase lunga e facile da ricordare, magari mescolando lettere maiuscole, numeri e simboli. Non si deve mai usare la stessa password per servizi diversi, perché se un sito viene attaccato i ladri provano subito le stesse credenziali altrove. Un gestore di password aiuta a tenere tutto in ordine.',
@@ -163,7 +163,7 @@ function Gioco() {
         <div><b>{stat.risolti}</b><span>risolti</span></div>
       </div>
       <div className="tabs" role="group" aria-label="Livello">
-        <Btn variant={!difficile ? 'primary' : ''} aria-pressed={!difficile} onClick={() => cambiaLivello('facile')}>Facile (chiave 3-7)</Btn>
+        <Btn variant={!difficile ? 'primary' : ''} aria-pressed={!difficile} onClick={() => cambiaLivello('facile')}>Facile (chiave 3-5 lettere)</Btn>
         <Btn variant={difficile ? 'primary' : ''} aria-pressed={difficile} onClick={() => cambiaLivello('difficile')}>Difficile (gruppi, ×2)</Btn>
       </div>
 
